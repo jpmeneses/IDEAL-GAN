@@ -29,7 +29,7 @@ class ItemPool:
         return tf.stack(out_items, axis=0)
 
 def load_hdf5(ds_dir,hdf5_file,ech_idx):
-    f = h5py.File(dataset_dir + hdf5_file, 'r')
+    f = h5py.File(ds_dir + hdf5_file, 'r')
     acqs = f1['Acquisitions'][...]
     out_maps = f1['OutMaps'][...]
     f.close()
