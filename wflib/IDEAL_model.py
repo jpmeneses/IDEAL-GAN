@@ -1,5 +1,4 @@
 import tensorflow as tf
-import tensorflow_probability as tfp
 import numpy as np
 
 # Multipeak fat model
@@ -95,7 +94,7 @@ def acq_add_te(acqs,out_maps,te_orig,te_mod):
         # return tf.concat([D_xi, tf.ones(D_xi.shape,dtype=tf.complex64)],axis=0)
 
     # Solve for first echo only
-    res = tfp.math.ode.BDF().solve(ode_fn, te_orig[0,0], Smtx[:,0], solution_times=[all_dte[0]], jacobian_fn=jacobian_fn)
+    # res = tfp.math.ode.BDF().solve(ode_fn, te_orig[0,0], Smtx[:,0], solution_times=[all_dte[0]], jacobian_fn=jacobian_fn)
     Smtx_aux = tf.transpose(res.states)
     Smtx_hat = tf.zeros([n_batch*num_voxel, ne-1], dtype=tf.complex64)
     Smtx_hat = tf.concat([Smtx_aux, Smtx_hat], axis=-1)
