@@ -60,6 +60,8 @@ py.arg('--R2_TV_Reg',type=bool, default=False)
 py.arg('--R2_TV_weight', type=float, default=1e-5)
 py.arg('--FM_TV_Reg',type=bool, default=False)
 py.arg('--FM_TV_weight', type=float, default=1e-5)
+py.arg('--FM_L1_Reg',type=bool, default=False)
+py.arg('--FM_L1_weight', type=float, default=1e-5)
 py.arg('--R2_SelfAttention',type=bool, default=False)
 py.arg('--FM_SelfAttention',type=bool, default=True)
 py.arg('--FM_OppCritic',type=bool, default=False)
@@ -244,7 +246,7 @@ D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.be
 # ==============================================================================
 
 @tf.function
-def train_G(A, B, te_A=None, te_B=None):
+def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
     indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
 
@@ -327,6 +329,7 @@ def train_G(A, B, te_A=None, te_B=None):
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B_PM, B2A2B_PM)
 
+        ################ Regularizers #####################
         if args.R2_TV_Reg:
             R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
         else:
@@ -336,8 +339,13 @@ def train_G(A, B, te_A=None, te_B=None):
             FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
         else:
             FM_TV = 0
+
+        if args.FM_L1_Reg:
+            FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight * (1-ep/(args.epochs-1))
+        else:
+            FM_L1 = 0
         
-        G_loss = (A2B_g_loss) + (A2B2A_cycle_loss + args.B2A2B_weight * B2A2B_cycle_loss) * args.cycle_loss_weight + R2_TV + FM_TV
+        G_loss = (A2B_g_loss) + (A2B2A_cycle_loss + args.B2A2B_weight * B2A2B_cycle_loss) * args.cycle_loss_weight + R2_TV + FM_TV + FM_L1
         
     if not(args.Res_model):
         G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
@@ -430,8 +438,8 @@ def train_D(B_R2, B_FM, A2B_R2, A2B_FM, A=None, B2A=None):
                 'D_A_r2': D_A_r2,}
 
 
-def train_step(A, B, te_A=None, te_B=None):
-    A2B, B2A, G_loss_dict = train_G(A, B, te_A, te_B)
+def train_step(A, B, te_A=None, te_B=None, ep=args.epochs):
+    A2B, B2A, G_loss_dict = train_G(A, B, te_A, te_B, ep)
 
     # B split
     indices =tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
@@ -583,9 +591,9 @@ for ep in range(args.epochs):
             else:
                 te_var_A = None
             te_var_B = wf.gen_TEvar(args.n_echoes,args.batch_size)
-            G_loss_dict, D_loss_dict = train_step(A, B, te_var_A, te_var_B)
+            G_loss_dict, D_loss_dict = train_step(A, B, te_var_A, te_var_B, ep)
         else:
-            G_loss_dict, D_loss_dict = train_step(A, B)
+            G_loss_dict, D_loss_dict = train_step(A, B, ep)
 
         if args.lr_step and (G_optimizer.iterations.numpy() % (args.ep_step*len_dataset) == 0):
             G_lr_scheduler.current_learning_rate = G_lr_scheduler.current_learning_rate * args.cnst_step
