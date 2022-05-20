@@ -593,7 +593,7 @@ for ep in range(args.epochs):
             te_var_B = wf.gen_TEvar(args.n_echoes,args.batch_size)
             G_loss_dict, D_loss_dict = train_step(A, B, te_var_A, te_var_B, ep)
         else:
-            G_loss_dict, D_loss_dict = train_step(A, B, ep)
+            G_loss_dict, D_loss_dict = train_step(A, B, ep=ep)
 
         if args.lr_step and (G_optimizer.iterations.numpy() % (args.ep_step*len_dataset) == 0):
             G_lr_scheduler.current_learning_rate = G_lr_scheduler.current_learning_rate * args.cnst_step
