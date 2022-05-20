@@ -1,0 +1,21 @@
+2022-05-20 06:44:10.429241: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+2022-05-20 06:44:18.382599: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcuda.so.1
+2022-05-20 06:44:18.813832: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1716] Found device 0 with properties: 
+pciBusID: 0000:1d:00.0 name: Quadro RTX 8000 computeCapability: 7.5
+coreClock: 1.77GHz coreCount: 72 deviceMemorySize: 47.43GiB deviceMemoryBandwidth: 625.94GiB/s
+2022-05-20 06:44:18.813895: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+2022-05-20 06:44:18.861010: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcublas.so.10
+2022-05-20 06:44:18.877799: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcufft.so.10
+2022-05-20 06:44:18.899295: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcurand.so.10
+2022-05-20 06:44:18.937266: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcusolver.so.10
+2022-05-20 06:44:18.956103: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcusparse.so.10
+2022-05-20 06:44:19.079100: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudnn.so.7
+2022-05-20 06:44:19.091783: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1858] Adding visible gpu devices: 0
+Traceback (most recent call last):
+  File "train-IDEAL.py", line 12, in <module>
+    import wflib as wf
+  File "/home4/jpmeneses/IDEAL-GAN/wflib/__init__.py", line 1, in <module>
+    from wflib.IDEAL_model import *
+  File "/home4/jpmeneses/IDEAL-GAN/wflib/IDEAL_model.py", line 2, in <module>
+    import tensorflow_probability as tfp
+ModuleNotFoundError: No module named 'tensorflow_probability'
