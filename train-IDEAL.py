@@ -10,8 +10,6 @@ import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
 import wflib as wf
-import tqdm
-import h5py
 
 import data
 import module
