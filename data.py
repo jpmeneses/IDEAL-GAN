@@ -30,8 +30,8 @@ class ItemPool:
 
 def load_hdf5(ds_dir,hdf5_file,ech_idx):
     f = h5py.File(ds_dir + hdf5_file, 'r')
-    acqs = f1['Acquisitions'][...]
-    out_maps = f1['OutMaps'][...]
+    acqs = f['Acquisitions'][...]
+    out_maps = f['OutMaps'][...]
     f.close()
 
     idxs_list = []
