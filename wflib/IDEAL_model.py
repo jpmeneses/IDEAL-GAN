@@ -305,7 +305,7 @@ def get_rho(acqs,param_maps,te=None):
         te = tf.expand_dims(te,0)
         te = tf.tile(te,[n_batch,1])
 
-    ne = len(te)
+    ne = te.shape[1]
     M, M_pinv = gen_M(te)
 
     te_complex = tf.complex(0.0,te)
