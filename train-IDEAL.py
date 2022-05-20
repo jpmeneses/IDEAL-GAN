@@ -93,100 +93,19 @@ r2_sc,fm_sc = 200.0,300.0
 ############################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1)
+
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2)
+
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3)
+
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4)
+
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-
-############################################################
-################### LOAD DATASET 1 #########################
-############################################################
-f1 = h5py.File(dataset_dir + dataset_hdf5_1, 'r')
-acqs_1 = f1['Acquisitions'][...]
-out_maps_1 = f1['OutMaps'][...]
-f1.close()
-
-idxs_list_1 = []
-for nd in range(len(acqs_1)):
-  if np.sum(acqs_1[nd,:,:,1])!=0.0:
-    idxs_list_1.append(nd)
-
-acqs_1 = acqs_1[idxs_list_1,:,:,:ech_idx]
-out_maps_1 = out_maps_1[idxs_list_1,:,:,:]
-
-print('Num. Elements- DS1:', len(acqs_1))
-
-############################################################
-################### LOAD DATASET 2 #########################
-############################################################
-f2 = h5py.File(dataset_dir + dataset_hdf5_2, 'r')
-acqs_2 = f2['Acquisitions'][...]
-out_maps_2 = f2['OutMaps'][...]
-f2.close()
-
-idxs_list_2 = []
-for nd in range(len(acqs_2)):
-  if np.sum(acqs_2[nd,:,:,1])!=0.0:
-    idxs_list_2.append(nd)
-
-acqs_2 = acqs_2[idxs_list_2,:,:,:ech_idx]
-out_maps_2 = out_maps_2[idxs_list_2,:,:,:]
-
-print('Num. Elements- DS2:', len(acqs_2))
-
-############################################################
-################### LOAD DATASET 3 #########################
-############################################################
-f3 = h5py.File(dataset_dir + dataset_hdf5_3, 'r')
-acqs_3 = f3['Acquisitions'][...]
-out_maps_3 = f3['OutMaps'][...]
-f3.close()
-
-idxs_list_3 = []
-for nd in range(len(acqs_3)):
-  if np.sum(acqs_3[nd,:,:,1])!=0.0:
-    idxs_list_3.append(nd)
-
-acqs_3 = acqs_3[idxs_list_3,:,:,:ech_idx]
-out_maps_3 = out_maps_3[idxs_list_3,:,:,:]
-
-print('Num. Elements- DS3:', len(acqs_3))
-
-############################################################
-################### LOAD DATASET 4 #########################
-############################################################
-f4 = h5py.File(dataset_dir + dataset_hdf5_4, 'r')
-acqs_4 = f4['Acquisitions'][...]
-out_maps_4 = f4['OutMaps'][...]
-f4.close()
-
-idxs_list_4 = []
-for nd in range(len(acqs_4)):
-  if np.sum(acqs_4[nd,:,:,1])!=0.0:
-    idxs_list_4.append(nd)
-
-acqs_4 = acqs_4[idxs_list_4,:,:,:ech_idx]
-out_maps_4 = out_maps_4[idxs_list_4,:,:,:]
-
-print('Num. Elements- DS4:', len(acqs_4))
-
-############################################################
-################### LOAD DATASET 5 #########################
-############################################################
-f5 = h5py.File(dataset_dir + dataset_hdf5_5, 'r')
-acqs_5 = f5['Acquisitions'][...]
-out_maps_5 = f5['OutMaps'][...]
-f5.close()
-
-idxs_list_5 = []
-for nd in range(len(acqs_5)):
-  if np.sum(acqs_5[nd,:,:,1])!=0.0:
-    idxs_list_5.append(nd)
-
-acqs_5 = acqs_5[idxs_list_5,:,:,:ech_idx]
-out_maps_5 = out_maps_5[idxs_list_5,:,:,:]
-
-print('Num. Elements- DS5:', len(acqs_5))
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5)
 
 ############################################################
 ################# DATASET PARTITIONS #######################
