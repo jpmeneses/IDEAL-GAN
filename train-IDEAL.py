@@ -298,7 +298,7 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
                       'A2B2A_cycle_loss': A2B2A_cycle_loss,
                       'B2A2B_cycle_loss': B2A2B_cycle_loss,
                       'TV_R2': R2_TV,
-                      'TV_FM': FM_TV
+                      'TV_FM': FM_TV,
                       'L1_FM': FM_L1}
 
 
