@@ -67,8 +67,6 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 A2B_R2_pool = data.ItemPool(args.pool_size)
 A2B_FM_pool = data.ItemPool(args.pool_size)
-if args.Res_model:
-    B2A_pool = data.ItemPool(args.pool_size)
 
 ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200.0,300.0
@@ -228,9 +226,6 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
             A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM)
         else:
             A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,te=te_A)
-        if args.Res_model:
-            A2B2A = R_B2A(A2B2A, training=True)
-            A2B2A = tf.where(A!=0.0,A2B2A,0.0)
         A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
         ##################### B Cycle #####################
@@ -239,10 +234,6 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
 
         B2A = wf.IDEAL_model(B,echoes,te=te_B)
-        if args.Res_model:
-            B2A = R_B2A(B2A, training=True)
-            B_aux = tf.tile(B,tf.constant([1,1,1,2],dtype=tf.int32))
-            B2A = tf.where(B_aux[:,:,:,:(2*echoes)]!=0.0,B2A,0.0)
         if not(args.te_input):
             B2A2B_PM = G_A2B(B2A, training=True)
         elif te_B is not(None):
@@ -268,11 +259,6 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         A2B_FM_g_loss = g_loss_fn(A2B_FM_d_logits)
 
         A2B_g_loss = args.R2_critic_weight * A2B_R2_g_loss + A2B_FM_g_loss
-
-        if args.Res_model:
-            B2A_d_logits = D_A(B2A, training=True)
-            B2A_g_loss = g_loss_fn(B2A_d_logits)
-            A2B_g_loss += B2A_g_loss
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -286,12 +272,8 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         
         G_loss = (A2B_g_loss) + (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + reg_term
         
-    if not(args.Res_model):
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
-    else:
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables + R_B2A.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables + R_B2A.trainable_variables))
+    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
     return A2B, B2A, {'A2B_R2_g_loss': A2B_R2_g_loss,
                       'A2B_FM_g_loss': A2B_FM_g_loss,
@@ -303,7 +285,7 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
 
 
 @tf.function
-def train_D(B_R2, B_FM, A2B_R2, A2B_FM, A=None, B2A=None):
+def train_D(B_R2, B_FM, A2B_R2, A2B_FM,):
     with tf.GradientTape() as t:
         # R2*
         B_R2_d_logits = D_B_R2(B_R2, training=True)
@@ -328,54 +310,20 @@ def train_D(B_R2, B_FM, A2B_R2, A2B_FM, A=None, B2A=None):
         D_FM_loss = (B_FM_d_loss + A2B_FM_d_loss) + (D_B_FM_gp) * args.gradient_penalty_weight + (D_B_FM_r1) * args.R1_reg_weight + (D_B_FM_r2) * args.R2_reg_weight
         D_loss = args.R2_critic_weight * D_R2_loss + D_FM_loss
 
-        if (A is not(None)) and (B2A is not(None)):
-            A_d_logits = D_A(A, training=True)
-            B2A_d_logits = D_A(B2A, training=True)
-            A_d_loss, B2A_d_loss = d_loss_fn(A_d_logits, B2A_d_logits)
-            
-            D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, B2A, mode=args.gradient_penalty_mode)
-            D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
-            D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), B2A)
-
-            D_A_loss = (A_d_loss + B2A_d_loss) + (D_A_gp) * args.gradient_penalty_weight + (D_A_r1) * args.R1_reg_weight + (D_A_r2) * args.R2_reg_weight
-            D_loss += D_A_loss
-
-    if (A is None) or (B2A is None):
-        D_grad = t.gradient(D_loss, D_B_R2.trainable_variables + D_B_FM.trainable_variables)
-        D_optimizer.apply_gradients(zip(D_grad, D_B_R2.trainable_variables + D_B_FM.trainable_variables))
-        return {'R2_d_loss': B_R2_d_loss + A2B_R2_d_loss,
-                'B_R2_d_loss': B_R2_d_loss,
-                'A2B_R2_d_loss': A2B_R2_d_loss,
-                'FM_d_loss': B_FM_d_loss + A2B_FM_d_loss,
-                'B_FM_d_loss': B_FM_d_loss,
-                'A2B_FM_d_loss': A2B_FM_d_loss,
-                'D_B_R2_gp': D_B_R2_gp,
-                'D_B_FM_gp': D_B_FM_gp,
-                'D_B_R2_r1': D_B_R2_r1,
-                'D_B_FM_r1': D_B_FM_r1,
-                'D_B_R2_r2': D_B_R2_r2,
-                'D_B_FM_r2': D_B_FM_r2,}
-    else:
-        D_grad = t.gradient(D_loss, D_B_R2.trainable_variables + D_B_FM.trainable_variables + D_A.trainable_variables)
-        D_optimizer.apply_gradients(zip(D_grad, D_B_R2.trainable_variables + D_B_FM.trainable_variables + D_A.trainable_variables))
-        return {'R2_d_loss': B_R2_d_loss + A2B_R2_d_loss,
-                'B_R2_d_loss': B_R2_d_loss,
-                'A2B_R2_d_loss': A2B_R2_d_loss,
-                'FM_d_loss': B_FM_d_loss + A2B_FM_d_loss,
-                'B_FM_d_loss': B_FM_d_loss,
-                'A2B_FM_d_loss': A2B_FM_d_loss,
-                'A_all_d_loss': A_d_loss + B2A_d_loss,
-                'A_d_loss': A_d_loss,
-                'B2A_d_loss': B2A_d_loss,
-                'D_B_R2_gp': D_B_R2_gp,
-                'D_B_FM_gp': D_B_FM_gp,
-                'D_A_gp': D_A_gp,
-                'D_B_R2_r1': D_B_R2_r1,
-                'D_B_FM_r1': D_B_FM_r1,
-                'D_A_r1': D_A_r1,
-                'D_B_R2_r2': D_B_R2_r2,
-                'D_B_FM_r2': D_B_FM_r2,
-                'D_A_r2': D_A_r2,}
+    D_grad = t.gradient(D_loss, D_B_R2.trainable_variables + D_B_FM.trainable_variables)
+    D_optimizer.apply_gradients(zip(D_grad, D_B_R2.trainable_variables + D_B_FM.trainable_variables))
+    return {'R2_d_loss': B_R2_d_loss + A2B_R2_d_loss,
+            'B_R2_d_loss': B_R2_d_loss,
+            'A2B_R2_d_loss': A2B_R2_d_loss,
+            'FM_d_loss': B_FM_d_loss + A2B_FM_d_loss,
+            'B_FM_d_loss': B_FM_d_loss,
+            'A2B_FM_d_loss': A2B_FM_d_loss,
+            'D_B_R2_gp': D_B_R2_gp,
+            'D_B_FM_gp': D_B_FM_gp,
+            'D_B_R2_r1': D_B_R2_r1,
+            'D_B_FM_r1': D_B_FM_r1,
+            'D_B_R2_r2': D_B_R2_r2,
+            'D_B_FM_r2': D_B_FM_r2,}
 
 
 def train_step(A, B, te_A=None, te_B=None, ep=args.epochs):
@@ -397,14 +345,9 @@ def train_step(A, B, te_A=None, te_B=None, ep=args.epochs):
     # cannot autograph `A2B_pool`
     A2B_R2 = A2B_R2_pool(A2B_R2)
     A2B_FM = A2B_FM_pool(A2B_FM)
-    if args.Res_model:
-        B2A = B2A_pool(B2A)
 
     for _ in range(5):
-        if not(args.Res_model):
-            D_loss_dict = train_D(B_R2, B_FM, A2B_R2, A2B_FM)
-        else:
-            D_loss_dict = train_D(B_R2, B_FM, A2B_R2, A2B_FM, A, B2A)
+        D_loss_dict = train_D(B_R2, B_FM, A2B_R2, A2B_FM)
 
     return G_loss_dict, D_loss_dict
 
@@ -431,18 +374,11 @@ def sample(A, B, te_B=None):
     # A2B Mask
     A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
     A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM)
-    if args.Res_model:
-        A2B2A = R_B2A(A2B2A, training=False)
-        A2B2A = tf.where(A!=0.0,A2B2A,0.0)
     A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
     B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
     B2A = wf.IDEAL_model(B,echoes,te=te_B)
-    if args.Res_model:
-        B2A = R_B2A(B2A, training=False)
-        B_aux = tf.tile(B,tf.constant([1,1,1,2],dtype=tf.int32))
-        B2A = tf.where(B_aux[:,:,:,:(2*echoes)]!=0.0,B2A,0.0)
     if not(args.te_input):
         B2A2B_PM = G_A2B(B2A, training=False)
     else:
