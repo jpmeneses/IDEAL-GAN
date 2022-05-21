@@ -168,15 +168,12 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-D_B_R2 = module.PatchGAN_vConv1(input_shape=(hgt,wdt,1),
-                                dim=args.n_D_filters,
-                                n_layers=1,
-                                self_attention=args.R2_SelfAttention)
+D_B_R2= module.PatchGAN(input_shape=(hgt,wdt,1),
+                        dim=args.n_D_filters,
+                        self_attention=(args.R2_SelfAttention))
 
 D_B_FM= module.PatchGAN(input_shape=(hgt,wdt,1),
                         dim=args.n_D_filters,
-                        n_downsamplings=3,
-                        n_kernel=4,
                         self_attention=(args.FM_SelfAttention))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
