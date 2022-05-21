@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL.py --dataset 'IDEAL-GAN-002' --FM_D_model 'PatchGAN' --R2_D_model 'PatchGAN' --n_G_filters 32 --n_D_filters 64 --batch_size 4 --epochs 50 --epoch_decay 50 --lr 0.0001 --cycle_loss_weight 100.0 --B2A2B_weight 0.1 --R2_critic_weight 1.0 -FM_L1_weight 0.0001
+python train-IDEAL.py --dataset 'IDEAL-GAN-002' --n_G_filters 32 --n_D_filters 64 --batch_size 4 --epochs 50 --epoch_decay 50 --lr 0.0001 --cycle_loss_weight 100.0 --B2A2B_weight 0.1 --R2_critic_weight 1.0 -FM_L1_weight 0.0001
