@@ -169,7 +169,7 @@ else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 D_B_R2 = module.PatchGAN_vConv1(input_shape=(hgt,wdt,1),
-                                dim=args.n_filters,
+                                dim=args.n_D_filters,
                                 n_layers=1,
                                 self_attention=args.R2_SelfAttention)
 
