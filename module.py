@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow.keras as keras
+import complex_utils
 
 from tensorflow.keras.layers import Layer, InputSpec
 import tensorflow.keras.backend as K
@@ -229,49 +230,6 @@ def PatchGAN_vConv1(input_shape,
     # 3
     conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(1, 1, strides=1, padding='same', kernel_initializer='glorot_normal'))
     h = conv2d(h)
-
-    return keras.Model(inputs=inputs, outputs=h)
-
-def ConvDiscriminator(input_shape,
-                      dim=64,
-                      n_downsamplings=3,
-                      in_kernel=4,
-                      n_kernel=4,
-                      self_attention=True,
-                      norm='instance_norm'):
-    dim_ = dim
-    Norm = _get_norm_layer(norm)
-
-    # 0
-    h = inputs = keras.Input(shape=input_shape)
-
-    # 1
-    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, in_kernel, strides=2, padding='same', kernel_initializer='he_normal'))
-    h = conv2d(h)
-    h = tf.nn.leaky_relu(h, alpha=0.2)
-
-    for _ in range(n_downsamplings - 1):
-        dim = min(dim * 2, dim_ * 16)
-        conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=2, padding='same', use_bias=False, kernel_initializer='he_normal'))
-        h = conv2d(h)
-        h = Norm()(h)
-        h = tf.nn.leaky_relu(h, alpha=0.2)
-
-    # 2
-    dim = min(dim * 2, dim_ * 16)
-    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=1, padding='same', use_bias=False, kernel_initializer='he_normal'))
-    h = conv2d(h)
-    h = Norm()(h)
-    h = tf.nn.leaky_relu(h, alpha=0.2)
-
-    # Self-attention
-    if self_attention:
-        h = SelfAttention(ch=dim)(h)
-
-    # 3
-    h = tf.keras.layers.Flatten()(h)
-    dense = tfa.layers.SpectralNormalization(keras.layers.Dense(1, use_bias=False, kernel_initializer='glorot_normal'))
-    h = dense(h)
 
     return keras.Model(inputs=inputs, outputs=h)
 
@@ -599,6 +557,85 @@ def PM_Generator(
         return keras.Model(inputs=[inputs,inputs2], outputs=outputs)
     else:
         return keras.Model(inputs=inputs, outputs=outputs)
+
+def PM_complex(
+    input_shape,
+    te_input=False,
+    te_shape=(6,),
+    filters=72,
+    num_layers=4,
+    self_attention=False,
+    norm='instance_norm'):
+    
+    Norm = _get_norm_layer(norm)
+
+    def _conv2d_block(
+        inputs,
+        filters=16,
+        kernel_size=(3, 3),
+        kernel_initializer="he_normal",
+    ):
+        c = complex_utils.complex_conv(
+            inputs,
+            filters,
+            kernel_size,
+            use_bias=False,
+            use_cReLU=True,
+            kernel_initializer=kernel_initializer)
+        c = Norm()(c)
+        c = complex_utils.complex_conv(
+            c,
+            filters,
+            kernel_size,
+            stride=2,
+            use_bias=False,
+            use_cReLU=True,
+            kernel_initializer=kernel_initializer)
+        c = Norm()(c)
+        return c
+
+    x = inputs = keras.Input(input_shape)
+    if te_input:
+        te = inputs2 = keras.Input(te_shape)
+
+    down_layers = []
+    for l in range(num_layers):
+        x = _conv2d_block(
+            inputs=x,
+            filters=filters,
+            )
+
+        # if te_input:
+            # Fully-connected network for processing the vector with echo-times
+            # y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
+            # Adaptive Instance Normalization for Style-Trasnfer
+            # x = AdaIN(x, y)
+        
+        filters = filters * 2  # double the number of filters with each layer
+
+    x = _conv2d_block(
+        inputs=x,
+        filters=filters,
+        )
+
+    for conv in reversed(down_layers):
+        filters //= 2  # decreasing number of filters with each layer
+        x = complex_utils.complex_conv_transpose(x, filters, (2,2), (2,2))
+
+        x = keras.layers.concatenate([x, conv])
+        # if self_attention and cont == 0:
+        #     x = SelfAttention(ch=2*filters)(x)
+        x = _conv2d_block(
+            inputs=x,
+            filters=filters
+            )
+
+    output = complex_utils.complex_conv(x2, 1, (1, 1), kernel_initializer='glorot_normal')
+
+    if te_input:
+        return keras.Model(inputs=[inputs,inputs2], outputs=output)
+    else:
+        return keras.Model(inputs=inputs, outputs=output)
 
 # ==============================================================================
 # =                          learning rate scheduler                           =

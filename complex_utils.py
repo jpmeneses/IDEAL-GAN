@@ -6,14 +6,14 @@ import tensorflow as tf
 
 def complex_conv(
     tf_input, num_features, kernel_size, stride=1, data_format="channels_last", dilation_rate=(1, 1), use_bias=True,
-    kernel_initializer=None, kernel_regularizer=None, bias_regularizer=None,
+    use_cReLU=True, kernel_initializer=None, kernel_regularizer=None, bias_regularizer=None,
     activity_regularizer=None, kernel_constraint=None, bias_constraint=None, trainable=True
 ):
     # allocate half the features to real, half to imaginary
     num_features = num_features // 2
 
-    tf_real = tf.real(tf_input)
-    tf_imag = tf.imag(tf_input)
+    tf_real = tf.math.real(tf_input)
+    tf_imag = tf.math.imag(tf_input)
 
     with tf.variable_scope(None, default_name="complex_conv2d"):
         tf_real_real = tf.layers.conv2d(
@@ -92,20 +92,23 @@ def complex_conv(
         )
     real_out = tf_real_real - tf_imag_imag
     imag_out = tf_imag_real + tf_real_imag
+    if use_cReLU:
+        real_out = tf.nn.relu(real_out)
+        imag_out = tf.nn.relu(imag_out)
     tf_output = tf.complex(real_out, imag_out)
 
     return tf_output
 
 
 def complex_conv_transpose(tf_input, num_features, kernel_size, stride, data_format="channels_last", use_bias=True,
-                           kernel_initializer=None, kernel_regularizer=None, bias_regularizer=None,
+                           use_cReLU=True, kernel_initializer=None, kernel_regularizer=None, bias_regularizer=None,
                            activity_regularizer=None, kernel_constraint=None, bias_constraint=None, trainable=True
                            ):
     # allocate half the features to real, half to imaginary
     # num_features = num_features // 2
 
-    tf_real = tf.real(tf_input)
-    tf_imag = tf.imag(tf_input)
+    tf_real = tf.math.real(tf_input)
+    tf_imag = tf.math.imag(tf_input)
 
     with tf.variable_scope(None, default_name="complex_conv2d"):
         tf_real_real = tf.layers.conv2d_transpose(
@@ -180,6 +183,9 @@ def complex_conv_transpose(tf_input, num_features, kernel_size, stride, data_for
         )
     real_out = tf_real_real - tf_imag_imag
     imag_out = tf_imag_real + tf_real_imag
+    if use_cReLU:
+        real_out = tf.nn.relu(real_out)
+        imag_out = tf.nn.relu(imag_out)
     tf_output = tf.complex(real_out, imag_out)
 
     return tf_output
@@ -193,8 +199,8 @@ def complex_conv1d(
     # allocate half the features to real, half to imaginary
     num_features = num_features // 2
 
-    tf_real = tf.real(tf_input)
-    tf_imag = tf.imag(tf_input)
+    tf_real = tf.math.real(tf_input)
+    tf_imag = tf.math.imag(tf_input)
 
     with tf.variable_scope(None, default_name="complex_conv1d"):
         tf_real_real = tf.layers.conv1d(
@@ -325,8 +331,8 @@ def modrelu(x, data_format="channels_last"):
     # relu(|z|+b) * (z / |z|)
     norm = tf.abs(x)
     scale = tf.nn.relu(norm + bias) / (norm + 1e-6)
-    output = tf.complex(tf.real(x) * scale,
-                        tf.imag(x) * scale)
+    output = tf.complex(tf.math.real(x) * scale,
+                        tf.math.imag(x) * scale)
 
     return output
 
@@ -334,7 +340,7 @@ def modrelu(x, data_format="channels_last"):
 def cardioid(x):
     phase = tf.angle(x)
     scale = 0.5 * (1 + tf.cos(phase))
-    output = tf.complex(tf.real(x) * scale, tf.imag(x) * scale)
+    output = tf.complex(tf.math.real(x) * scale, tf.math.imag(x) * scale)
     # output = 0.5*(1+tf.cos(phase))*z
 
     return output

@@ -24,30 +24,19 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
+py.arg('--complex_data', type=bool, default=True)
 py.arg('--G_model', default='encod-decod', choices=['encod-decod','U-Net','MEBCRN'])
 py.arg('--te_input', type=bool, default=False)
 py.arg('--acqs_DataAug', type=bool, default=True)
-py.arg('--R2_D_model', default='ConvDiscriminator', choices=['ConvDiscriminator','PatchGAN','PatchGAN_vConv1'])
-py.arg('--FM_D_model', default='ConvDiscriminator', choices=['ConvDiscriminator','PatchGAN','PatchGAN_vConv1'])
 py.arg('--n_G_filters', type=int, default=72)
 py.arg('--n_D_filters', type=int, default=72)
-py.arg('--Res_model', type=bool, default=False)
-py.arg('--res_filters', type=int, default=64)
 py.arg('--frac_labels', type=bool, default=False)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=200)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
 py.arg('--lr', type=float, default=0.0002)
-py.arg('--lr_step', type=bool, default=False)
-py.arg('--ep_step',type=int, default=15)
-py.arg('--cnst_step', type=float, default=0.1)
 py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
-py.arg('--D_R2_ink', type=int, default=4)
-py.arg('--D_R2_nk', type=int, default=4)
-py.arg('--D_FM_nk', type=int, default=4)
-py.arg('--D_R2_nds', type=int, default=3)
-py.arg('--D_FM_nds', type=int, default=4)
 py.arg('--adversarial_loss_mode', default='wgan', choices=['gan', 'hinge_v1', 'hinge_v2', 'lsgan', 'wgan'])
 py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
 py.arg('--gradient_penalty_weight', type=float, default=10.0)
@@ -56,15 +45,11 @@ py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--cycle_loss_weight', type=float, default=10.0)
 py.arg('--B2A2B_weight', type=float, default=1.0)
 py.arg('--R2_critic_weight', type=float, default=1.0)
-py.arg('--R2_TV_Reg',type=bool, default=False)
-py.arg('--R2_TV_weight', type=float, default=1e-5)
-py.arg('--FM_TV_Reg',type=bool, default=False)
-py.arg('--FM_TV_weight', type=float, default=1e-5)
-py.arg('--FM_L1_Reg',type=bool, default=False)
-py.arg('--FM_L1_weight', type=float, default=1e-5)
+py.arg('--R2_TV_weight', type=float, default=0.0)
+py.arg('--FM_TV_weight', type=float, default=0.0)
+py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--R2_SelfAttention',type=bool, default=False)
 py.arg('--FM_SelfAttention',type=bool, default=True)
-py.arg('--FM_OppCritic',type=bool, default=False)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
 args = py.args()
 
@@ -185,52 +170,16 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-if args.R2_D_model == 'ConvDiscriminator':
-    D_B_R2  =  module.ConvDiscriminator(input_shape=(hgt,wdt,1),
-                                        dim=args.n_D_filters,
-                                        n_downsamplings=args.D_R2_nds,
-                                        n_kernel=args.D_R2_nk,
-                                        self_attention=args.R2_SelfAttention)
-elif args.R2_D_model == 'PatchGAN':
-    D_B_R2= module.PatchGAN(input_shape=(hgt,wdt,1),
-                            dim=args.n_D_filters,
-                            n_downsamplings=args.D_R2_nds,
-                            in_kernel=args.D_R2_ink,
-                            n_kernel=args.D_R2_nk,
-                            self_attention=args.R2_SelfAttention)
+D_B_R2 = module.PatchGAN_vConv1(input_shape=(hgt,wdt,1),
+                                dim=args.n_filters,
+                                n_layers=1,
+                                self_attention=args.R2_SelfAttention)
 
-elif args.R2_D_model == 'PatchGAN_vConv1':
-    D_B_R2 = module.PatchGAN_vConv1(input_shape=(hgt,wdt,1),
-                                    dim=args.n_filters,
-                                    n_layers=args.D_R2_nds,
-                                    self_attention=args.R2_SelfAttention)
-
-if args.FM_D_model == 'ConvDiscriminator':
-    D_B_FM  =  module.ConvDiscriminator(input_shape=(hgt,wdt,1),
-                                        dim=args.n_D_filters,
-                                        n_downsamplings=args.D_FM_nds,
-                                        in_kernel=args.D_R2_ink,
-                                        n_kernel=args.D_FM_nk,
-                                        self_attention=(args.FM_SelfAttention^args.FM_OppCritic))
-elif args.FM_D_model == 'PatchGAN':
-    D_B_FM= module.PatchGAN(input_shape=(hgt,wdt,1),
-                            dim=args.n_D_filters,
-                            n_downsamplings=args.D_FM_nds,
-                            n_kernel=args.D_FM_nk,
-                            self_attention=(args.FM_SelfAttention^args.FM_OppCritic))
-
-if args.Res_model:
-    R_B2A = custom_unet(input_shape=(hgt,wdt,d_ech),
-                        num_classes=d_ech,
-                        dropout=0.0,
-                        use_attention=True,
-                        filters=48,
-                        num_layers=4,
-                        output_activation='tanh')
-    D_A =  module.ConvDiscriminator(input_shape=(hgt,wdt,d_ech),
-                                    dim=args.res_filters,
-                                    n_downsamplings=4,
-                                    self_attention=True)
+D_B_FM= module.PatchGAN(input_shape=(hgt,wdt,1),
+                        dim=args.n_D_filters,
+                        n_downsamplings=3,
+                        n_kernel=4,
+                        self_attention=(args.FM_SelfAttention))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanAbsoluteError()
@@ -330,22 +279,12 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         B2A2B_cycle_loss = cycle_loss_fn(B_PM, B2A2B_PM)
 
         ################ Regularizers #####################
-        if args.R2_TV_Reg:
-            R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
-        else:
-            R2_TV = 0
-
-        if args.FM_TV_Reg:
-            FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
-        else:
-            FM_TV = 0
-
-        if args.FM_L1_Reg:
-            FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight * (1-ep/(args.epochs-1))
-        else:
-            FM_L1 = 0
+        R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
+        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
+        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight * (1-ep/(args.epochs-1))
+        reg_term = R2_TV + FM_TV + FM_L1
         
-        G_loss = (A2B_g_loss) + (A2B2A_cycle_loss + args.B2A2B_weight * B2A2B_cycle_loss) * args.cycle_loss_weight + R2_TV + FM_TV + FM_L1
+        G_loss = (A2B_g_loss) + (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + reg_term
         
     if not(args.Res_model):
         G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
@@ -359,7 +298,8 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
                       'A2B2A_cycle_loss': A2B2A_cycle_loss,
                       'B2A2B_cycle_loss': B2A2B_cycle_loss,
                       'TV_R2': R2_TV,
-                      'TV_FM': FM_TV}
+                      'TV_FM': FM_TV
+                      'L1_FM': FM_L1}
 
 
 @tf.function
@@ -594,13 +534,6 @@ for ep in range(args.epochs):
             G_loss_dict, D_loss_dict = train_step(A, B, te_var_A, te_var_B, ep)
         else:
             G_loss_dict, D_loss_dict = train_step(A, B, ep=ep)
-
-        if args.lr_step and (G_optimizer.iterations.numpy() % (args.ep_step*len_dataset) == 0):
-            G_lr_scheduler.current_learning_rate = G_lr_scheduler.current_learning_rate * args.cnst_step
-            D_lr_scheduler.current_learning_rate = D_lr_scheduler.current_learning_rate * args.cnst_step
-            if G_lr_scheduler.current_learning_rate < 1e-6:
-                G_lr_scheduler.current_learning_rate = 1e-6
-                D_lr_scheduler.current_learning_rate = 4e-6
 
         # # summary
         with train_summary_writer.as_default():

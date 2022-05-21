@@ -3,4 +3,5 @@ __pycache__/
 .ipynb_checkpoints/
 /deprecated/
 /output/
+DiscTest.py
 out_IDEALGAN_*
