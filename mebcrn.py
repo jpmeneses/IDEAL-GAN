@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow.keras as keras
 
-import module
+import DLlib as dl
 
 def _get_norm_layer(norm):
     if norm == 'none':
@@ -176,7 +176,7 @@ def MEBCRN(input_shape=(192, 192, 12),
         h = _MLFF_block(RB_list)
 
     if self_attention:
-        h = module.SelfAttention(ch=h.shape[-1])(h)
+        h = dl.SelfAttention(ch=h.shape[-1])(h)
 
     for _ in range(n_downsamplings):
         dim //= 2
