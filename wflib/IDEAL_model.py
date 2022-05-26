@@ -114,9 +114,12 @@ def acq_add_te(acqs,out_maps,te_orig,te_mod):
     return res_gt
 
 
-def acq_to_acq(acqs,param_maps,te=None):
+def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
-    n_ech = d_ech//2
+    if complex_data:
+        n_ech = d_ech
+    else:
+        n_ech = d_ech//2
 
     if te is None:
         stop_te = (n_ech*12/6)*1e-3
@@ -132,9 +135,12 @@ def acq_to_acq(acqs,param_maps,te=None):
     te_complex = tf.expand_dims(te_complex,-1) # shape: (bs,ne,1)
 
     # Generate complex signal
-    real_S = acqs[:,:,:,0::2]
-    imag_S = acqs[:,:,:,1::2]
-    S = tf.complex(real_S,imag_S)
+    if not(complex_data):
+        real_S = acqs[:,:,:,0::2]
+        imag_S = acqs[:,:,:,1::2]
+        S = tf.complex(real_S,imag_S)
+    else:
+        S = acqs
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
@@ -173,19 +179,21 @@ def acq_to_acq(acqs,param_maps,te=None):
     # Reshape to original acquisition dimensions
     S_hat = tf.reshape(tf.transpose(Smtx_hat, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
 
-    Re_gt = tf.math.real(S_hat)
-    Im_gt = tf.math.imag(S_hat)
-    zero_fill = tf.zeros_like(Re_gt)
-    re_stack = tf.stack([Re_gt,zero_fill],4)
-    re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*n_ech])
-    im_stack = tf.stack([zero_fill,Im_gt],4)
-    im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*n_ech])
-    res_gt = re_aux + im_aux
-    
-    return (res_rho,res_gt)
+    if not(complex_data):
+        Re_gt = tf.math.real(S_hat)
+        Im_gt = tf.math.imag(S_hat)
+        zero_fill = tf.zeros_like(Re_gt)
+        re_stack = tf.stack([Re_gt,zero_fill],4)
+        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*n_ech])
+        im_stack = tf.stack([zero_fill,Im_gt],4)
+        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*n_ech])
+        res_gt = re_aux + im_aux
+        return (res_rho,res_gt)
+    else:
+        return (res_rho,S_hat)
 
 
-def IDEAL_model(out_maps,n_ech,te=None):
+def IDEAL_model(out_maps,n_ech,te=None,complex_data=False):
     n_batch,hgt,wdt,_ = out_maps.shape
 
     if te is None:
@@ -230,17 +238,19 @@ def IDEAL_model(out_maps,n_ech,te=None):
     # Reshape to original acquisition dimensions
     S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
 
-    # Split into real and imaginary channels
-    Re_gt = tf.math.real(S_hat)
-    Im_gt = tf.math.imag(S_hat)
-    zero_fill = tf.zeros_like(Re_gt)
-    re_stack = tf.stack([Re_gt,zero_fill],4)
-    re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ne])
-    im_stack = tf.stack([zero_fill,Im_gt],4)
-    im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ne])
-    res_gt = re_aux + im_aux
-    
-    return res_gt
+    if not(complex_data):
+        # Split into real and imaginary channels
+        Re_gt = tf.math.real(S_hat)
+        Im_gt = tf.math.imag(S_hat)
+        zero_fill = tf.zeros_like(Re_gt)
+        re_stack = tf.stack([Re_gt,zero_fill],4)
+        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ne])
+        im_stack = tf.stack([zero_fill,Im_gt],4)
+        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ne])
+        res_gt = re_aux + im_aux
+        return res_gt
+    else:
+        return S_hat
 
 def get_Ps_norm(acqs,param_maps,te=None):
     n_batch,hgt,wdt,d_ech = acqs.shape
@@ -294,9 +304,12 @@ def get_Ps_norm(acqs,param_maps,te=None):
 
     return L2_norm
 
-def get_rho(acqs,param_maps,te=None):
+def get_rho(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
-    n_ech = d_ech//2
+    if complex_data:
+        n_ech = d_ech
+    else:
+        n_ech = d_ech//2
 
     if te is None:
         stop_te = (n_ech*12/6)*1e-3
@@ -312,9 +325,12 @@ def get_rho(acqs,param_maps,te=None):
     te_complex = tf.expand_dims(te_complex,-1)
 
     # Generate complex signal
-    real_S = acqs[:,:,:,0::2]
-    imag_S = acqs[:,:,:,1::2]
-    S = tf.complex(real_S,imag_S)
+    if not(complex_data):
+        real_S = acqs[:,:,:,0::2]
+        imag_S = acqs[:,:,:,1::2]
+        S = tf.complex(real_S,imag_S)
+    else:
+        S = acqs
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)

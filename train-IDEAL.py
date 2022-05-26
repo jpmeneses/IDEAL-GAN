@@ -24,8 +24,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--complex_data', type=bool, default=True)
-py.arg('--G_model', default='encod-decod', choices=['encod-decod','U-Net','MEBCRN'])
+py.arg('--G_model', default='encod-decod', choices=['encod-decod','complex','U-Net','MEBCRN'])
 py.arg('--te_input', type=bool, default=False)
 py.arg('--acqs_DataAug', type=bool, default=True)
 py.arg('--n_G_filters', type=int, default=72)
@@ -68,7 +67,10 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 A2B_R2_pool = data.ItemPool(args.pool_size)
 A2B_FM_pool = data.ItemPool(args.pool_size)
 
-ech_idx = args.n_echoes * 2
+if args.G_model == 'complex':
+    ech_idx = args.n_echoes
+else:
+    ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -150,6 +152,12 @@ if args.G_model == 'encod-decod':
                                 te_shape=(args.n_echoes,),
                                 R2_self_attention=args.R2_SelfAttention,
                                 FM_self_attention=args.FM_SelfAttention)
+elif args.G_model == 'complex':
+    G_A2B=module.PM_complex(input_shape=(hgt,wdt,d_ech),
+                            filters=args.n_G_filters,
+                            te_input=args.te_input,
+                            te_shape=(args.n_echoes,),
+                            self_attention=(args.R2_SelfAttention and args.FM_SelfAttention))
 elif args.G_model == 'U-Net':
     G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
                         num_classes=2,
@@ -209,20 +217,27 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         elif te_A is None:
             te_A = wf.gen_TEvar(args.n_echoes,args.batch_size,orig=True)
             A2B_PM = G_A2B([A,(te_A-1e-3)/(11.5*1e-3)], training=True)
-        # A2B Mask
-        A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
-        # Split A2B param maps
-        A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
-        if args.G_model == 'U-Net':
-            A2B_FM = (A2B_FM - 0.5) * 2
+        
+        if args.G_model != 'complex':
+            # A2B Mask
+            A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
+            # Split A2B param maps
+            A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            if args.G_model == 'U-Net':
+                A2B_FM = (A2B_FM - 0.5) * 2
+                A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+        else:
+            A2B_R2 = tf.math.imag(A2B_PM)/np.pi
+            A2B_FM = tf.math.real(A2B_PM)
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+            A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
         
         if te_A is None:
-            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM)
+            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
         else:
-            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,te=te_A)
+            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,te=te_A,complex_data=(args.G_model=='complex'))
         A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
         ##################### B Cycle #####################
@@ -230,7 +245,7 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
         B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
 
-        B2A = wf.IDEAL_model(B,echoes,te=te_B)
+        B2A = wf.IDEAL_model(B,echoes,te=te_B,complex_data=(args.G_model=='complex'))
         if not(args.te_input):
             B2A2B_PM = G_A2B(B2A, training=True)
         elif te_B is not(None):
@@ -244,7 +259,9 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
             # U-Net fieldmap correction
             B2A2B_FM = (B2A2B_FM - 0.5) * 2
             B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
-
+        elif args.G_model == 'complex':
+            B2A2B_PM = tf.concat([tf.math.imag(B2A2B_PM)/np.pi,tf.math.real(B2A2B_PM)],axis=-1)
+        
         # B2A2B Mask
         B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
@@ -368,21 +385,29 @@ def sample(A, B, te_B=None):
         A2B_FM = tf.reshape(A2B_FM,A[:,:,:,:1].shape)
         A2B_FM = (A2B_FM - 0.5) * 2
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+    elif args.G_model == 'complex':
+        A2B_R2 = tf.math.imag(A2B_PM)/np.pi
+        A2B_FM = tf.math.real(A2B_PM)
+        A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     # A2B Mask
     A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
-    A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM)
+    A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
     A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
     B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-    B2A = wf.IDEAL_model(B,echoes,te=te_B)
+    B2A = wf.IDEAL_model(B,echoes,te=te_B,complex_data=(args.G_model=='complex'))
     if not(args.te_input):
         B2A2B_PM = G_A2B(B2A, training=False)
     else:
         B2A2B_PM = G_A2B([B2A,(te_B-1e-3)/(11.5*1e-3)], training=False)
+    if args.G_model == 'complex':
+        B2A2B_R2 = tf.math.imag(B2A2B_PM)/np.pi
+        B2A2B_FM = tf.math.real(B2A2B_PM)
+        B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
     # B2A2B Mask
     B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
-    B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te_B)
+    B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te_B,complex_data=(args.G_model=='complex'))
     B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
     val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B_PM, B2A2B_PM)
@@ -490,20 +515,41 @@ for ep in range(args.epochs):
                 tl.summary(val_loss_dict, step=G_optimizer.iterations, name='G_losses')
 
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
+
+            # Magnitude of recon MR images at each echo
+            if G_model != 'complex':
+                im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,0],B2A[:,:,:,1])))
+                im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,2],B2A[:,:,:,3])))
+                if args.n_echoes >= 3:
+                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,4],B2A[:,:,:,5])))
+                if args.n_echoes >= 4:
+                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,6],B2A[:,:,:,7])))
+                if args.n_echoes >= 5:
+                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,8],B2A[:,:,:,9])))
+                if args.n_echoes >= 6:
+                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,10],B2A[:,:,:,11])))
+            else:
+                im_ech1 = np.squeeze(np.abs(B2A[:,:,:,0]))
+                im_ech2 = np.squeeze(np.abs(B2A[:,:,:,1]))
+                if args.n_echoes >= 3:
+                    im_ech3 = np.squeeze(np.abs(B2A[:,:,:,2]))
+                if args.n_echoes >= 4:
+                    im_ech4 = np.squeeze(np.abs(B2A[:,:,:,3]))
+                if args.n_echoes >= 5:
+                    im_ech5 = np.squeeze(np.abs(B2A[:,:,:,4]))
+                if args.n_echoes >= 6:
+                    im_ech6 = np.squeeze(np.abs(B2A[:,:,:,5]))
             
             # Acquisitions in the first row
-            im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,0],B2A[:,:,:,1])))
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
                                   interpolation='none', vmin=0, vmax=1)
             axs[0,0].set_title('1st Echo')
             axs[0,0].axis('off')
-            im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,2],B2A[:,:,:,3])))
             acq_ech2 = axs[0,1].imshow(im_ech2, cmap='gist_earth',
                                   interpolation='none', vmin=0, vmax=1)
             axs[0,1].set_title('2nd Echo')
             axs[0,1].axis('off')
             if args.n_echoes >= 3:
-                im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,4],B2A[:,:,:,5])))
                 acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,2].set_title('3rd Echo')
@@ -511,7 +557,6 @@ for ep in range(args.epochs):
             else:
                 fig.delaxes(axs[0,2])
             if args.n_echoes >= 4:
-                im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,6],B2A[:,:,:,7])))
                 acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,3].set_title('4th Echo')
@@ -519,7 +564,6 @@ for ep in range(args.epochs):
             else:
                 fig.delaxes(axs[0,3])
             if args.n_echoes >= 5:
-                im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,8],B2A[:,:,:,9])))
                 acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,4].set_title('5th Echo')
@@ -527,7 +571,6 @@ for ep in range(args.epochs):
             else:
                 fig.delaxes(axs[0,4])
             if args.n_echoes >= 6:
-                im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,10],B2A[:,:,:,11])))
                 acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,5].set_title('6th Echo')

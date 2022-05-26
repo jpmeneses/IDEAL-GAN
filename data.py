@@ -28,7 +28,7 @@ class ItemPool:
                     out_items.append(in_item)
         return tf.stack(out_items, axis=0)
 
-def load_hdf5(ds_dir,hdf5_file,ech_idx):
+def load_hdf5(ds_dir,hdf5_file,ech_idx,complex_data=False):
     f = h5py.File(ds_dir + hdf5_file, 'r')
     acqs = f['Acquisitions'][...]
     out_maps = f['OutMaps'][...]
@@ -38,6 +38,12 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx):
     for nd in range(len(acqs)):
         if np.sum(acqs[nd,:,:,1])!=0.0:
             idxs_list.append(nd)
+
+    if complex_data:
+        ech_complex_idx = acqs.shape[-1] // 2
+        acqs_real = np.real(acqs)
+        acqs_imag = np.imag(acqs)
+        acqs = acqs_real + 1j*acqs_imag
 
     acqs = acqs[idxs_list,:,:,:ech_idx]
     out_maps = out_maps[idxs_list,:,:,:]

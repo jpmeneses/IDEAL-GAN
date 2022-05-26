@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow.keras as keras
 
-from DLlib import complex_utils
+from DLlib import bn, complex_utils
 from DLlib.attention import SelfAttention, AdaIN
 
 # ==============================================================================
@@ -492,19 +492,34 @@ def PM_complex(
         kernel_size=(3, 3),
         kernel_initializer="he_normal",
     ):
+        def _concat_complex(x):
+            x_real = tf.math.real(x)
+            x_imag = tf.math.imag(x)
+            return tf.concat((x_real,x_imag),axis=-1)
+
+        def _merge_complex(x):
+            x_dim = x.shape[-1] // 2
+            x_real = x[:,:,:,:x_dim]
+            x_imag = x[:,:,:,x_dim:]
+            return tf.complex(x_real,x_imag)
+
         c = complex_utils.complex_Conv2D(
             filters,
             kernel_size,
+            activation='zrelu',
             use_bias=False,
             kernel_initializer=kernel_initializer)(inputs)
-        c = keras.layers.BatchNormalization()(c)
+        c = bn.ComplexBatchNormalization()(_concat_complex(c))
+        c = _merge_complex(c)
         c = complex_utils.complex_Conv2D(
             filters,
             kernel_size,
+            activation='cardioid',
             stride=1,
             use_bias=False,
             kernel_initializer=kernel_initializer)(c)
-        c = keras.layers.BatchNormalization()(c)
+        c = bn.ComplexBatchNormalization()(_concat_complex(c))
+        c = _merge_complex(c)
         return c
 
     x = inputs = keras.Input(input_shape)
@@ -546,7 +561,7 @@ def PM_complex(
             filters=filters
             )
 
-    output = complex_utils.complex_Conv2D(1, (1, 1), kernel_initializer='glorot_normal')(x)
+    output = complex_utils.complex_Conv2D(1, (1, 1), kernel_initializer='glorot_normal', activation='last_layer')(x)
 
     if te_input:
         return keras.Model(inputs=[inputs,inputs2], outputs=output)

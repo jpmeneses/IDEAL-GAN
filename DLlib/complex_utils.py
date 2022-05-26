@@ -9,7 +9,7 @@ import tensorflow.keras.backend as K
 class complex_Conv2D(Layer):
 
     def __init__(self, filters, kernel_size, stride=1, padding='valid', data_format="channels_last", dilation_rate=(1, 1),
-                activation='cReLU', use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros',
+                activation=None, use_bias=True, kernel_initializer='glorot_uniform', bias_initializer='zeros',
                 kernel_regularizer=None, bias_regularizer=None, activity_regularizer=None, kernel_constraint=None,
                 bias_constraint=None, **kwargs):
         super(complex_Conv2D, self).__init__(**kwargs)
@@ -73,11 +73,20 @@ class complex_Conv2D(Layer):
         real_out = tf_real_real - tf_imag_imag
         imag_out = tf_imag_real + tf_real_imag
         
-        if self.activation == 'cReLU':
+        if self.activation == 'crelu':
             real_out = tf.nn.relu(real_out)
             imag_out = tf.nn.relu(imag_out)
-        
-        tf_output = tf.complex(real_out, imag_out)
+            tf_output = tf.complex(real_out, imag_out)
+        elif self.activation == 'zrelu':
+            tf_output = zrelu(tf.complex(real_out, imag_out))
+        elif self.activation == 'modrelu':
+            tf_output = modrelu(tf.complex(real_out, imag_out))
+        elif self.activation == 'cardioid':
+            tf_output = cardioid(tf.complex(real_out, imag_out))
+        elif self.activation == 'last_layer':
+            real_out = tf.nn.tanh(real_out)
+            imag_out = tf.nn.sigmoid(imag_out/np.pi)
+            tf_output = tf.complex(real_out, imag_out)
 
         return tf_output
 
@@ -177,7 +186,7 @@ class complex_Conv2DTranspose(Layer):
         else:
             h_axis, w_axis = 1, 2
 
-        height, width = input_shape[h_axis], input_shape[w_axis]
+        height, width = x.shape[h_axis], x.shape[w_axis]
         kernel_h, kernel_w = self.kernel_size
         stride_h, stride_w = self.strides
         dil_rt_h, dil_rt_w = self.dilation_rate
@@ -227,7 +236,7 @@ class complex_Conv2DTranspose(Layer):
 
 class complex_MaxPool2D(Layer):
 
-    def __init__(self, pool_size=(2, 2), strides=None, padding='valid', data_format=None, **kwargs):
+    def __init__(self, pool_size=(2, 2), strides=None, padding='VALID', **kwargs):
         super(complex_MaxPool2D, self).__init__(**kwargs)
         self.pool_size = pool_size
         if strides is None:
@@ -235,17 +244,48 @@ class complex_MaxPool2D(Layer):
         else:
             self.strides = strides
         self.padding = padding
-        self.data_format = data_format
+
+    def build(self, input_shape):
+        super(complex_MaxPool2D, self).build(input_shape)
 
     def call(self, x):
-        y = K.pool2d(tf.abs(x), self.pool_size, self.strides, self.padding, self.data_format)
-        return y
+        def _mag_phase(x):
+            return (tf.math.abs(x), tf.math.angle(x))
 
+        def _unravel_argmax(argmax, shape):
+            output_list = []
+            output_list.append(argmax // (shape[2] * shape[3]))
+            output_list.append(argmax % (shape[2] * shape[3]) // shape[3])
+            return tf.stack(output_list)
+
+        x_shape = x.get_shape()
+        channels = x_shape[-1]
+        bs = tf.shape(x)[0]
+
+        x_mag, x_phase = _mag_phase(x)
+
+        # Pool magnitude, and use the same indices to pool phase
+        # (Source: https://stackoverflow.com/questions/48215969/usage-of-argmax-from-tf-nn-max-pool-with-argmax-tensorflow)
+        y_mag, argmax =  tf.nn.max_pool_with_argmax(input=x_mag, ksize=self.pool_size, strides=self.strides,
+                                                    padding=self.padding, include_batch_in_index=True)
+        argmax = tf.cast(argmax,tf.int32)
+        unraveld = _unravel_argmax(argmax, x_shape)
+        indices = tf.transpose(unraveld,(1,2,3,4,0))
+        t1 = tf.range(channels,dtype=argmax.dtype)[None, None, None, :, None]
+        t2 = tf.tile(t1,multiples=(bs,) + tuple(indices.get_shape()[1:-2]) + (1,1))
+        t3 = tf.concat((indices,t2),axis=-1)
+        t4 = tf.range(tf.cast(bs, dtype=argmax.dtype))
+        t5 = tf.tile(t4[:,None,None,None,None],(1,) + tuple(indices.get_shape()[1:-2].as_list()) + (channels,1))
+        t6 = tf.concat((t5, t3), -1)
+        y_phase = tf.cast(tf.gather_nd(x_phase,t6),tf.complex64)
+
+        y = tf.cast(y_mag,tf.complex64) * tf.math.exp(1j*y_phase)
+        return y
 
 
 def zrelu(x):
     # x and tf_output are complex-valued
-    phase = tf.angle(x)
+    phase = tf.math.angle(x)
 
     # Check whether phase <= pi/2
     le = tf.less_equal(phase, pi / 2)
@@ -298,19 +338,9 @@ def modrelu(x, data_format="channels_last"):
 
 
 def cardioid(x):
-    phase = tf.angle(x)
+    phase = tf.math.angle(x)
     scale = 0.5 * (1 + tf.cos(phase))
     output = tf.complex(tf.math.real(x) * scale, tf.math.imag(x) * scale)
     # output = 0.5*(1+tf.cos(phase))*z
 
     return output
-
-def _batch_norm(tf_input, data_format="channels_last", training=False):
-    tf_output = tf.compat.v1.layers.batch_normalization(
-        tf_input,
-        axis=(1 if data_format == "channels_first" else -1),
-        training=training,
-        renorm=True,
-        fused=True,
-    )
-    return tf_output
