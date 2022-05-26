@@ -40,9 +40,8 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx,complex_data=False):
             idxs_list.append(nd)
 
     if complex_data:
-        ech_complex_idx = acqs.shape[-1] // 2
-        acqs_real = np.real(acqs)
-        acqs_imag = np.imag(acqs)
+        acqs_real = acqs[:,:,:,0::2]
+        acqs_imag = acqs[:,:,:,1::2]
         acqs = acqs_real + 1j*acqs_imag
 
     acqs = acqs[idxs_list,:,:,:ech_idx]
