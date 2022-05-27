@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --job-name=v003-IDEALGAN
-#SBATCH --output=out_IDEALGAN_003.txt
+#SBATCH --job-name=v004-IDEALGAN
+#SBATCH --output=out_IDEALGAN_004.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
