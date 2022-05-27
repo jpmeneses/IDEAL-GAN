@@ -86,7 +86,7 @@ class complex_Conv2D(Layer):
         elif self.activation == 'last_layer':
             # real_out = tf.nn.tanh(real_out)
             # imag_out = tf.nn.sigmoid(imag_out/(2*np.pi))
-            tf_output = zrelu_v2(real_out, imag_out)
+            tf_output = zrelu_v2(tf.complex(real_out, imag_out))
 
         return tf_output
 
