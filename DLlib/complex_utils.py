@@ -84,9 +84,9 @@ class complex_Conv2D(Layer):
         elif self.activation == 'cardioid':
             tf_output = cardioid(tf.complex(real_out, imag_out))
         elif self.activation == 'last_layer':
-            # real_out = tf.nn.tanh(real_out)
-            # imag_out = tf.nn.sigmoid(imag_out/(2*np.pi))
-            tf_output = zrelu_v2(tf.complex(real_out, imag_out))
+            real_out = tf.nn.tanh(real_out)
+            imag_out = tf.nn.sigmoid(imag_out/(2*np.pi))
+            # tf_output = zrelu_v2(tf.complex(real_out, imag_out))
 
         return tf_output
 
