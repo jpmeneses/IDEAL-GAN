@@ -84,9 +84,9 @@ class complex_Conv2D(Layer):
         elif self.activation == 'cardioid':
             tf_output = cardioid(tf.complex(real_out, imag_out))
         elif self.activation == 'last_layer':
-            real_out = tf.nn.tanh(real_out)
-            imag_out = tf.nn.sigmoid(imag_out)
-            tf_output = tf.complex(real_out, imag_out)
+            # real_out = tf.nn.tanh(real_out)
+            # imag_out = tf.nn.sigmoid(imag_out/(2*np.pi))
+            tf_output = zrelu_v2(real_out, imag_out)
 
         return tf_output
 
@@ -292,6 +292,28 @@ def zrelu(x):
 
     # if phase <= pi/2, keep it in comp
     # if phase > pi/2, throw it away and set comp equal to 0
+    y = tf.zeros_like(x)
+    x = tf.where(le, x, y)
+
+    # Check whether phase >= 0
+    ge = tf.greater_equal(phase, 0)
+
+    # if phase >= 0, keep it
+    # if phase < 0, throw it away and set output equal to 0
+    output = tf.where(ge, x, y)
+
+    return output
+
+
+def zrelu_v2(x):
+    # x and tf_output are complex-valued
+    phase = tf.math.angle(x)
+
+    # Check whether phase <= pi
+    le = tf.less_equal(phase, pi)
+
+    # if phase <= pi, keep it in comp
+    # if phase > pi, throw it away and set comp equal to 0
     y = tf.zeros_like(x)
     x = tf.where(le, x, y)
 
