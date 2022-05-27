@@ -116,7 +116,10 @@ trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],ou
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(trainX)
 _,_,_,n_out = np.shape(trainY)
-echoes = int(d_ech/2)
+if args.G_model == 'complex':
+    echoes = d_ech
+else:
+    echoes = int(d_ech/2)
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
@@ -146,18 +149,18 @@ A_B_dataset_val.batch(1)
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 if args.G_model == 'encod-decod':
-    G_A2B = module.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                                filters=args.n_G_filters,
-                                te_input=args.te_input,
-                                te_shape=(args.n_echoes,),
-                                R2_self_attention=args.R2_SelfAttention,
-                                FM_self_attention=args.FM_SelfAttention)
-elif args.G_model == 'complex':
-    G_A2B=module.PM_complex(input_shape=(hgt,wdt,d_ech),
+    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                             filters=args.n_G_filters,
                             te_input=args.te_input,
                             te_shape=(args.n_echoes,),
-                            self_attention=(args.R2_SelfAttention and args.FM_SelfAttention))
+                            R2_self_attention=args.R2_SelfAttention,
+                            FM_self_attention=args.FM_SelfAttention)
+elif args.G_model == 'complex':
+    G_A2B=dl.PM_complex(input_shape=(hgt,wdt,d_ech),
+                        filters=args.n_G_filters,
+                        te_input=args.te_input,
+                        te_shape=(args.n_echoes,),
+                        self_attention=(args.R2_SelfAttention and args.FM_SelfAttention))
 elif args.G_model == 'U-Net':
     G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
                         num_classes=2,
@@ -176,20 +179,20 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-D_B_R2= module.PatchGAN(input_shape=(hgt,wdt,1),
-                        dim=args.n_D_filters,
-                        self_attention=(args.R2_SelfAttention))
+D_B_R2= dl.PatchGAN(input_shape=(hgt,wdt,1),
+                    dim=args.n_D_filters,
+                    self_attention=(args.R2_SelfAttention))
 
-D_B_FM= module.PatchGAN(input_shape=(hgt,wdt,1),
-                        dim=args.n_D_filters,
-                        self_attention=(args.FM_SelfAttention))
+D_B_FM= dl.PatchGAN(input_shape=(hgt,wdt,1),
+                    dim=args.n_D_filters,
+                    self_attention=(args.FM_SelfAttention))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanAbsoluteError()
 identity_loss_fn = tf.losses.MeanAbsoluteError()
 
-G_lr_scheduler = module.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
-D_lr_scheduler = module.LinearDecay(4*args.lr, 5 * total_steps, 5 * args.epoch_decay * total_steps / args.epochs)
+G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
+D_lr_scheduler = dl.LinearDecay(4*args.lr, 5 * total_steps, 5 * args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
