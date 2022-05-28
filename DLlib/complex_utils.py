@@ -87,6 +87,8 @@ class complex_Conv2D(Layer):
             real_out = tf.nn.relu(real_out)
             imag_out = tf.nn.tanh(imag_out)
             tf_output = tf.complex(real_out, imag_out)
+        else:
+            tf_output = tf.complex(real_out, imag_out)
 
         return tf_output
 
