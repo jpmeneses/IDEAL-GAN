@@ -161,6 +161,12 @@ elif args.G_model == 'complex':
                         te_input=args.te_input,
                         te_shape=(args.n_echoes,),
                         self_attention=(args.R2_SelfAttention and args.FM_SelfAttention))
+    unwrap_model =  custom_unet(input_shape=(hgt,wdt,1),
+                                num_classes=1,
+                                dropout=0.0,
+                                use_attention=args.FM_SelfAttention,
+                                filters=8,
+                                output_activation='tanh')
 elif args.G_model == 'U-Net':
     G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
                         num_classes=2,
@@ -232,8 +238,9 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
                 A2B_FM = (A2B_FM - 0.5) * 2
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
         else:
-            A2B_R2 = tf.math.real(A2B_PM) #*(2*np.pi)
-            A2B_FM = tf.math.imag(A2B_PM)
+            A2B_R2 = tf.abs(A2B_PM) #*(2*np.pi)
+            A2B_FM = tf.math.angle(A2B_PM)
+            A2B_FM = unwrap_model(A2B_FM, training=True)
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
             A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
         
@@ -263,7 +270,11 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
             B2A2B_FM = (B2A2B_FM - 0.5) * 2
             B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
         elif args.G_model == 'complex':
-            B2A2B_PM = tf.concat([tf.math.real(B2A2B_PM),tf.math.imag(B2A2B_PM)],axis=-1) # *(2*np.pi)
+            # Phase unwrapping
+            B2A2B_R2 = tf.abs(B2A2B_PM)
+            B2A2B_FM = tf.math.angle(B2A2B_PM)
+            B2A2B_FM = unwrap_model(B2A2B_FM, training=True)
+            B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1) # *(2*np.pi)
         
         # B2A2B Mask
         B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
@@ -289,8 +300,8 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         
         G_loss = (A2B_g_loss) + (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + reg_term
         
-    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
+    G_grad = t.gradient(G_loss, G_A2B.trainable_variables + unwrap_model.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables + unwrap_model.trainable_variables))
 
     return A2B, B2A, {'A2B_R2_g_loss': A2B_R2_g_loss,
                       'A2B_FM_g_loss': A2B_FM_g_loss,
