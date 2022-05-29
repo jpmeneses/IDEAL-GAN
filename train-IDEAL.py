@@ -239,7 +239,7 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         
         if te_A is None:
             A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-        else:y
+        else:
             A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,te=te_A,complex_data=(args.G_model=='complex'))
         A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
