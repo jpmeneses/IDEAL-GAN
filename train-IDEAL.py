@@ -586,13 +586,13 @@ for ep in range(args.epochs):
             # B2A2B maps in the second row
             w_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,0],B2A2B[:,:,:,1])))
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
-                                    interpolation='none', vmin=0, vmax=1)
+                                    interpolation='none')#, vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
             f_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,2],B2A2B[:,:,:,3])))
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
-                                    interpolation='none', vmin=0, vmax=1)
+                                    interpolation='none')#, vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 

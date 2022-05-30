@@ -363,8 +363,8 @@ def modrelu(x, data_format="channels_last"):
 
 def cardioid(x):
     phase = tf.math.angle(x)
-    scale = 0.5 * (1 + tf.math.cos(phase))
-    output = tf.complex(tf.math.real(x) * scale / (2*np.pi), -tf.math.imag(x) * scale)
+    scale = (1/4) * 0.5 * (1 + tf.math.cos(phase))
+    output = tf.complex(tf.math.real(x) * scale, tf.math.imag(x) * scale)
     # output = 0.5*(1+tf.cos(phase))*z
 
     return output
