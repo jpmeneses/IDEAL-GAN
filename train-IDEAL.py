@@ -232,8 +232,8 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
                 A2B_FM = (A2B_FM - 0.5) * 2
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
         else:
-            A2B_R2 = tf.abs(A2B_PM)
-            A2B_FM = tf.math.angle(A2B_PM)/np.pi
+            A2B_R2 = tf.abs(A2B_PM)*10
+            A2B_FM = tf.math.angle(A2B_PM)*10
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
             A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
         
@@ -263,8 +263,8 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
             B2A2B_FM = (B2A2B_FM - 0.5) * 2
             B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
         elif args.G_model == 'complex':
-            B2A2B_R2 = tf.abs(B2A2B_PM)
-            B2A2B_FM = tf.math.angle(B2A2B_PM)/np.pi
+            B2A2B_R2 = tf.abs(B2A2B_PM)*10
+            B2A2B_FM = tf.math.angle(B2A2B_PM)*10
             B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1) # *(2*np.pi)
         
         # B2A2B Mask
@@ -391,8 +391,8 @@ def sample(A, B, te_B=None):
         A2B_FM = (A2B_FM - 0.5) * 2
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     elif args.G_model == 'complex':
-        A2B_R2 = tf.abs(A2B_PM) #*(2*np.pi)
-        A2B_FM = tf.math.angle(A2B_PM)/np.pi
+        A2B_R2 = tf.abs(A2B_PM)*10
+        A2B_FM = tf.math.angle(A2B_PM)*10
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     # A2B Mask
     A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
