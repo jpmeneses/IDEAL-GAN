@@ -585,26 +585,26 @@ for ep in range(args.epochs):
 
             # B2A2B maps in the second row
             w_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,0],B2A2B[:,:,:,1])))
-            W_ok = axs[1,1].imshow(w_aux, cmap='bone',
-                              interpolation='none', vmin=0, vmax=1)
+            W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
+                                    interpolation='none')#, vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
             f_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,2],B2A2B[:,:,:,3])))
-            F_ok = axs[1,2].imshow(f_aux, cmap='pink',
-                              interpolation='none', vmin=0, vmax=1)
+            F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
+                                    interpolation='none')#, vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
             r2_aux = np.squeeze(B2A2B[:,:,:,4])
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
-                               interpolation='none', vmin=0, vmax=r2_sc)
+                                    interpolation='none')#, vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
             field_aux = np.squeeze(B2A2B[:,:,:,5])
-            field_ok = axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
-                                  interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
+                                        interpolation='none')#, vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
             axs[1,4].axis('off')
             fig.delaxes(axs[1,0])

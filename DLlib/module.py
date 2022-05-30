@@ -561,7 +561,7 @@ def PM_complex(
             filters=filters
             )
 
-    output = complex_utils.complex_Conv2D(1, (1, 1), kernel_initializer='glorot_normal', activation='cardioid')(x)
+    output = complex_utils.complex_Conv2D(1, (1, 1), kernel_initializer='glorot_uniform', activation='cardioid')(x)
 
     if te_input:
         return keras.Model(inputs=[inputs,inputs2], outputs=output)
