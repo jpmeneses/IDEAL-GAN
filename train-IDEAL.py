@@ -528,11 +528,11 @@ for ep in range(args.epochs):
                 if args.n_echoes >= 3:
                     im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,4],B2A[:,:,:,5])))
                 if args.n_echoes >= 4:
-                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,6],B2A[:,:,:,7])))
+                    im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,6],B2A[:,:,:,7])))
                 if args.n_echoes >= 5:
-                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,8],B2A[:,:,:,9])))
+                    im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,8],B2A[:,:,:,9])))
                 if args.n_echoes >= 6:
-                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,10],B2A[:,:,:,11])))
+                    im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,10],B2A[:,:,:,11])))
             else:
                 im_ech1 = np.squeeze(np.abs(B2A[:,:,:,0]))
                 im_ech2 = np.squeeze(np.abs(B2A[:,:,:,1]))
