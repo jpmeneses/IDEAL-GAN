@@ -647,5 +647,5 @@ for ep in range(args.epochs):
             plt.close(fig)
 
     # save checkpoint
-    if (((ep+1) % 10) == 0) or ((ep+1)==args.epochs):
+    if (((ep+1) % 5) == 0) or ((ep+1)==args.epochs):
         checkpoint.save(ep)
