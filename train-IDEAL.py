@@ -280,7 +280,7 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         A2B_g_loss = args.R2_critic_weight * A2B_R2_g_loss + A2B_FM_g_loss
         
         ############ Cycle-Consistency Losses #############
-        A2B2A_cycle_loss = cycle_loss_fn(tf.math.real(A), tf.math.real(A2B2A)) + cycle_loss_fn(tf.math.imag(A), tf.math.imag(A2B2A))
+        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B_PM, B2A2B_PM)
 
         ################ Regularizers #####################
