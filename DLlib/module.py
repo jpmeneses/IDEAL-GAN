@@ -506,7 +506,7 @@ def PM_complex(
         c = complex_utils.complex_Conv2D(
             filters,
             kernel_size,
-            activation='cardioid',
+            activation='crelu',
             use_bias=False,
             kernel_initializer=kernel_initializer)(inputs)
         c = bn.ComplexBatchNormalization()(_concat_complex(c))
@@ -514,7 +514,7 @@ def PM_complex(
         c = complex_utils.complex_Conv2D(
             filters,
             kernel_size,
-            activation='cardioid',
+            activation='crelu',
             stride=1,
             use_bias=False,
             kernel_initializer=kernel_initializer)(c)
