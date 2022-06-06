@@ -285,39 +285,39 @@ class complex_MaxPool2D(Layer):
         return y
 
 
-class mod_cardioid(Layer):
+# class mod_cardioid(Layer):
     
-    def __init__(self,beta_initializer='zeros', beta_regularizer=None, beta_constraint=None, **kwargs):
-        super(mod_cardioid, self).__init__(**kwargs)
-        self.beta_initializer = tf.keras.initializers.get(beta_initializer)
-        self.beta_regularizer = tf.keras.regularizers.get(beta_regularizer)
-        self.beta_constraing = tf.keras.constraints.get(beta_constraint)
+#     def __init__(self,beta_initializer='zeros', beta_regularizer=None, beta_constraint=None, **kwargs):
+#         super(mod_cardioid, self).__init__(**kwargs)
+#         self.beta_initializer = tf.keras.initializers.get(beta_initializer)
+#         self.beta_regularizer = tf.keras.regularizers.get(beta_regularizer)
+#         self.beta_constraing = tf.keras.constraints.get(beta_constraint)
 
-    @tf_utils.shape_type_conversion
-    def build(self, input_shape):
-        param_shape = list(input_shape[1:])
-        if self.shared_axes is not None:
-            for i in self.shared_axes:
-                param_shape[i - 1] = 1
-        self.beta =self.add_weight(shape=param_shape,
-                                    name='alpha',
-                                    initializer=self.alpha_initializer,
-                                    regularizer=self.alpha_regularizer,
-                                    constraint=self.alpha_constraint)
-        # Set input spec
-        axes = {}
-        if self.shared_axes:
-            for i in range(1, len(input_shape)):
-                if i not in self.shared_axes:
-                    axes[i] = input_shape[i]
-        self.input_spec = InputSpec(ndim=len(input_shape), axes=axes)
-        self.built = True
+#     @tf_utils.shape_type_conversion
+#     def build(self, input_shape):
+#         param_shape = list(input_shape[1:])
+#         if self.shared_axes is not None:
+#             for i in self.shared_axes:
+#                 param_shape[i - 1] = 1
+#         self.beta =self.add_weight(shape=param_shape,
+#                                     name='alpha',
+#                                     initializer=self.alpha_initializer,
+#                                     regularizer=self.alpha_regularizer,
+#                                     constraint=self.alpha_constraint)
+#         # Set input spec
+#         axes = {}
+#         if self.shared_axes:
+#             for i in range(1, len(input_shape)):
+#                 if i not in self.shared_axes:
+#                     axes[i] = input_shape[i]
+#         self.input_spec = InputSpec(ndim=len(input_shape), axes=axes)
+#         self.built = True
 
-    def call(self, inputs):
-        phase = tf.math.angle(x) + self.beta
-        scale = 0.5 * (1 + tf.math.cos(phase))
-        output = tf.complex(tf.math.real(x) * scale, tf.math.imag(x) * scale)
-        return output
+#     def call(self, inputs):
+#         phase = tf.math.angle(x) + self.beta
+#         scale = 0.5 * (1 + tf.math.cos(phase))
+#         output = tf.complex(tf.math.real(x) * scale, tf.math.imag(x) * scale)
+#         return output
 
 
 def zrelu(x):
