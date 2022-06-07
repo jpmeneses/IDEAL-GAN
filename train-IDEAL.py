@@ -189,7 +189,6 @@ D_B_FM= dl.PatchGAN(input_shape=(hgt,wdt,1),
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
-identity_loss_fn = tf.losses.MeanSquaredError()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 D_lr_scheduler = dl.LinearDecay(4*args.lr, 5 * total_steps, 5 * args.epoch_decay * total_steps / args.epochs)
@@ -280,7 +279,10 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         A2B_g_loss = args.R2_critic_weight * A2B_R2_g_loss + A2B_FM_g_loss
         
         ############ Cycle-Consistency Losses #############
-        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        if args.G_model != 'complex':
+            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        else:
+            A2B2A_cycle_loss = tf.math.real(cycle_loss_fn(A, A2B2A))
         B2A2B_cycle_loss = cycle_loss_fn(B_PM, B2A2B_PM)
 
         ################ Regularizers #####################
