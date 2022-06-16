@@ -3,12 +3,12 @@ import tensorflow as tf
 import tensorflow.keras as keras
 from keras_unet.models import custom_unet
 
+import DLlib as dl
 import pylib as py
 import tf2lib as tl
 import wflib as wf
 
 import data
-import module
 import mebcrn
 
 import matplotlib.pyplot as plt
@@ -37,7 +37,7 @@ args.__dict__.update(test_args.__dict__)
 # ==============================================================================
 # =                                   excel                                    =
 # ==============================================================================
-workbook = xlsxwriter.Workbook(py.join(test_args.experiment_dir, 'metrics.xlsx'))
+workbook = xlsxwriter.Workbook(py.join(args.experiment_dir, 'metrics.xlsx'))
 ws_MAE = workbook.add_worksheet('MAE')
 ws_MAE.write(0,0,'Water')
 ws_MAE.write(0,1,'Fat')
@@ -66,86 +66,15 @@ ws_SSIM.write(0,3,'FieldMap')
 # data
 ech_idx = args.n_echoes * 2
 
-############################################################
-############### DIRECTORIES AND FILENAMES ##################
-############################################################
+################################################################################
+######################### DIRECTORIES AND FILENAMES ############################
+################################################################################
 dataset_dir = '../MRI-Datasets/'
 dataset_hdf5_1 = 'UNet-JGalgani/JGalgani_GC_192_complex_2D.hdf5'
-dataset_hdf5_2 = 'UNet-INTA/INTA_GC_192_complex_2D.hdf5'
-dataset_hdf5_3 = 'UNet-INTA_rest/INTArest_GC_192_complex_2D.hdf5'
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx, complex_data=(args.G_model=='complex'))
+
 dataset_hdf5_4 = 'UNet-Volunteers/Volunteers_GC_192_complex_2D.hdf5'
-
-############################################################
-################### LOAD DATASET 1 #########################
-############################################################
-f1 = h5py.File(dataset_dir + dataset_hdf5_1, 'r')
-acqs_1 = f1['Acquisitions'][...]
-out_maps_1 = f1['OutMaps'][...]
-f1.close()
-
-idxs_list_1 = []
-for nd in range(len(acqs_1)):
-  if np.sum(acqs_1[nd,:,:,1])!=0.0:
-    idxs_list_1.append(nd)
-
-acqs_1 = acqs_1[idxs_list_1,:,:,:ech_idx]
-out_maps_1 = out_maps_1[idxs_list_1,:,:,:]
-
-print('Num. Elements- DS1:', len(acqs_1))
-
-############################################################
-################### LOAD DATASET 2 #########################
-############################################################
-# f2 = h5py.File(dataset_dir + dataset_hdf5_2, 'r')
-# acqs_2 = f2['Acquisitions'][...]
-# out_maps_2 = f2['OutMaps'][...]
-# f2.close()
-
-# idxs_list_2 = []
-# for nd in range(len(acqs_2)):
-#   if np.sum(acqs_2[nd,:,:,1])!=0.0:
-#     idxs_list_2.append(nd)
-
-# acqs_2 = acqs_2[idxs_list_2,:,:,:]
-# out_maps_2 = out_maps_2[idxs_list_2,:,:,:]
-
-# print('Num. Elements- DS2:', len(acqs_2))
-
-############################################################
-################### LOAD DATASET 3 #########################
-############################################################
-# f3 = h5py.File(dataset_dir + dataset_hdf5_3, 'r')
-# acqs_3 = f3['Acquisitions'][...]
-# out_maps_3 = f3['OutMaps'][...]
-# f3.close()
-
-# idxs_list_3 = []
-# for nd in range(len(acqs_3)):
-#   if np.sum(acqs_3[nd,:,:,1])!=0.0:
-#     idxs_list_3.append(nd)
-
-# acqs_3 = acqs_3[idxs_list_3,:,:,:]
-# out_maps_3 = out_maps_3[idxs_list_3,:,:,:]
-
-# print('Num. Elements- DS3:', len(acqs_3))
-
-############################################################
-################### LOAD DATASET 4 #########################
-############################################################
-f4 = h5py.File(dataset_dir + dataset_hdf5_4, 'r')
-acqs_4 = f4['Acquisitions'][...]
-out_maps_4 = f4['OutMaps'][...]
-f4.close()
-
-idxs_list_4 = []
-for nd in range(len(acqs_4)):
-  if np.sum(acqs_4[nd,:,:,1])!=0.0:
-    idxs_list_4.append(nd)
-
-acqs_4 = acqs_4[idxs_list_4,:,:,:ech_idx]
-out_maps_4 = out_maps_4[idxs_list_4,:,:,:]
-
-print('Num. Elements- DS4:', len(acqs_4))
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx, complex_data=(args.G_model=='complex'))
 
 ############################################################
 ################# DATASET PARTITIONS #######################
@@ -154,12 +83,7 @@ print('Num. Elements- DS4:', len(acqs_4))
 n1_div = 248 # 65
 n4_div = 434 # 113
 
-# trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:]),axis=0)
-# valX    = acqs_2
 testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
-
-# trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3,out_maps_4[n4_div:,:,:,:]),axis=0)
-# valY    = out_maps_2
 testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
 
 # Overall dataset statistics
@@ -181,7 +105,7 @@ A_B_dataset_test.batch(1)
 
 # model
 if args.G_model == 'encod-decod':
-    G_A2B = module.PM_Generator(input_shape=(hgt,wdt,d_ech),
+    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
                                 filters=args.n_filters,
