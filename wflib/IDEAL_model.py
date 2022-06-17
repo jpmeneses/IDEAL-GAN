@@ -41,22 +41,26 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
     elif not(get_Mpinv) and not(get_P0):
         return M
 
-def acq_add_te(acqs,out_maps,te_orig,te_mod):
+def acq_add_te(acqs,out_maps,te_orig,te_mod,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
-    n_ech = d_ech//2
+    if complex_data:
+        n_ech = d_ech
+    else:
+        n_ech = d_ech//2
 
-    ne = te_mod.shape[1]
-    dte = te_mod - te_orig
-    all_dte = tf.reshape(dte,[-1])
+    ne = te_orig.shape[1]
 
     # Generate complex signal
-    real_S = acqs[:,:,:,0::2]
-    imag_S = acqs[:,:,:,1::2]
-    S = tf.complex(real_S,imag_S)
+    if not(complex_data):
+        real_S = acqs[:,:,:,0::2]
+        imag_S = acqs[:,:,:,1::2]
+        S = tf.complex(real_S,imag_S)
+    else:
+        S = acqs
 
-    voxel_shape = tf.convert_to_tensor((n_batch,hgt,wdt))
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
-    Smtx = tf.reshape(S, [num_voxel, ne]) # shape: (bs*nv,ne)
+    Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # shape: (bs,ne,nv)
 
     # Split water/fat images (orig_rho) and param. maps
     orig_rho = out_maps[:,:,:,:4]
@@ -69,38 +73,46 @@ def acq_add_te(acqs,out_maps,te_orig,te_mod):
     imag_rho = orig_rho[:,:,:,1::2]
     rho = tf.complex(real_rho,imag_rho) * rho_sc 
 
-    rho_mtx = tf.reshape(rho, [num_voxel, ns])
-    rho_mtx = tf.expand_dims(rho_mtx,-1) # shape: (bs*nv,ns,1)
+    rho_mtx = tf.transpose(tf.reshape(rho, [n_batch, num_voxel, ns]), perm=[0,2,1]) # shape: (bs,ns,nv)
 
-    Arho = tf.linalg.matmul(A_p,rho_mtx) # shape: (bs*nv,np,1)
+    Arho = tf.linalg.matmul(A_p,rho_mtx) # shape: (bs,np,nv)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
-    xi_rav = tf.reshape(xi,[-1]) # shape: (bs*nv)
+    xi_rav = tf.reshape(xi,[n_batch, num_voxel]) # shape: (bs,nv)
 
-    D_xi = 2j*np.pi*xi_rav # shape: (bs*nv)
+    D_xi = 2j*np.pi*xi_rav # shape: (bs,nv)
+    D_xi = tf.expand_dims(D_xi,1) # shape: (bs,1,nv)
     D_p = tf.linalg.diag(2j*np.pi*tf.squeeze(f_p)) # shape: (np,np)
+    DpArho = tf.linalg.matmul(D_p,Arho) # shape: (bs,np,nv)
 
-    def ode_fn(t,y):
-        W = tf.math.exp(xi_rav*tf.cast(t,tf.complex64)) # shape: (bs*nv)
-        P = tf.math.exp(2j*np.pi*f_p*tf.cast(t,tf.complex64)) # shape: (1,np)
-        DpArho = tf.linalg.matmul(D_p,Arho) # shape: (bs*nv,np,1)
-        PDpArho = tf.linalg.matmul(P,DpArho) # shape: (bs*nv,1,1)
-        WPDpArho = W*tf.squeeze(PDpArho, axis=[1,2]) # shape: (bs*nv)
-        return D_xi*y + WPDpArho
+    dt = 0.05e-3
 
-    def jacobian_fn(t,y):
-        return tf.linalg.diag(D_xi)
-        # return tf.concat([D_xi, tf.ones(D_xi.shape,dtype=tf.complex64)],axis=0)
-
-    # Solve for first echo only
-    # res = tfp.math.ode.BDF().solve(ode_fn, te_orig[0,0], Smtx[:,0], solution_times=[all_dte[0]], jacobian_fn=jacobian_fn)
-    Smtx_aux = tf.transpose(res.states)
-    Smtx_hat = tf.zeros([n_batch*num_voxel, ne-1], dtype=tf.complex64)
-    Smtx_hat = tf.concat([Smtx_aux, Smtx_hat], axis=-1)
+    for ech_idx in range(ne):
+        S_ech = Smtx[:,ech_idx,:] # shape: (bs,nv)
+        S_ech = tf.expand_dims(S_ech,1) # shape: (bs,1,nv)
+        te_ini = tf.cast(tf.squeeze(te_orig[:,ech_idx]),tf.float32)
+        te_end = tf.cast(tf.squeeze(te_mod[:,ech_idx]),tf.float32)
+        if te_ini <= te_end:
+            t_vec = tf.range(start=te_ini,limit=te_end,delta=dt)
+        else:
+            t_vec = tf.range(start=te_end,limit=te_ini,delta=dt)
+        for t in t_vec:
+            t = tf.cast(t,tf.complex64)
+            P_ech = tf.math.exp(2j*np.pi*t*f_p) # shape: (1,np)
+            W_ech = tf.math.exp(xi_rav*t) # shape: (bs,nv)
+            W_ech = tf.expand_dims(W_ech,1) # shape: (bs,1,nv)
+            PDpArho = tf.linalg.matmul(P_ech,DpArho) # shape: (bs,1,nv)
+            WPDpArho = W_ech * PDpArho # shape: (bs,1,nv)
+            S_dt = D_xi*S_ech + WPDpArho
+            S_ech += S_dt*dt
+        if ech_idx == 0:
+            Smtx_hat = S_ech
+        else:
+            Smtx_hat = tf.concat([Smtx_hat, S_ech], axis=1)
 
     # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(Smtx_hat,[n_batch,hgt,wdt,ne])
+    S_hat = tf.reshape(tf.transpose(Smtx_hat, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
 
     Re_gt = tf.math.real(S_hat)
     Im_gt = tf.math.imag(S_hat)

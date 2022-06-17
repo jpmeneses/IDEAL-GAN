@@ -214,8 +214,7 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
             A2B_PM = G_A2B(A, training=True)
         elif te_A is not(None):
             te_orig = wf.gen_TEvar(args.n_echoes,args.batch_size,orig=True)
-            dte = te_A - te_orig
-            A = wf.acq_add_te(A,B,dte)
+            A = wf.acq_add_te(A,B,te_orig,te_A)
             A2B_PM = G_A2B([A,(te_A-1e-3)/(11.5*1e-3)], training=True)
         elif te_A is None:
             te_A = wf.gen_TEvar(args.n_echoes,args.batch_size,orig=True)

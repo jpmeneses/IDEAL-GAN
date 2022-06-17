@@ -285,6 +285,7 @@ class complex_MaxPool2D(Layer):
         return y
 
 
+# See: https://github.com/keras-team/keras/blob/v2.9.0/keras/layers/activation/prelu.py#L29-L120
 # class mod_cardioid(Layer):
     
 #     def __init__(self,beta_initializer='zeros', beta_regularizer=None, beta_constraint=None, **kwargs):

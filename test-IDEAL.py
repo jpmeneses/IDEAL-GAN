@@ -22,13 +22,6 @@ from skimage.metrics import structural_similarity
 # ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
-py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='encod-decod', choices=['encod-decod','U-Net','MEBCRN'])
-py.arg('--te_input', type=bool, default=False)
-py.arg('--n_filters', type=int, default=72)
-py.arg('--batch_size', type=int, default=1)
-py.arg('--R2_SelfAttention',type=bool, default=False)
-py.arg('--FM_SelfAttention',type=bool, default=True)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
@@ -108,19 +101,19 @@ if args.G_model == 'encod-decod':
     G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
-                                filters=args.n_filters,
+                                filters=args.n_G_filters,
                                 R2_self_attention=args.R2_SelfAttention,
                                 FM_self_attention=args.FM_SelfAttention)
 elif args.G_model == 'U-Net':
     G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
                         num_classes=2,
                         use_attention=args.FM_SelfAttention,
-                        filters=args.n_filters)
+                        filters=args.n_G_filters)
 elif args.G_model == 'MEBCRN':
     G_A2B  =  mebcrn.MEBCRN(input_shape=(hgt,wdt,d_ech),
                             n_res_blocks=5,
                             n_downsamplings=2,
-                            filters=args.n_filters,
+                            filters=args.n_G_filters,
                             self_attention=args.FM_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
