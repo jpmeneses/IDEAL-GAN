@@ -24,7 +24,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='encod-decod', choices=['encod-decod','U-Net','MEBCRN'])
+py.arg('--G_model', default='encod-decod', choices=['encod-decod','complex'])
 py.arg('--n_G_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=200)
@@ -141,31 +141,16 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 if args.G_model == 'encod-decod':
     G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                             filters=args.n_G_filters,
-                            te_input=args.te_input,
+                            te_input=True,
                             te_shape=(args.n_echoes,),
                             R2_self_attention=args.R2_SelfAttention,
                             FM_self_attention=args.FM_SelfAttention)
 elif args.G_model == 'complex':
     G_A2B=dl.PM_complex(input_shape=(hgt,wdt,d_ech),
                         filters=args.n_G_filters,
-                        te_input=args.te_input,
+                        te_input=True,
                         te_shape=(args.n_echoes,),
                         self_attention=(args.R2_SelfAttention and args.FM_SelfAttention))
-elif args.G_model == 'U-Net':
-    G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
-                        num_classes=2,
-                        dropout=0.0,
-                        use_attention=args.FM_SelfAttention,
-                        filters=args.n_G_filters)
-    trainY[:,:,:,-1]    = 0.5*trainY[:,:,:,-1] + 0.5
-    valY[:,:,:,-1]      = 0.5*valY[:,:,:,-1] + 0.5
-    testY[:,:,:,-1]     = 0.5*testY[:,:,:,-1] + 0.5
-elif args.G_model == 'MEBCRN':
-    G_A2B=mebcrn.MEBCRN(input_shape=(hgt,wdt,d_ech),
-                        n_res_blocks=5,
-                        n_downsamplings=2,
-                        filters=args.n_G_filters,
-                        self_attention=args.FM_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
@@ -197,15 +182,7 @@ def train_G(B, te=None):
         B2A2B_PM = G_A2B([B2A,(te_B-1e-3)/(11.5*1e-3)], training=True)
         # B2A2B_WF = wf.get_rho(B2A,B2A2B_PM)
 
-        if args.G_model == 'U-Net':
-            # Split A2B param maps
-            B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
-            # U-Net fieldmap correction
-            B2A2B_FM = (B2A2B_FM - 0.5) * 2
-            B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
-        elif args.G_model == 'complex':
+        if args.G_model == 'complex':
             B2A2B_R2 = tf.math.real(B2A2B_PM)
             B2A2B_FM = tf.math.imag(B2A2B_PM)
             B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
@@ -248,13 +225,6 @@ def sample(B, te=None):
     B2A = wf.IDEAL_model(B,echoes,te=te_B)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     B2A2B_PM = G_A2B([B2A,te], training=False)
-    if args.G_model == 'U-Net':
-        orig_shape = B2A2B_PM.shape
-        B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-        B2A2B_R2 = tf.reshape(B2A2B_R2,B2A[:,:,:,:1].shape)
-        B2A2B_FM = tf.reshape(B2A2B_FM,B2A[:,:,:,:1].shape)
-        B2A2B_FM = (B2A2B_FM - 0.5) * 2
-        B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
     # B2A2B Mask
     B2A2B_PM = tf.where(B!=0.0,B2A2B_PM,0.0)
     B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te_B)
