@@ -4,4 +4,4 @@ __pycache__/
 /deprecated/
 /output/
 DiscTest.py
-out_IDEALGAN_*
+out_*
