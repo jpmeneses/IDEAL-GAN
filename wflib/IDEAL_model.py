@@ -86,7 +86,7 @@ def acq_add_te(acqs,out_maps,te_orig,te_mod,complex_data=False):
     D_p = tf.linalg.diag(2j*np.pi*tf.squeeze(f_p)) # shape: (np,np)
     DpArho = tf.linalg.matmul(D_p,Arho) # shape: (bs,np,nv)
 
-    dt = 0.05e-3
+    dt = 0.00001e-3
 
     for ech_idx in range(ne):
         S_ech = Smtx[:,ech_idx,:] # shape: (bs,nv)

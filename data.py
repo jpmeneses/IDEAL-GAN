@@ -28,33 +28,40 @@ class ItemPool:
                     out_items.append(in_item)
         return tf.stack(out_items, axis=0)
 
-def load_hdf5(ds_dir,hdf5_file,ech_idx,te_data=False,complex_data=False):
+def load_hdf5(ds_dir,hdf5_file,ech_idx,acqs_data=True,te_data=False,complex_data=False):
     f = h5py.File(ds_dir + hdf5_file, 'r')
-    acqs = f['Acquisitions'][...]
+    if acqs_data:
+        acqs = f['Acquisitions'][...]
     out_maps = f['OutMaps'][...]
     if te_data:
-        TEs = f1['TEs'][...]
+        TEs = f['TEs'][...]
     f.close()
 
     idxs_list = []
-    for nd in range(len(acqs)):
-        if np.sum(acqs[nd,:,:,1])!=0.0:
+    for nd in range(len(out_maps)):
+        if np.sum(out_maps[nd,:,:,1])!=0.0:
             idxs_list.append(nd)
 
-    if complex_data:
-        acqs_real = acqs[:,:,:,0::2]
-        acqs_imag = acqs[:,:,:,1::2]
-        acqs = acqs_real + 1j*acqs_imag
-
-    acqs = acqs[idxs_list,:,:,:ech_idx]
     out_maps = out_maps[idxs_list,:,:,:]
-    if te_data:
+
+    if acqs_data and not(te_data):
+        if complex_data:
+            acqs_real = acqs[:,:,:,0::2]
+            acqs_imag = acqs[:,:,:,1::2]
+            acqs = acqs_real + 1j*acqs_imag
+        acqs = acqs[idxs_list,:,:,:ech_idx]
+        return acqs, out_maps
+    elif te_data:
         if complex_data:
             TEs = TEs[idxs_list,:ech_idx]
         else:
             TEs = TEs[idxs_list,:ech_idx//2]
-        return acqs, out_maps, TEs
-    else:
-        return acqs, out_maps
+        if acqs_data:
+            return acqs, out_maps, TEs
+        else:
+            return out_maps, TEs
+    elif not(acqs_data) and not(te_data):
+        return out_maps
+        
 
     
