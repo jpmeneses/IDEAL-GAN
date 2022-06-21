@@ -177,9 +177,9 @@ def train_G(B, te=None):
         B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
         B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
 
-        B2A = wf.IDEAL_model(B,echoes,te=te_B)
+        B2A = wf.IDEAL_model(B,echoes,te=te)
         B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
-        B2A2B_PM = G_A2B([B2A,(te_B-1e-3)/(11.5*1e-3)], training=True)
+        B2A2B_PM = G_A2B([B2A,te], training=True)
         # B2A2B_WF = wf.get_rho(B2A,B2A2B_PM)
 
         if args.G_model == 'complex':
@@ -227,7 +227,7 @@ def sample(B, te=None):
     B2A2B_PM = G_A2B([B2A,te], training=False)
     # B2A2B Mask
     B2A2B_PM = tf.where(B!=0.0,B2A2B_PM,0.0)
-    B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te_B)
+    B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te)
     B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
 
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
