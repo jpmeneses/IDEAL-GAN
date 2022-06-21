@@ -41,7 +41,6 @@ py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--R2_SelfAttention',type=bool, default=False)
 py.arg('--FM_SelfAttention',type=bool, default=True)
-py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
 args = py.args()
 
 # output_dir
@@ -55,9 +54,6 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # ==============================================================================
 # =                                    data                                    =
 # ==============================================================================
-
-A2B_R2_pool = data.ItemPool(args.pool_size)
-A2B_FM_pool = data.ItemPool(args.pool_size)
 
 if args.G_model == 'complex':
     ech_idx = args.n_echoes
