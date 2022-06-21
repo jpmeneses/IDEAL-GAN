@@ -208,7 +208,7 @@ def train_G(B, te=None):
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_FM),axis=(1,2,3))) * args.FM_L1_weight # * (1-ep/(args.epochs-1))
         reg_term = R2_TV + FM_TV + FM_L1
         
-        G_loss = args.B2A2B_weight*args.cycle_loss_weight + reg_term
+        G_loss = B2A2B_cycle_loss + reg_term
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
