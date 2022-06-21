@@ -2,12 +2,11 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 
+import DLlib as dl
 import pylib as py
 import tf2lib as tl
 import wflib as wf
-
 import data
-import module
 
 import matplotlib.pyplot as plt
 import tqdm
@@ -21,13 +20,8 @@ from skimage.metrics import structural_similarity
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','phantom'])
-py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='encod-decod', choices=['encod-decod','U-Net','MEBCRN'])
 py.arg('--te_input', type=bool, default=True)
-py.arg('--n_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=1)
-py.arg('--R2_SelfAttention',type=bool, default=False)
-py.arg('--FM_SelfAttention',type=bool, default=True)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
@@ -80,39 +74,18 @@ ws_SSIM.write(0,9,'B2A2B FieldMap')
 ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200.0,300.0
 
-############################################################
-############### DIRECTORIES AND FILENAMES ##################
-############################################################
+################################################################################
+######################### DIRECTORIES AND FILENAMES ############################
+################################################################################
 dataset_dir = '../MRI-Datasets/'
 dataset_hdf5 = 'UNet-' + args.dataset + '/' + args.dataset + '_GC_192_complex_2D.hdf5'
+testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
+                                    acqs_data=True, te_data=True,
+                                    complex_data=(args.G_model=='complex'))
 
-############################################################
-###################### LOAD DATASET ########################
-############################################################
-f1 = h5py.File(dataset_dir + dataset_hdf5, 'r')
-acqs_1 = f1['Acquisitions'][...]
-TEs_1 = f1['TEs'][...]
-out_maps_1 = f1['OutMaps'][...]
-f1.close()
-
-idxs_list_1 = []
-for nd in range(len(acqs_1)):
-  if np.sum(acqs_1[nd,:,:,1])!=0.0:
-    idxs_list_1.append(nd)
-
-acqs_1 = acqs_1[idxs_list_1,:,:,:ech_idx]
-TEs_1 = TEs_1[idxs_list_1,:args.n_echoes]
-out_maps_1 = out_maps_1[idxs_list_1,:,:,:]
-
-print('Num. Elements- DS1:', len(acqs_1))
-
-############################################################
-################# DATASET PARTITIONS #######################
-############################################################
-
-testX   = acqs_1
-testY   = out_maps_1
-TEs     = TEs_1
+################################################################################
+########################### DATASET PARTITIONS #################################
+################################################################################
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(testX)
@@ -131,12 +104,12 @@ A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,TEs,testY))
 A_B_dataset_test.batch(1)
 
 # model
-G_A2B = module.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                            filters=args.n_filters,
-                            te_input=args.te_input,
-                            te_shape=(args.n_echoes,),
-                            R2_self_attention=args.R2_SelfAttention,
-                            FM_self_attention=args.FM_SelfAttention)
+G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+                        filters=args.n_G_filters,
+                        te_input=args.te_input,
+                        te_shape=(args.n_echoes,),
+                        R2_self_attention=args.R2_SelfAttention,
+                        FM_self_attention=args.FM_SelfAttention)
 
 # restore
 tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
@@ -144,7 +117,7 @@ tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).re
 @tf.function
 def sample_A2B(A,TE):
     if args.te_input:
-        A2B_PM = G_A2B([A,(TE-1e-3)/(11.5*1e-3)], training=False)
+        A2B_PM = G_A2B([A,TE], training=False)
     else:
         A2B_PM = G_A2B(A, training=False)
     A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0)
@@ -157,7 +130,7 @@ def sample_A2B(A,TE):
 def sample_B2A(B,TE):
     B2A = wf.IDEAL_model(B,args.n_echoes,te=TE)
     if args.te_input:
-        B2A2B_PM = G_A2B([B2A,(TE-1e-3)/(11.5*1e-3)], training=False)
+        B2A2B_PM = G_A2B([B2A,TE], training=False)
     else:
         B2A2B_PM = G_A2B(B2A, training=False)
     B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,TE)
