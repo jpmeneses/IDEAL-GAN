@@ -228,7 +228,7 @@ def sample(B, te=None):
                         tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
     indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-    B2A = wf.IDEAL_model(B,echoes,te=te_B)
+    B2A = wf.IDEAL_model(B,echoes,te=te)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     B2A2B_PM = G_A2B([B2A,te], training=False)
     # B2A2B Mask
