@@ -182,13 +182,19 @@ def train_G(B, te=None):
         B2A2B_PM = G_A2B([B2A,te], training=True)
         # B2A2B_WF = wf.get_rho(B2A,B2A2B_PM)
 
-        if args.G_model == 'complex':
+        if args.G_model != 'complex':
+            # B2A2B Mask
+            B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
+            # Split A2B param maps
+            B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
+            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+        else:
             B2A2B_R2 = tf.math.real(B2A2B_PM)
             B2A2B_FM = tf.math.imag(B2A2B_PM)
             B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
-
-        # B2A2B Mask
-        B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
+            # B2A2B Mask
+            B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
         # Merge B2A2B output maps 
         # B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
