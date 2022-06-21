@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-TEaug.py --dataset 'TEaug-001' --G_model 'encod-decod' --n_G_filters 32 --batch_size 4 --epochs 40 --epoch_decay 40 --epoch_ckpt 5 --lr 0.0002
+python train-IDEAL-TEaug.py --dataset 'TEaug-001' --G_model 'encod-decod' --n_G_filters 32 --batch_size 1 --epochs 40 --epoch_decay 40 --epoch_ckpt 5 --lr 0.0001
