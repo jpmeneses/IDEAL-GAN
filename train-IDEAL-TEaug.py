@@ -214,7 +214,9 @@ def train_G(B, te=None):
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
     return {'B2A2B_cycle_loss': B2A2B_cycle_loss,
-            'TV_R2': R2_TV}
+            'TV_R2': R2_TV,
+            'TV_FM': FM_TV,
+            'L1_FM': FM_L1}
 
 
 def train_step(B, te=None):
@@ -406,13 +408,13 @@ for ep in range(args.epochs):
 
             r2_aux = np.squeeze(B2A2B[:,:,:,4])
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
-                                    interpolation='none')#, vmin=0, vmax=r2_sc)
+                                    interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
             field_aux = np.squeeze(B2A2B[:,:,:,5])
             field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
-                                        interpolation='none')#, vmin=-fm_sc/2, vmax=fm_sc/2)
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
             axs[1,4].axis('off')
             fig.delaxes(axs[1,0])
