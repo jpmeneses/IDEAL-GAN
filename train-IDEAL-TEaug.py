@@ -228,16 +228,18 @@ def sample(B, te=None):
                         tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
     indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
+    # Split B
+    B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
+    B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
+    # Compute B2A (+ noise) and estimate B2A2B
     B2A = wf.IDEAL_model(B,echoes,te=te)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     B2A2B_PM = G_A2B([B2A,te], training=False)
-    # B2A2B Mask
-    B2A2B_PM = tf.where(B!=0.0,B2A2B_PM,0.0)
+    # B2A2B Mask and compute rho
+    B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
     B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te)
     B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
 
-    B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-    B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
     val_B2A2B_loss = cycle_loss_fn(B_PM, B2A2B_PM)
     return B2A, B2A2B, {'B2A2B_cycle_loss': val_B2A2B_loss}
 
