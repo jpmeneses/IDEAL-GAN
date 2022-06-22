@@ -214,6 +214,7 @@ def train_G(B, te=None):
     return {'B2A2B_cycle_loss': B2A2B_cycle_loss,
             'TV_R2': R2_TV,
             'TV_FM': FM_TV,
+            'L1_R2': R2_L1,
             'L1_FM': FM_L1}
 
 
