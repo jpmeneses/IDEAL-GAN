@@ -63,27 +63,27 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
                             acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
                             acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
                             acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
                             acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
                             acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'))
 
@@ -95,16 +95,20 @@ n1_div = 248
 n3_div = 0
 n4_div = 434
 
+trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
+valX    = acqs_2
+testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
+
 valY    = out_maps_2
 testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
 
 # Overall dataset statistics
-len_dataset,hgt,wdt,n_out = np.shape(trainY)
-echoes = args.n_echoes
+len_dataset,hgt,wdt,d_ech = np.shape(trainX)
+_,_,_,n_out = np.shape(valY)
 if args.G_model == 'complex':
-    d_ech = echoes
+    echoes = d_ech
 else:
-    d_ech = echoes*2
+    echoes = int(d_ech/2)
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
@@ -401,13 +405,13 @@ for ep in range(args.epochs):
             # A2B maps in the second row
             w_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,0],A2B[:,:,:,1])))
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
-                                    interpolation='none')#, vmin=0, vmax=1)
+                                    interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
             f_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,2],A2B[:,:,:,3])))
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
-                                    interpolation='none')#, vmin=0, vmax=1)
+                                    interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
