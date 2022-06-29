@@ -212,6 +212,9 @@ def UNet_Generator(
         filters=filters,
         )
 
+    r2_decod_list = list()
+    fm_decod_list = list()
+
     for conv in reversed(down_layers):
         filters //= 2  # decreasing number of filters with each layer
         x = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
@@ -590,3 +593,22 @@ class LinearDecay(keras.optimizers.schedules.LearningRateSchedule):
             false_fn=lambda: self._initial_learning_rate
         ))
         return self.current_learning_rate
+
+# ==============================================================================
+# =                         Indexes of decoder layers                          =
+# ==============================================================================
+
+def PM_decoder_idxs(variable,
+                    num_decod,
+                    num_layers,
+                    R2_self_attention=False,
+                    FM_self_attention=True):
+    decod_layers = 1 + num_decod + (num_layers-1)*12 + 13
+    idxs = list()
+    if variable == 'FM':
+        for a in range(decod_layers):
+            b = a+1
+            if b==2 or (b%2==0 and b<49) or (b%2==1 and b>=49):
+                idxs.append(b)
+    return idxs
+

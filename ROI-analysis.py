@@ -3,11 +3,11 @@ from __future__ import print_function
 import tensorflow as tf
 from utils import *
 
+import DLlib as dl
 import pylib as py
 import tf2lib as tl
 import wflib as wf
 import data
-import module
 
 import numpy as np
 import statsmodels.api as sm
@@ -24,12 +24,8 @@ from matplotlib.ticker import PercentFormatter
 
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--experiment_dir',default='output/WF-sep')
-py.arg('--n_echoes', type=int, default=6)
 py.arg('--te_input', type=bool, default=False)
-py.arg('--n_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=1)
-py.arg('--R2_SelfAttention',type=bool, default=False)
-py.arg('--FM_SelfAttention',type=bool, default=True)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
@@ -43,78 +39,16 @@ ws_ROI_2 = workbook.add_worksheet('LHL')
 ws_ROI_2.write(0,0,'Ground-truth')
 ws_ROI_2.write(0,1,'Model res.')
 
+# data
+ech_idx = args.n_echoes * 2
+
 dataset_dir = '../MRI-Datasets/'
-dataset_hdf5_1 = 'UNet-JGalgani/JGalgani_GC_192_complex_2D.hdf5'
-dataset_hdf5_2 = 'UNet-INTA/INTA_GC_192_complex_2D.hdf5'
-dataset_hdf5_3 = 'UNet-INTA_rest/INTArest_GC_192_complex_2D.hdf5'
-dataset_hdf5_4 = 'UNet-Volunteers/Volunteers_GC_192_complex_2D.hdf5'
-
-f1 = h5py.File(dataset_dir + dataset_hdf5_1, 'r')
-acqs_1 = f1['Acquisitions'][...]
-out_maps_1 = f1['OutMaps'][...]
-f1.close()
-
-idxs_list_1 = []
-for nd in range(len(acqs_1)):
-  if np.sum(acqs_1[nd,:,:,1])!=0.0:
-    idxs_list_1.append(nd)
-
-acqs_1 = acqs_1[idxs_list_1,:,:,:]
-out_maps_1 = out_maps_1[idxs_list_1,:,:,:]
-
-print('Num. Elements- DS1:', len(acqs_1))
-
-# f2 = h5py.File(dataset_dir + dataset_hdf5_2, 'r')
-# acqs_2 = f2['Acquisitions'][...]
-# out_maps_2 = f2['OutMaps'][...]
-# f2.close()
-
-# idxs_list_2 = []
-# for nd in range(len(acqs_2)):
-#   if np.sum(acqs_2[nd,:,:,1])!=0.0:
-#     idxs_list_2.append(nd)
-
-# acqs_2 = acqs_2[idxs_list_2,:,:,:]
-# out_maps_2 = out_maps_2[idxs_list_2,:,:,:]
-
-# print('Num. Elements- DS2:', len(acqs_2))
-
-# f3 = h5py.File(dataset_dir + dataset_hdf5_3, 'r')
-# acqs_3 = f3['Acquisitions'][...]
-# out_maps_3 = f3['OutMaps'][...]
-# f3.close()
-
-# idxs_list_3 = []
-# for nd in range(len(acqs_3)):
-#   if np.sum(acqs_3[nd,:,:,1])!=0.0:
-#     idxs_list_3.append(nd)
-
-# acqs_3 = acqs_3[idxs_list_3,:,:,:]
-# out_maps_3 = out_maps_3[idxs_list_3,:,:,:]
-
-# print('Num. Elements- DS3:', len(acqs_3))
-
-f4 = h5py.File(dataset_dir + dataset_hdf5_4, 'r')
-acqs_4 = f4['Acquisitions'][...]
-out_maps_4 = f4['OutMaps'][...]
-f4.close()
-
-idxs_list_4 = []
-for nd in range(len(acqs_4)):
-  if np.sum(acqs_4[nd,:,:,1])!=0.0:
-    idxs_list_4.append(nd)
-
-acqs_4 = acqs_4[idxs_list_4,:,:,:]
-out_maps_4 = out_maps_4[idxs_list_4,:,:,:]
-
-print('Num. Elements- DS4:', len(acqs_4))
-
-n1_div = 248
-n4_div = 434
-
-testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
-
-testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
+if args.n_echoes == 6:
+  dataset_hdf5 = 'UNet-multiTE/6ech_GC_192_origTEs_complex_2D.hdf5'
+elif args.n_echoes == 3:
+  dataset_hdf5 = 'UNet-multiTE/3ech_GC_192_complex_2D.hdf5'
+testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
+                                  te_data=True,complex_data=(args.G_model=='complex'))
 
 len_dataset,hgt,wdt,d_ech = np.shape(testX)
 _,_,_,n_out = np.shape(testY)
@@ -129,7 +63,7 @@ print('Output Maps:',n_out)
 print('Testing input shape:',testX.shape)
 print('Testing output shape:',testY.shape)
 
-A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,testY))
+A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,testY,TEs))
 A_B_dataset_test.batch(1)
 
 #################################################################################
@@ -138,12 +72,12 @@ A_B_dataset_test.batch(1)
 
 # model
 with tf.device('/cpu:0'):
-  G_A2B = module.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                              filters=args.n_filters,
-                              te_input=args.te_input,
-                              te_shape=(args.n_echoes,),
-                              R2_self_attention=args.R2_SelfAttention,
-                              FM_self_attention=args.FM_SelfAttention)
+  G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+                          filters=args.n_G_filters,
+                          te_input=args.te_input,
+                          te_shape=(args.n_echoes,),
+                          R2_self_attention=args.R2_SelfAttention,
+                          FM_self_attention=args.FM_SelfAttention)
 
   # restore
   tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
@@ -151,7 +85,7 @@ with tf.device('/cpu:0'):
 @tf.function
 def sample_A2B(A,TE=None):
   if args.te_input:
-    A2B_PM = G_A2B([A,(TE-1e-3)/(11.5*1e-3)], training=False)
+    A2B_PM = G_A2B([A,TE], training=False)
   else:
     A2B_PM = G_A2B(A, training=False)
   A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0)
@@ -162,12 +96,10 @@ def sample_A2B(A,TE=None):
 all_test_ans = np.zeros(testY.shape)
 i = 0
 
-if args.te_input:
-  TE = wf.gen_TEvar(args.n_echoes,args.batch_size,orig=True)
-
-for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
+for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
   A = tf.expand_dims(A,axis=0)
   B = tf.expand_dims(B,axis=0)
+  TE=tf.expand_dims(TE,axis=0)
   if args.te_input:
     A2B, A2B2A = sample_A2B(A,TE)
   else:
@@ -212,7 +144,7 @@ else:
   raise TypeError('The selected map is not available')
 
 fig, ax = plt.subplots(1, 1)
-tracker = IndexTracker(fig, ax, X, bool_PDFF, lims)
+tracker = IndexTracker(fig, ax, X, bool_PDFF, lims, npy_file='slices_crops_3ech.npy')
 
 fig.canvas.mpl_connect('scroll_event', tracker.onscroll)
 fig.canvas.mpl_connect('button_press_event', tracker.button_press)
@@ -220,7 +152,7 @@ fig.canvas.mpl_connect('key_press_event', tracker.key_press)
 plt.show()
 
 # Save slices indexes and crops coordinates
-with open('slices_crops.npy', 'wb') as f:
+with open('slices_crops_3ech.npy', 'wb') as f:
   np.save(f,np.array(tracker.frms))
   np.save(f,np.array(tracker.crops_1))
   np.save(f,np.array(tracker.crops_2))
