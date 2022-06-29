@@ -459,7 +459,7 @@ n_div = np.ceil(total_steps/len(valX))
 if args.FM_fix:
     FM_idxs = dl.PM_decoder_idxs('FM',2,4,args.R2_SelfAttention,args.FM_SelfAttention)
     for idx in FM_idxs:
-        G_A2B.layers[-FM_idxs].trainable = False
+        G_A2B.layers[-idx].trainable = False
 
 # main loop
 for ep in range(args.epochs):
