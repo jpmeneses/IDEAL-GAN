@@ -621,7 +621,7 @@ def PM_decoder_idxs(decod_idx,
         elif FM_self_attention^R2_self_attention and a+1==sa_idx:
             if (FM_self_attention and decod_idx==2) or (R2_self_attention and decod_idx==1):
                 idxs.append(a+1)
-        elif (FM_self_attention^R2_self_attention) and (a%num_decoders==(num_decoders-decod_idx) and (a+1)>sa_idx):
+        elif (FM_self_attention^R2_self_attention) and ((a+1)%num_decoders==(num_decoders-decod_idx) and (a+1)>sa_idx):
             idxs.append(a+1)
     return idxs
 

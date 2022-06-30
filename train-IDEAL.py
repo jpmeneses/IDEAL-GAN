@@ -463,12 +463,18 @@ n_div = np.ceil(total_steps/len(valX))
 # ==============================================================================
 
 if args.R2_fix:
+    # Fix the respective critic
+    D_B_R2.trainable = False
+    # Fix generator weights
     FM_idxs = dl.PM_decoder_idxs(2,2,4,args.R2_SelfAttention,args.FM_SelfAttention)
     for p_idx in range(len(G_A2B.layers)):
         idx = p_idx + 1
         if not(idx in FM_idxs):
             G_A2B.layers[-idx].trainable = False
 if args.FM_fix:
+    # Fix the respective critic
+    D_B_FM.trainable = False
+    # Fix generator weights
     R2_idxs = dl.PM_decoder_idxs(1,2,4,args.R2_SelfAttention,args.FM_SelfAttention)
     for p_idx in range(len(G_A2B.layers)):
         idx = p_idx + 1
