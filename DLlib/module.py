@@ -598,17 +598,29 @@ class LinearDecay(keras.optimizers.schedules.LearningRateSchedule):
 # =                         Indexes of decoder layers                          =
 # ==============================================================================
 
-def PM_decoder_idxs(variable,
-                    num_decod,
-                    num_layers,
+def PM_decoder_idxs(decod_idx,
+                    num_decoders,
+                    num_levels,
                     R2_self_attention=False,
                     FM_self_attention=True):
-    decod_layers = 1 + num_decod + (num_layers-1)*12 + 13
+    cnst = 1 + num_decoders
+    conv2d_layers = 4
+    level_layers = conv2d_layers + 2  # Transpose Conv2D + skip-connection
+    if num_decoders < 1:
+        NameError('CNN architecture must have 2 or more decoders')
+    decod_layers = cnst + (num_levels)*(level_layers*num_decoders)
+    sa_idx = cnst + (num_levels-1)*(level_layers*num_decoders) + 2*(conv2d_layers) +1 #48
+    if R2_self_attention:
+        decod_layers += 1
+    if FM_self_attention:
+        decod_layers += 1
     idxs = list()
-    if variable == 'FM':
-        for a in range(decod_layers):
-            b = a+1
-            if b==2 or (b%2==0 and b<49) or (b%2==1 and b>=49):
-                idxs.append(b)
+    for a in range(decod_layers):
+        if (a!=0 and (a+(num_decoders-1))%num_decoders==(num_decoders-decod_idx) and (a+1)<sa_idx):
+            idxs.append(a+1)
+        elif FM_self_attention^R2_self_attention and a+1==sa_idx:
+            idxs.append(a+1)
+        elif (FM_self_attention^R2_self_attention) and (a%num_decoders==(num_decoders-decod_idx) and (a+1)>sa_idx):
+            idxs.append(a+1)
     return idxs
 
