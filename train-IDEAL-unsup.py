@@ -38,6 +38,8 @@ py.arg('--R2_L1_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--R2_SelfAttention',type=bool, default=False)
 py.arg('--FM_SelfAttention',type=bool, default=True)
+py.arg('--R2_fix',type=bool, default=False)
+py.arg('--FM_fix',type=bool, default=False)
 args = py.args()
 
 # output_dir
@@ -288,6 +290,25 @@ val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
 n_div = np.ceil(total_steps/len(valY))
+
+# ==============================================================================
+# =                         Fix R2s/FM decoder weights                         =
+# ==============================================================================
+
+if args.R2_fix:
+    # Fix generator weights
+    FM_idxs = dl.PM_decoder_idxs(2,2,4,args.R2_SelfAttention,args.FM_SelfAttention)
+    for p_idx in range(len(G_A2B.layers)):
+        idx = p_idx + 1
+        if not(idx in FM_idxs):
+            G_A2B.layers[-idx].trainable = False
+if args.FM_fix:
+    # Fix generator weights
+    R2_idxs = dl.PM_decoder_idxs(1,2,4,args.R2_SelfAttention,args.FM_SelfAttention)
+    for p_idx in range(len(G_A2B.layers)):
+        idx = p_idx + 1
+        if not(idx in R2_idxs):
+            G_A2B.layers[-idx].trainable = False
 
 # main loop
 for ep in range(args.epochs):
