@@ -376,3 +376,76 @@ def get_rho(acqs,param_maps,te=None,complex_data=False):
     res_rho = re_aux + im_aux
     
     return res_rho
+
+def abs_acq_to_acq(acqs,param_maps,te=None,complex_data=False):
+    n_batch,hgt,wdt,d_ech = acqs.shape
+    if complex_data:
+        n_ech = d_ech
+    else:
+        n_ech = d_ech//2
+
+    if te is None:
+        stop_te = (n_ech*12/6)*1e-3
+        te = np.arange(start=1.3e-3,stop=stop_te,step=2.1e-3)
+        te = tf.convert_to_tensor(te,dtype=tf.float32)
+        te = tf.expand_dims(te,0)
+        te = tf.tile(te,[n_batch,1])
+    
+    ne = te.shape[1]
+    M, M_pinv = gen_M(te) # M shape: (bs,ne,ns)
+
+    te = tf.expand_dims(te,-1) # shape: (bs,ne,1)
+    te_complex = tf.complex(0.0,te) # shape: (bs,ne,1)
+
+    # Generate complex signal
+    if not(complex_data):
+        real_S = acqs[:,:,:,0::2]
+        imag_S = acqs[:,:,:,1::2]
+        S = tf.complex(real_S,imag_S)
+    else:
+        S = acqs
+
+    S_abs = tf.abs(S)
+
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
+    Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # shape: (bs,nv,ne)
+
+    r2s = param_maps[:,:,:,0] * r2_sc
+    phi = param_maps[:,:,:,1] * fm_sc
+
+    # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
+    xi = tf.complex(phi,r2s/(2*np.pi))
+    xi_rav = tf.reshape(xi,[n_batch,-1]) # shape: (bs,nv)
+    xi_rav = tf.expand_dims(xi_rav,1) # shape: (bs,1,nv)
+
+    r2s_rav = tf.reshape(r2s,[n_batch,-1]) # shape: (bs,nv)
+    r2s_rav = tf.expand_dims(r2s,1) # shape: (bs,1,nv)
+
+    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (bs,ne,nv)
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
+    Wp_abs = tf.math.exp(tf.linalg.matmul(te, -r2s_rav))
+
+    # Matrix operations
+    WmS = Wm * Smtx # shape = (bs,ne,nv)
+    MWmS = tf.linalg.matmul(M_pinv,WmS) # shape = (bs,ns,nv)
+    MMWmS = tf.linalg.matmul(M,MWmS) # shape = (bs,ne,nv)
+    Smtx_hat_abs = Wp_abs * tf.abs(MMWmS) # shape = (bs,ne,nv)
+
+    # Extract corresponding Water/Fat signals
+    # Reshape to original images dimensions
+    rho_hat = tf.reshape(tf.transpose(MWmS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
+
+    Re_rho = tf.math.real(rho_hat)
+    Im_rho = tf.math.imag(rho_hat)
+    zero_fill = tf.zeros_like(Re_rho)
+    re_stack = tf.stack([Re_rho,zero_fill],4)
+    re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
+    im_stack = tf.stack([zero_fill,Im_rho],4)
+    im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
+    res_rho = re_aux + im_aux
+
+    # Reshape to original acquisition dimensions
+    S_hat_abs = tf.reshape(tf.transpose(Smtx_hat_abs, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
+
+    return (res_rho,S_hat_abs)

@@ -237,8 +237,8 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
             A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
         
-        if te_A is None:
-            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        if args.FM_fix:
+            A2B_WF, A2B2A = wf.abs_acq_to_acq(A,A2B_PM,te=te_A,complex_data=(args.G_model=='complex'))
         else:
             A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,te=te_A,complex_data=(args.G_model=='complex'))
         A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
@@ -282,6 +282,11 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         ############ Cycle-Consistency Losses #############
         if args.G_model != 'complex':
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        elif args.FM_fix:
+            A_real = A[:,:,:,0::2]
+            A_imag = A[:,:,:,1::2]
+            A_cplx = acqs_real + 1j*acqs_imag
+            A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
         else:
             A2B2A_cycle_loss = tf.math.real(cycle_loss_fn(A, A2B2A))
         B2A2B_cycle_loss = cycle_loss_fn(B_PM, B2A2B_PM)
