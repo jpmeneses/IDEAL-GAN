@@ -422,7 +422,13 @@ def sample(A, B, te_B=None):
     B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
     B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te_B,complex_data=(args.G_model=='complex'))
     B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
-    val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
+    if args.FM_fix:
+        A_real = A[:,:,:,0::2]
+        A_imag = A[:,:,:,1::2]
+        A_cplx = acqs_real + 1j*acqs_imag
+        val_A2B2A_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
+    else:
+        val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
     val_B2A2B_loss = cycle_loss_fn(B_PM, B2A2B_PM)
     return A2B, B2A, A2B2A, B2A2B, {'A2B2A_cycle_loss': val_A2B2A_loss,
                                     'B2A2B_cycle_loss': val_B2A2B_loss}

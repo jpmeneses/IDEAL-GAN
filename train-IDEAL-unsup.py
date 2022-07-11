@@ -201,11 +201,20 @@ def train_G(A):
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
             A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
         
-        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        if args.FM_fix:
+            A2B_WF, A2B2A = wf.abs_acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        else:
+            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
         A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
         ############ Cycle-Consistency Losses #############
-        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        if args.FM_fix:
+            A_real = A[:,:,:,0::2]
+            A_imag = A[:,:,:,1::2]
+            A_cplx = acqs_real + 1j*acqs_imag
+            A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
+        else:
+            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
@@ -252,10 +261,19 @@ def sample(A, B):
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     # A2B Mask
     A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
-    A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+    if args.FM_fix:
+        A2B_WF, A2B2A = wf.abs_acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+    else:
+        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
     A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
-    val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
+    if args.FM_fix:
+        A_real = A[:,:,:,0::2]
+        A_imag = A[:,:,:,1::2]
+        A_cplx = acqs_real + 1j*acqs_imag
+        val_A2B2A_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
+    else:
+        val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
     return A2B, A2B2A, {'A2B2A_cycle_loss': val_A2B2A_loss}
 
 def validation_step(A, B):
