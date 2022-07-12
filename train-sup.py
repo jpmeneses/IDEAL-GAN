@@ -24,7 +24,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--out_vars', default='WF', choices=['WF','PM','WF-PM'])
-py.arg('--G_model', default='encod-decod', choices=['multi-decod','U-Net','MEBCRN','complex'])
+py.arg('--G_model', default='encod-decod', choices=['multi-decod','U-Net','MEBCRN'])
 py.arg('--n_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=32)
 py.arg('--epochs', type=int, default=100)
@@ -54,10 +54,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # =                                    data                                    =
 # ==============================================================================
 
-if args.G_model == 'complex':
-    ech_idx = args.n_echoes
-else:
-    ech_idx = args.n_echoes * 2
+ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -67,27 +64,27 @@ dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
                                     acqs_data=True, te_data=False,
-                                    complex_data=(args.G_model=='complex'))
+                                    complex_data=False)
 
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
 acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
                                     acqs_data=True, te_data=False,
-                                    complex_data=(args.G_model=='complex'))
+                                    complex_data=False)
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
 acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
                                     acqs_data=True, te_data=False,
-                                    complex_data=(args.G_model=='complex'))
+                                    complex_data=False)
 
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
 acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
                                     acqs_data=True, te_data=False,
-                                    complex_data=(args.G_model=='complex'))
+                                    complex_data=False)
 
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
 acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
                                     acqs_data=True, te_data=False,
-                                    complex_data=(args.G_model=='complex'))
+                                    complex_data=False)
 
 ################################################################################
 ############################# DATASET PARTITIONS ###############################
@@ -113,10 +110,7 @@ trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],ou
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(trainX)
 _,_,_,n_out = np.shape(trainY)
-if args.G_model == 'complex':
-    echoes = d_ech
-else:
-    echoes = int(d_ech/2)
+echoes = int(d_ech/2)
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
@@ -179,7 +173,7 @@ elif args.G_model == 'MEBCRN':
     else:
         n_out = 2
     G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
-                    n_outputs=n_out
+                    n_outputs=n_out,
                     n_res_blocks=5,
                     n_downsamplings=2,
                     filters=args.n_filters,
@@ -188,11 +182,6 @@ elif args.G_model == 'MEBCRN':
         trainY[:,:,:,-1]    = 0.5*trainY[:,:,:,-1] + 0.5
         valY[:,:,:,-1]      = 0.5*valY[:,:,:,-1] + 0.5
         testY[:,:,:,-1]     = 0.5*testY[:,:,:,-1] + 0.5
-
-elif args.G_model == 'complex':
-    G_A2B=dl.PM_complex(input_shape=(hgt,wdt,d_ech),
-                        filters=args.n_filters,
-                        self_attention=args.D1_SelfAttention)
 
 else:
     raise(NameError('Unrecognized Generator Architecture'))
