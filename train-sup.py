@@ -256,10 +256,16 @@ def train_G(A, B):
             sup_loss = sup_loss_fn(B_abs, A2B_abs)
 
         ################ Regularizers #####################
-        R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
-        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
-        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
-        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
+        if not(args.out_vars=='WF'):
+            R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
+            FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
+            R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
+            FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
+        else:
+            R2_TV = 0.0
+            FM_TV = 0.0
+            R2_L1 = 0.0
+            FM_L1 = 0.0
         reg_term = R2_TV + FM_TV + R2_L1 + FM_L1
         
         G_loss = sup_loss + reg_term
