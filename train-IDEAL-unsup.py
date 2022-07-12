@@ -211,7 +211,7 @@ def train_G(A):
         if args.FM_fix:
             A_real = A[:,:,:,0::2]
             A_imag = A[:,:,:,1::2]
-            A_cplx = acqs_real + 1j*acqs_imag
+            A_cplx = A_real + 1j*A_imag
             A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -270,7 +270,7 @@ def sample(A, B):
     if args.FM_fix:
         A_real = A[:,:,:,0::2]
         A_imag = A[:,:,:,1::2]
-        A_cplx = acqs_real + 1j*acqs_imag
+        A_cplx = A_real + 1j*A_imag
         val_A2B2A_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
     else:
         val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
