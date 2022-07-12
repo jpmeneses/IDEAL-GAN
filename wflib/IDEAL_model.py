@@ -420,7 +420,7 @@ def abs_acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     xi_rav = tf.expand_dims(xi_rav,1) # shape: (bs,1,nv)
 
     r2s_rav = tf.reshape(r2s,[n_batch,-1]) # shape: (bs,nv)
-    r2s_rav = tf.expand_dims(r2s,1) # shape: (bs,1,nv)
+    r2s_rav = tf.expand_dims(r2s_rav,1) # shape: (bs,1,nv)
 
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (bs,ne,nv)
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
