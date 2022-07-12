@@ -416,7 +416,7 @@ for ep in range(args.epochs):
             A, B = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
-            B2A, val_sup_dict = validation_step(A, B)
+            A2B, val_sup_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
@@ -425,16 +425,16 @@ for ep in range(args.epochs):
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            im_ech1 = np.squeeze(np.abs(B2A[:,:,:,0]))
-            im_ech2 = np.squeeze(np.abs(B2A[:,:,:,1]))
+            im_ech1 = np.squeeze(np.abs(A[:,:,:,0]))
+            im_ech2 = np.squeeze(np.abs(A[:,:,:,1]))
             if args.n_echoes >= 3:
-                im_ech3 = np.squeeze(np.abs(B2A[:,:,:,2]))
+                im_ech3 = np.squeeze(np.abs(A[:,:,:,2]))
             if args.n_echoes >= 4:
-                im_ech4 = np.squeeze(np.abs(B2A[:,:,:,3]))
+                im_ech4 = np.squeeze(np.abs(A[:,:,:,3]))
             if args.n_echoes >= 5:
-                im_ech5 = np.squeeze(np.abs(B2A[:,:,:,4]))
+                im_ech5 = np.squeeze(np.abs(A[:,:,:,4]))
             if args.n_echoes >= 6:
-                im_ech6 = np.squeeze(np.abs(B2A[:,:,:,5]))
+                im_ech6 = np.squeeze(np.abs(A[:,:,:,5]))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
