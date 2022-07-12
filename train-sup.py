@@ -236,7 +236,7 @@ def train_G(A, B):
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
 
             # Compute water/fat
-            A2B_WF = wf.get_rho(B2A,B2A2B_PM)
+            A2B_WF = wf.get_rho(A, A2B_PM)
             
             # Magnitude of water/fat images
             A2B_WF_real = A2B_WF[:,:,:,0::2]
@@ -256,10 +256,10 @@ def train_G(A, B):
             sup_loss = sup_loss_fn(B_abs, A2B_abs)
 
         ################ Regularizers #####################
-        R2_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_R2)) * args.R2_TV_weight
-        FM_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_FM)) * args.FM_TV_weight
-        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
-        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
+        R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
+        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
+        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
+        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
         reg_term = R2_TV + FM_TV + R2_L1 + FM_L1
         
         G_loss = sup_loss + reg_term
