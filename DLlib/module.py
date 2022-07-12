@@ -77,6 +77,7 @@ def ResnetGenerator(input_shape=(256, 256, 3),
 
     return keras.Model(inputs=inputs, outputs=h)
 
+
 def PatchGAN(input_shape,
             dim=64,
             n_downsamplings=3,
@@ -119,125 +120,20 @@ def PatchGAN(input_shape,
 
     return keras.Model(inputs=inputs, outputs=h)
 
-def PatchGAN_vConv1(input_shape,
-                    dim=64,
-                    n_layers=4,
-                    self_attention=True,
-                    norm='instance_norm'):
-    dim_ = dim
-    Norm = _get_norm_layer(norm)
-
-    # 0
-    h = inputs = keras.Input(shape=input_shape)
-
-    # 1
-    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, 1, strides=1, padding='same', kernel_initializer='he_normal'))
-    h = conv2d(h)
-    h = tf.nn.leaky_relu(h, alpha=0.2)
-
-    for _ in range(n_layers):
-        dim = min(dim * 2, dim_ * 16)
-        conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, 1, strides=1, padding='same', use_bias=False, kernel_initializer='he_normal'))
-        h = conv2d(h)
-        h = Norm()(h)
-        h = tf.nn.leaky_relu(h, alpha=0.2)
-
-    # Self-attention
-    if self_attention:
-        h = SelfAttention(ch=dim)(h)
-
-    # 3
-    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(1, 1, strides=1, padding='same', kernel_initializer='glorot_normal'))
-    h = conv2d(h)
-
-    return keras.Model(inputs=inputs, outputs=h)
 
 # ==============================================================================
 # =                                 MDWF-Net                                   =
 # ==============================================================================
 
-def UNet_Generator(
-    input_shape,
-    num_outputs=6,
-    filters=32,
-    num_layers=4,
-    norm='instance_norm'):
-    
-    Norm = _get_norm_layer(norm)
-
-    def _upsample(filters, kernel_size, strides, padding):
-        return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
-
-    def _conv2d_block(
-        inputs,
-        filters=16,
-        kernel_size=(3, 3),
-        kernel_initializer="he_normal",
-        padding="same",
-    ):
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(inputs)
-        c = Norm()(c)
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(c)
-        c = Norm()(c)
-        return c
-
-    x = inputs = keras.Input(input_shape)
-
-    down_layers = []
-    for l in range(num_layers):
-        x = _conv2d_block(
-            inputs=x,
-            filters=filters,
-            )
-        down_layers.append(x)
-        x = keras.layers.MaxPooling2D((2, 2))(x)
-        filters = filters * 2  # double the number of filters with each layer
-
-    x = _conv2d_block(
-        inputs=x,
-        filters=filters,
-        )
-
-    r2_decod_list = list()
-    fm_decod_list = list()
-
-    for conv in reversed(down_layers):
-        filters //= 2  # decreasing number of filters with each layer
-        x = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
-        
-        # Water/Fat decoder
-        x = keras.layers.concatenate([x, conv])
-        x = _conv2d_block(
-            inputs=x,
-            filters=filters
-            )
-
-    x = keras.layers.Conv2D(num_outputs, (1, 1), activation='tanh')(x)
-
-    return keras.Model(inputs=inputs, outputs=x)
-
 def MDWF_Generator(
     input_shape,
     te_input=False,
     te_shape=(6,),
-    num_outputs=6,
     filters=72,
     num_layers=4,
-    self_attention=False,
+    WF_self_attention=False,
+    R2_self_attention=False,
+    FM_self_attention=True,
     norm='instance_norm'):
     
     Norm = _get_norm_layer(norm)
@@ -303,17 +199,6 @@ def MDWF_Generator(
         filters=filters,
         )
 
-    # if te_input:
-    #     # Fully-connected network for processing the vector with echo-times
-    #     hgt_dim = input_shape[0] // (2**(len(down_layers)))
-    #     wdt_dim = input_shape[1] // (2**(len(down_layers)))
-    #     y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_normal')(te)
-    #     y = keras.layers.RepeatVector(hgt_dim*wdt_dim)(y)
-    #     y = keras.layers.Reshape((hgt_dim,wdt_dim,filters))(y)
-
-    #     # Add fully-connected output with latent space
-    #     x = keras.layers.add([x,y])
-
     cont = 0
     for conv in reversed(down_layers):
         filters //= 2  # decreasing number of filters with each layer
@@ -328,7 +213,7 @@ def MDWF_Generator(
 
         # Water/Fat decoder
         x2 = keras.layers.concatenate([x2, conv])
-        if self_attention and cont == 0:
+        if WF_self_attention and cont == 0:
             x2 = SelfAttention(ch=2*filters)(x2)
         x2 = _conv2d_block(
             inputs=x2,
@@ -337,7 +222,7 @@ def MDWF_Generator(
 
         # R2* decoder
         x3 = keras.layers.concatenate([x3, conv])
-        if self_attention and cont == 0:
+        if R2_self_attention and cont == 0:
             x3 = SelfAttention(ch=2*filters)(x3)
         x3 = _conv2d_block(
             inputs=x3,
@@ -346,7 +231,7 @@ def MDWF_Generator(
 
         # Field map decoder
         x4 = keras.layers.concatenate([x4, conv])
-        if cont == 0: # and self_attention
+        if FM_self_attention and cont == 0:
             x4 = SelfAttention(ch=2*filters)(x4)
         x4 = _conv2d_block(
             inputs=x4,
@@ -366,6 +251,7 @@ def MDWF_Generator(
         return keras.Model(inputs=[inputs1,inputs2], outputs=outputs)
     else:
         return keras.Model(inputs=inputs1, outputs=outputs)
+
 
 def PM_Generator(
     input_shape,
@@ -479,6 +365,7 @@ def PM_Generator(
         return keras.Model(inputs=[inputs,inputs2], outputs=outputs)
     else:
         return keras.Model(inputs=inputs, outputs=outputs)
+
 
 def PM_complex(
     input_shape,

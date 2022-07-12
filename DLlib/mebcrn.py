@@ -15,6 +15,7 @@ def _get_norm_layer(norm):
         return keras.layers.LayerNormalization
 
 def MEBCRN(input_shape=(192, 192, 12),
+           n_outputs=2,
 		   n_mebc_blocks=4,
 		   n_res_blocks=9,
            n_downsamplings=0,
@@ -185,19 +186,9 @@ def MEBCRN(input_shape=(192, 192, 12),
         h = Norm()(h)
         h = tf.nn.relu(h)
 
-    # R2* decoder
-    h2 = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal')(h)
-    h2 = Norm()(h2)
-    h2 = tf.nn.relu(h2)
-    h2 = keras.layers.Conv2D(1,3,padding='same',activation='sigmoid',kernel_initializer='glorot_normal')(h2)
+    h = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal')(h)
+    h = Norm()(h)
+    h = tf.nn.relu(h)
+    output = keras.layers.Conv2D(n_outputs,3,padding='same',activation='sigmoid',kernel_initializer='glorot_normal')(h)
 
-    # Field-map decoder
-    h3 = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal')(h)
-    h3 = Norm()(h3)
-    h3 = tf.nn.relu(h3)
-    h3 = keras.layers.Conv2D(1,3,padding='same',activation='tanh',kernel_initializer='glorot_normal')(h3)
-
-    # Concatenate outputs
-    outputs = keras.layers.concatenate([h2,h3])
-
-    return keras.Model(inputs=inputs, outputs=outputs)
+    return keras.Model(inputs=inputs, outputs=output)
