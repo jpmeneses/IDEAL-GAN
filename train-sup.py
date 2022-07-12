@@ -223,15 +223,13 @@ def train_G(A, B):
             A2B_PM = G_A2B(A, training=True)
             A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
 
+            # Split A2B param maps
+            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-                
-                # Split A2B param maps
-                A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-                A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-                A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
-                
-                # U-Net fieldmap correction
                 A2B_FM = (A2B_FM - 0.5) * 2
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
 
@@ -250,6 +248,16 @@ def train_G(A, B):
             # Compute model's output
             A2B_abs = G_A2B(A, training=True)
             A2B_abs = tf.where(A[:,:,:,:4]!=0.0,A2B_abs,0.0)
+
+            # Split A2B outputs
+            A2B_WF_abs, A2B_PM = tf.dynamic_partition(A2B,indx_B,num_partitions=2)
+            A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
+            A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
+
+            # Split A2B param maps
+            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
 
             # Compute loss
             B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
