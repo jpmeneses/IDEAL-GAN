@@ -281,12 +281,13 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         
         ############ Cycle-Consistency Losses #############
         if args.G_model != 'complex':
-            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        elif args.FM_fix:
-            A_real = A[:,:,:,0::2]
-            A_imag = A[:,:,:,1::2]
-            A_cplx = tf.complex(A_real,A_imag)
-            A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
+            if not(args.FM_fix):
+                A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+            else:
+                A_real = A[:,:,:,0::2]
+                A_imag = A[:,:,:,1::2]
+                A_cplx = tf.complex(A_real,A_imag)
+                A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
         else:
             A2B2A_cycle_loss = tf.math.real(cycle_loss_fn(A, A2B2A))
         B2A2B_cycle_loss = cycle_loss_fn(B_PM, B2A2B_PM)
