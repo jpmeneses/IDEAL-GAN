@@ -265,31 +265,11 @@ def train_G(A, B):
         elif args.out_vars == 'WF-PM':
             # Compute model's output
             A2B_abs = G_A2B(A, training=True)
-            A2B_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_abs,0.0)
+            A2B_abs = tf.where(A[:,:,:,:4]!=0.0,A2B_abs,0.0)
 
             # Compute loss
             B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
             sup_loss = sup_loss_fn(B_abs, A2B_abs)
-
-        if args.G_model != 'complex':
-            # B2A2B Mask
-            B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
-            # Split A2B param maps
-            B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
-        else:
-            B2A2B_R2 = tf.math.real(B2A2B_PM)
-            B2A2B_FM = tf.math.imag(B2A2B_PM)
-            B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
-            # B2A2B Mask
-            B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
-
-        # Merge B2A2B output maps 
-        # B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
-
-        ############ Cycle-Consistency Losses #############
-        sup_loss = sup_loss_fn(B_PM, B2A2B_PM)
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_R2)) * args.R2_TV_weight
@@ -298,47 +278,77 @@ def train_G(A, B):
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
         reg_term = R2_TV + FM_TV + R2_L1 + FM_L1
         
-        G_loss = B2A2B_cycle_loss + reg_term
+        G_loss = sup_loss + reg_term
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
-    return {'B2A2B_cycle_loss': B2A2B_cycle_loss,
+    return {'sup_loss': sup_loss,
             'TV_R2': R2_TV,
             'TV_FM': FM_TV,
             'L1_R2': R2_L1,
             'L1_FM': FM_L1}
 
 
-def train_step(B, te=None):
-    G_loss_dict = train_G(B, te)
+def train_step(A, B):
+    G_loss_dict = train_G(A, B)
     return G_loss_dict
 
 
 @tf.function
-def sample(B, te=None):
+def sample(A, B):
     indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
     indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     # Split B
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
+    B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
     B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-    # Compute B2A (+ noise) and estimate B2A2B
-    B2A = wf.IDEAL_model(B,echoes,te=te)
-    B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
-    B2A2B_PM = G_A2B([B2A,te], training=False)
-    # B2A2B Mask and compute rho
-    B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
-    B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te)
-    B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
+    # Magnitude of water/fat images
+    B_WF_real = B_WF[:,:,:,0::2]
+    B_WF_imag = B_WF[:,:,:,1::2]
+    B_WF_abs = tf.complex(B_WF_real,B_WF_imag)
+    # Estimate A2B
+    if args.out_vars == 'WF':
+        A2B_WF_abs = G_A2B(A, training=True)
+        A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+        A2B_PM = tf.zeros_like(B_PM)
+        A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+        val_sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
+    elif args.out_vars == 'PM':
+        A2B_PM = G_A2B(A, training=True)
+        A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
+        if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            A2B_FM = (A2B_FM - 0.5) * 2
+            A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+        A2B_WF = wf.get_rho(A,A2B_PM)
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.complex(A2B_WF_real,A2B_WF_imag)
+        A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+        val_sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
+    elif args.out_vars == 'WF-PM':
+        A2B_abs = G_A2B(A, training=True)
+        if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+            A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B,num_partitions=2)
+            A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
+            A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
+            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            A2B_FM = (A2B_FM - 0.5) * 2
+            A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
+        val_sup_loss = sup_loss_fn(B_abs, A2B_abs)
 
-    val_B2A2B_loss = cycle_loss_fn(B_PM, B2A2B_PM)
-    return B2A, B2A2B, {'B2A2B_cycle_loss': val_B2A2B_loss}
+    return A2B_abs, {'sup_loss': val_sup_loss}
 
-def validation_step(B, TE):
-    B2A, B2A2B, val_B2A2B_dict = sample(B, TE)
-    return B2A, B2A2B, val_B2A2B_dict
+def validation_step(A, B):
+    A2B_abs, val_sup_dict = sample(A, B)
+    return A2B_abs, val_sup_dict
 
 
 # ==============================================================================
@@ -364,10 +374,10 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'validation'))
 
 # sample
-val_iter = cycle(B_dataset_val)
+val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(valY))
+n_div = np.ceil(total_steps/len(valX))
 
 # main loop
 for ep in range(args.epochs):
@@ -378,7 +388,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for B in B_dataset:
+    for A, B in A_B_dataset:
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
@@ -394,14 +404,8 @@ for ep in range(args.epochs):
             # Random vertical reflections
             B = tf.image.random_flip_up_down(B)
         # ==============================================================================
-
-        # ==============================================================================
-        # =                                RANDOM TEs                                  =
-        # ==============================================================================
         
-        te_var = wf.gen_TEvar(args.n_echoes,args.batch_size)
-
-        G_loss_dict = train_step(B, te=te_var)
+        G_loss_dict = train_step(A, B)
 
         # # summary
         with train_summary_writer.as_default():
@@ -411,40 +415,28 @@ for ep in range(args.epochs):
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
-            B = next(val_iter)
+            A, B = next(val_iter)
+            A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
-            TE_valid = wf.gen_TEvar(args.n_echoes,1)
-            B2A, B2A2B, val_A2B_dict = validation_step(B, TE_valid)
+            B2A, val_sup_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
-                tl.summary(val_A2B_dict, step=G_optimizer.iterations, name='G_losses')
+                tl.summary(val_sup_dict, step=G_optimizer.iterations, name='G_losses')
 
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            if args.G_model != 'complex':
-                im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,0],B2A[:,:,:,1])))
-                im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,2],B2A[:,:,:,3])))
-                if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,4],B2A[:,:,:,5])))
-                if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,6],B2A[:,:,:,7])))
-                if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,8],B2A[:,:,:,9])))
-                if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,10],B2A[:,:,:,11])))
-            else:
-                im_ech1 = np.squeeze(np.abs(B2A[:,:,:,0]))
-                im_ech2 = np.squeeze(np.abs(B2A[:,:,:,1]))
-                if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(np.abs(B2A[:,:,:,2]))
-                if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(np.abs(B2A[:,:,:,3]))
-                if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(np.abs(B2A[:,:,:,4]))
-                if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(np.abs(B2A[:,:,:,5]))
+            im_ech1 = np.squeeze(np.abs(B2A[:,:,:,0]))
+            im_ech2 = np.squeeze(np.abs(B2A[:,:,:,1]))
+            if args.n_echoes >= 3:
+                im_ech3 = np.squeeze(np.abs(B2A[:,:,:,2]))
+            if args.n_echoes >= 4:
+                im_ech4 = np.squeeze(np.abs(B2A[:,:,:,3]))
+            if args.n_echoes >= 5:
+                im_ech5 = np.squeeze(np.abs(B2A[:,:,:,4]))
+            if args.n_echoes >= 6:
+                im_ech6 = np.squeeze(np.abs(B2A[:,:,:,5]))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
@@ -484,26 +476,26 @@ for ep in range(args.epochs):
             else:
                 fig.delaxes(axs[0,5])
 
-            # B2A2B maps in the second row
-            w_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,0],B2A2B[:,:,:,1])))
+            # A2B maps in the second row
+            w_aux = np.squeeze(A2B[:,:,:,0])
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            f_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,2],B2A2B[:,:,:,3])))
+            f_aux = np.squeeze(A2B[:,:,:,1])
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_aux = np.squeeze(B2A2B[:,:,:,4])
+            r2_aux = np.squeeze(A2B[:,:,:,2])
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_aux = np.squeeze(B2A2B[:,:,:,5])
+            field_aux = np.squeeze(A2B[:,:,:,3])
             field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
@@ -538,9 +530,6 @@ for ep in range(args.epochs):
             fig.delaxes(axs[2,0])
             fig.delaxes(axs[2,5])
 
-            fig.suptitle('TE1/dTE: '+str([TE_valid[0,0].numpy(),np.mean(np.diff(TE_valid))]), fontsize=16)
-
-            # plt.show()
             plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
             tl.make_space_above(axs,topmargin=0.8)
             plt.savefig(py.join(sample_dir, 'iter-%09d.png' % G_optimizer.iterations.numpy()),
