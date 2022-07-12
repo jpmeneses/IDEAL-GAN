@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-unsup.py --dataset 'Unsup-003' --G_model 'encod-decod' --n_G_filters 32 --batch_size 1 --epochs 30 --epoch_decay 30 --epoch_ckpt 5 --lr 0.0001 --beta_1 0.9 --beta_2 0.999 --R2_TV_weight 0.0001
+python train-IDEAL-unsup.py --dataset 'Unsup-003' --G_model 'encod-decod' --n_G_filters 32 --batch_size 1 --epochs 40 --epoch_decay 40 --epoch_ckpt 5 --lr 0.0001 --beta_1 0.9 --beta_2 0.999 --FM_fix True
