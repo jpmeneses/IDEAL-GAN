@@ -424,16 +424,16 @@ for ep in range(args.epochs):
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            im_ech1 = np.squeeze(np.abs(A[:,:,:,0]))
-            im_ech2 = np.squeeze(np.abs(A[:,:,:,1]))
+            im_ech1 = np.squeeze(np.abs(tf.complex(A[:,:,:,0],A[:,:,:,1])))
+            im_ech2 = np.squeeze(np.abs(tf.complex(A[:,:,:,2],A[:,:,:,3])))
             if args.n_echoes >= 3:
-                im_ech3 = np.squeeze(np.abs(A[:,:,:,2]))
+                im_ech3 = np.squeeze(np.abs(tf.complex(A[:,:,:,4],A[:,:,:,5])))
             if args.n_echoes >= 4:
-                im_ech4 = np.squeeze(np.abs(A[:,:,:,3]))
+                im_ech4 = np.squeeze(np.abs(tf.complex(A[:,:,:,6],A[:,:,:,7])))
             if args.n_echoes >= 5:
-                im_ech5 = np.squeeze(np.abs(A[:,:,:,4]))
+                im_ech5 = np.squeeze(np.abs(tf.complex(A[:,:,:,8],A[:,:,:,9])))
             if args.n_echoes >= 6:
-                im_ech6 = np.squeeze(np.abs(A[:,:,:,5]))
+                im_ech6 = np.squeeze(np.abs(tf.complex(A[:,:,:,10],A[:,:,:,11])))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
