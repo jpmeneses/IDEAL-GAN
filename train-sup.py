@@ -199,7 +199,6 @@ def train_G(A, B):
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     with tf.GradientTape() as t:
-        ##################### B Cycle #####################
         # Split B outputs
         B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
         B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
@@ -208,7 +207,7 @@ def train_G(A, B):
         # Magnitude of water/fat images
         B_WF_real = B_WF[:,:,:,0::2]
         B_WF_imag = B_WF[:,:,:,1::2]
-        B_WF_abs = tf.complex(B_WF_real,B_WF_imag)
+        B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
 
         if args.out_vars == 'WF':
             # Compute model's output
@@ -239,7 +238,7 @@ def train_G(A, B):
             # Magnitude of water/fat images
             A2B_WF_real = A2B_WF[:,:,:,0::2]
             A2B_WF_imag = A2B_WF[:,:,:,1::2]
-            A2B_WF_abs = tf.complex(A2B_WF_real,A2B_WF_imag)
+            A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
             
             # Compute loss
             sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -306,7 +305,7 @@ def sample(A, B):
     # Magnitude of water/fat images
     B_WF_real = B_WF[:,:,:,0::2]
     B_WF_imag = B_WF[:,:,:,1::2]
-    B_WF_abs = tf.complex(B_WF_real,B_WF_imag)
+    B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
     # Estimate A2B
     if args.out_vars == 'WF':
         A2B_WF_abs = G_A2B(A, training=True)
@@ -326,7 +325,7 @@ def sample(A, B):
         A2B_WF = wf.get_rho(A,A2B_PM)
         A2B_WF_real = A2B_WF[:,:,:,0::2]
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
-        A2B_WF_abs = tf.complex(A2B_WF_real,A2B_WF_imag)
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
         val_sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
     elif args.out_vars == 'WF-PM':
