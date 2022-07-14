@@ -46,6 +46,7 @@ py.arg('--B2A2B_weight', type=float, default=1.0)
 py.arg('--R2_critic_weight', type=float, default=1.0)
 py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
+py.arg('--R2_L1_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--R2_SelfAttention',type=bool, default=False)
 py.arg('--FM_SelfAttention',type=bool, default=True)
@@ -295,6 +296,7 @@ def train_G(A, B, te_A=None, te_B=None, ep=args.epochs):
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
         FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
+        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_R2),axis=(1,2,3))) * args.FM_L1_weight # * (1-ep/(args.epochs-1))
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight # * (1-ep/(args.epochs-1))
         reg_term = R2_TV + FM_TV + FM_L1
         

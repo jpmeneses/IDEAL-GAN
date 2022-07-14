@@ -21,6 +21,7 @@ def MEBCRN(input_shape=(192, 192, 12),
            n_downsamplings=0,
 		   filters=64,
            MLFF=True,
+           dropout=0.0,
            self_attention=False,
 		   norm='instance_norm'):
     Norm = _get_norm_layer(norm)
