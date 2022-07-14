@@ -230,6 +230,7 @@ def train_G(A, B):
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
                 A2B_FM = (A2B_FM - 0.5) * 2
+                A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
 
             # Compute water/fat
@@ -257,6 +258,12 @@ def train_G(A, B):
             A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
             A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
             A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+
+            # Restore field-map when necessary
+            if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+                A2B_FM = (A2B_FM - 0.5) * 2
+                A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+                A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
 
             # Compute loss
             B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
@@ -321,6 +328,7 @@ def sample(A, B):
             A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
             A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
             A2B_FM = (A2B_FM - 0.5) * 2
+            A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
         A2B_WF = wf.get_rho(A,A2B_PM)
         A2B_WF_real = A2B_WF[:,:,:,0::2]
@@ -338,6 +346,7 @@ def sample(A, B):
             A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
             A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
             A2B_FM = (A2B_FM - 0.5) * 2
+            A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
             A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
         val_sup_loss = sup_loss_fn(B_abs, A2B_abs)
 
