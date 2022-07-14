@@ -241,7 +241,7 @@ def train_G(A, B):
             A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
             
             # Compute loss
-            sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
+            sup_loss = sup_loss_fn(B_PM, A2B_PM)
 
         elif args.out_vars == 'WF-PM':
             # Compute model's output
@@ -327,7 +327,7 @@ def sample(A, B):
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
-        val_sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
+        val_sup_loss = sup_loss_fn(B_PM, A2B_PM)
     elif args.out_vars == 'WF-PM':
         A2B_abs = G_A2B(A, training=True)
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
