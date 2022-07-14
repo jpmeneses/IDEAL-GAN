@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL.py --dataset 'Sup-003' --G_model 'multi-decod' --n_filters 72
+python train-sup.py --dataset 'Sup-003' --G_model 'multi-decod' --n_filters 72
