@@ -277,6 +277,6 @@ for n_sample in range(len(samples)):
     plt.margins(0,0)
     plt.gca().xaxis.set_major_locator(plt.NullLocator())
     plt.gca().yaxis.set_major_locator(plt.NullLocator())
-    plt.savefig(save_dir+'/sample'+str(n_sample).zfill(3)+'.png',
+    plt.savefig(save_dir+'/sample'+str(samples[n_sample]).zfill(3)+'.png',
         bbox_inches = 'tight', pad_inches = 0)
     plt.close(fig)
