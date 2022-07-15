@@ -192,8 +192,11 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(A, B):
-    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
+    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
+                        tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
+
+    indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
+                            tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
 
     indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
@@ -201,7 +204,7 @@ def train_G(A, B):
     with tf.GradientTape() as t:
         # Split B outputs
         B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-        B_WF = tf.reshape(B_WF,B[:,:,:,:2].shape)
+        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
         B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
 
         # Magnitude of water/fat images
@@ -250,7 +253,7 @@ def train_G(A, B):
             A2B_abs = tf.where(A[:,:,:,:4]!=0.0,A2B_abs,0.0)
 
             # Split A2B outputs
-            A2B_WF_abs, A2B_PM = tf.dynamic_partition(A2B_abs,indx_B,num_partitions=2)
+            A2B_WF_abs, A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
             A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
             A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
 
@@ -301,8 +304,10 @@ def train_step(A, B):
 
 @tf.function
 def sample(A, B):
-    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
+    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
+                        tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
+    indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
+                            tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
     indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     # Split B
@@ -339,7 +344,7 @@ def sample(A, B):
     elif args.out_vars == 'WF-PM':
         A2B_abs = G_A2B(A, training=True)
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-            A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B,num_partitions=2)
+            A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
             A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
             A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
             A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
