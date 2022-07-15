@@ -250,7 +250,7 @@ def train_G(A, B):
             A2B_abs = tf.where(A[:,:,:,:4]!=0.0,A2B_abs,0.0)
 
             # Split A2B outputs
-            A2B_WF_abs, A2B_PM = tf.dynamic_partition(A2B,indx_B,num_partitions=2)
+            A2B_WF_abs, A2B_PM = tf.dynamic_partition(A2B_abs,indx_B,num_partitions=2)
             A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
             A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
 
