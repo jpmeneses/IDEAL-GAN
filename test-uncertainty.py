@@ -190,7 +190,6 @@ save_dir = py.join(args.experiment_dir, 'samples_testing', 'Uncertainty')
 py.mkdir(save_dir)
 
 dropout_levels = [0.01,0.02,0.05,0.1,0.2,0.5]
-# dropout_Y = tf.zeros((len(dropout_levels),1,hgt,wdt,4))
 
 i = 0
 for d_lev in dropout_levels:
@@ -225,30 +224,32 @@ print('Saving images...')
 for n_sample in range(len(samples)):
     out_Y_1 = dropout_Y[0]
     A2B_1 = out_Y_1[n_sample,:,:,:]
+    out_Y_mid = dropout_Y[len(dropout_levels)//2]
+    A2B_mid = out_Y_mid[n_sample,:,:,:]
     out_Y_end = dropout_Y[-1]
     A2B_end = out_Y_end[n_sample,:,:,:]
     B = testY[n_sample,:,:,:]
 
     fig, axs = plt.subplots(figsize=(14, 6), nrows=2, ncols=4)
 
-    # Ground-truth W/F images in the first column
-    w_aux = np.squeeze(np.abs(tf.complex(B[:,:,0],B[:,:,1])))
-    f_aux = np.squeeze(np.abs(tf.complex(B[:,:,2],B[:,:,3])))
-    W_ok = axs[0,0].imshow(w_aux, cmap='bone', interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(W_ok, ax=axs[0,0])
-    axs[0,0].axis('off')
-    F_ok = axs[1,0].imshow(f_aux, cmap='pink', interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(F_ok, ax=axs[1,0])
-    axs[1,0].axis('off')
-
     # Smallest dropout W/F images in the second column
     wn_aux_1 = A2B_1[:,:,0]
     fn_aux_1 = A2B_1[:,:,1]
-    Wn_ok_1 = axs[0,1].imshow(wn_aux_1, cmap='bone', interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(Wn_ok_1, ax=axs[0,1])
+    Wn_ok_1 = axs[0,0].imshow(wn_aux_1, cmap='bone', interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(Wn_ok_1, ax=axs[0,0])
+    axs[0,0].axis('off')
+    Fn_ok_1 = axs[1,0].imshow(fn_aux_1, cmap='pink', interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(Fn_ok_1, ax=axs[1,0])
+    axs[1,0].axis('off')
+
+    # Smallest dropout W/F images in the second column
+    wn_aux_mid = A2B_mid[:,:,0]
+    fn_aux_mid = A2B_mid[:,:,1]
+    Wn_ok_mid = axs[0,1].imshow(wn_aux_mid, cmap='bone', interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(Wn_ok_mid, ax=axs[0,1])
     axs[0,1].axis('off')
-    Fn_ok_1 = axs[1,1].imshow(fn_aux_1, cmap='pink', interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(Fn_ok_1, ax=axs[1,1])
+    Fn_ok_mid = axs[1,1].imshow(fn_aux_mid, cmap='pink', interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(Fn_ok_mid, ax=axs[1,1])
     axs[1,1].axis('off')
 
     # Largest dropout W/F images in the third column
