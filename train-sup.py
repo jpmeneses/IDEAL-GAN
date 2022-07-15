@@ -201,7 +201,7 @@ def train_G(A, B):
     with tf.GradientTape() as t:
         # Split B outputs
         B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
+        B_WF = tf.reshape(B_WF,B[:,:,:,:2].shape)
         B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
 
         # Magnitude of water/fat images
@@ -307,7 +307,7 @@ def sample(A, B):
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     # Split B
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-    B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
+    B_WF = tf.reshape(B_WF,B[:,:,:,:2].shape)
     B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
     # Magnitude of water/fat images
     B_WF_real = B_WF[:,:,:,0::2]
