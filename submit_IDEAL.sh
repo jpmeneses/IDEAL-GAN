@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-sup.py --dataset 'Sup-004' --out_vars 'WF-PM' --G_model 'U-Net' --n_filters 72
+python train-sup.py --dataset 'Sup-005' --out_vars 'WF-PM' --G_model 'multi-decod' --n_filters 72
