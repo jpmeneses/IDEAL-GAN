@@ -267,7 +267,7 @@ def train_G(A, B):
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
                 A2B_FM = (A2B_FM - 0.5) * 2
                 A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
-                A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+                A2B_abs = tf.stack([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
 
             # Compute loss
             sup_loss = sup_loss_fn(B_abs, A2B_abs)
@@ -353,7 +353,7 @@ def sample(A, B):
             A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
             A2B_FM = (A2B_FM - 0.5) * 2
             A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
-            A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
+            A2B_abs = tf.stack([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
         val_sup_loss = sup_loss_fn(B_abs, A2B_abs)
 
     return A2B_abs, {'sup_loss': val_sup_loss}
