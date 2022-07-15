@@ -249,6 +249,7 @@ def train_G(A, B):
 
         elif args.out_vars == 'WF-PM':
             # Compute model's output
+            B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
             A2B_abs = G_A2B(A, training=True)
             A2B_abs = tf.where(A[:,:,:,:4]!=0.0,A2B_abs,0.0)
 
@@ -269,7 +270,6 @@ def train_G(A, B):
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
 
             # Compute loss
-            B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
             sup_loss = sup_loss_fn(B_abs, A2B_abs)
 
         ################ Regularizers #####################
@@ -342,6 +342,7 @@ def sample(A, B):
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
         val_sup_loss = sup_loss_fn(B_PM, A2B_PM)
     elif args.out_vars == 'WF-PM':
+        B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
         A2B_abs = G_A2B(A, training=True)
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
             A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
