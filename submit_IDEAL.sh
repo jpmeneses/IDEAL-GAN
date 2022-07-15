@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --job-name=v004-sup
-#SBATCH --output=out_sup_004.txt
+#SBATCH --job-name=v005-sup
+#SBATCH --output=out_sup_005.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
