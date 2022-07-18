@@ -344,6 +344,7 @@ def sample(A, B):
     elif args.out_vars == 'WF-PM':
         B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
         A2B_abs = G_A2B(A, training=True)
+        A2B_PM = tf.where(B_abs!=0.0,A2B_PM,0.0)
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
             A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
             A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)

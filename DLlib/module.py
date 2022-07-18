@@ -241,7 +241,7 @@ def MDWF_Generator(
         # Update counter
         cont += 1
 
-    x2 = keras.layers.Conv2D(2, (1, 1), activation='relu', kernel_initializer='glorot_normal')(x2)
+    x2 = keras.layers.Conv2D(2, (1, 1), activation='relu', kernel_initializer='he_normal')(x2)
     x3 = keras.layers.Conv2D(1, (1, 1), activation='relu', kernel_initializer='he_normal')(x3)
     x4 = keras.layers.Conv2D(1, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x4)
 
