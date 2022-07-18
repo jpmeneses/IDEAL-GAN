@@ -31,12 +31,12 @@ args.__dict__.update(test_args.__dict__)
 # =                                   excel                                    =
 # ==============================================================================
 workbook = xlsxwriter.Workbook(py.join(args.experiment_dir, 'uncertainty.xlsx'))
-ws_MAE = workbook.add_worksheet('Var')
-ws_MAE.write(0,0,'Water')
-ws_MAE.write(0,1,'Fat')
-ws_MAE.write(0,2,'PDFF')
-ws_MAE.write(0,3,'R2*')
-ws_MAE.write(0,4,'FieldMap')
+ws_unc = workbook.add_worksheet('Mean Unc')
+ws_unc.write(0,0,'Water')
+ws_unc.write(0,1,'Fat')
+ws_unc.write(0,2,'PDFF')
+ws_unc.write(0,3,'R2*')
+ws_unc.write(0,4,'FieldMap')
 
 # ==============================================================================
 # =                                    data                                    =
@@ -204,6 +204,11 @@ for d_lev in dropout_levels:
         X_batch = tf.expand_dims(X_batch,0)
         slice_d_lev_Y = sample_A2B(X_batch)
         slice_d_lev_Y = tf.where(X_batch[:,:,:,:4]!=0.0,slice_d_lev_Y,0.0)
+        # Estimate PDFF
+        PDFF_batch = slice_d_lev_Y[:,:,:,1]/(slice_d_lev_Y[:,:,:,0]+slice_d_lev_Y[:,:,:,1])
+        # PDFF_batch[np.isnan(PDFF_batch)] = 0.0
+        PDFF_batch = tf.expand_dims(PDFF_batch,axis=-1)
+        slice_d_lev_Y = tf.concat([slice_d_lev_Y,PDFF_batch],axis=-1)
         if sl == 0:
             d_lev_Y = slice_d_lev_Y
         else:
@@ -281,3 +286,18 @@ for n_sample in range(len(samples)):
     plt.savefig(save_dir+'/sample'+str(samples[n_sample]).zfill(3)+'.png',
         bbox_inches = 'tight', pad_inches = 0)
     plt.close(fig)
+
+    # Mean uncertainty
+    unc_w = np.mean(wn_unc)
+    unc_f = np.mean(fn_unc)
+    # unc_pdff = np.sqrt(np.mean(tf.square(PDFF_aux-PDFFn_aux), axis=(0,1)))
+    # unc_r2 = np.sqrt(np.mean(tf.square(r2_aux-r2n_aux), axis=(0,1)))
+    # unc_fm = np.sqrt(np.mean(tf.square(field_aux-fieldn_aux), axis=(0,1)))
+
+    ws_unc.write(n_sample+1,0,unc_w)
+    ws_unc.write(n_sample+1,1,unc_f)
+    # ws_MSE.write(i+1,2,MSE_pdff)
+    # ws_MSE.write(i+1,3,MSE_r2)
+    # ws_MSE.write(i+1,4,MSE_fm)
+
+workbook.close()
