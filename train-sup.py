@@ -251,7 +251,7 @@ def train_G(A, B):
             # Compute model's output
             B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
             A2B_abs = G_A2B(A, training=True)
-            A2B_abs = tf.where(B[:,:,:,:echoes]!=0.0,A2B_abs,0.0)
+            A2B_abs = tf.where(B[:,:,:,:4]!=0.0,A2B_abs,0.0)
 
             # Split A2B outputs
             A2B_WF_abs, A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
