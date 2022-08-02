@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow.keras as keras
+import tensorflow_probability as tfp
 
 from DLlib import bn, complex_utils
 from DLlib.attention import SelfAttention, AdaIN
@@ -131,6 +132,7 @@ def MDWF_Generator(
     te_shape=(6,),
     filters=72,
     num_layers=4,
+    dropout=0.0,
     WF_self_attention=False,
     R2_self_attention=False,
     FM_self_attention=True,
@@ -144,6 +146,7 @@ def MDWF_Generator(
     def _conv2d_block(
         inputs,
         filters=16,
+        dropout=0.0,
         kernel_size=(3, 3),
         kernel_initializer="he_normal",
         padding="same",
@@ -157,6 +160,8 @@ def MDWF_Generator(
             use_bias=False,
             )(inputs)
         c = Norm()(c)
+        if dropout > 0.0:
+            c = keras.layers.SpatialDropout2D(dropout)(c)
         c = keras.layers.Conv2D(
             filters,
             kernel_size,
@@ -177,6 +182,7 @@ def MDWF_Generator(
         x = _conv2d_block(
             inputs=x,
             filters=filters,
+            dropout=dropout
             )
         down_layers.append(x)
         x = keras.layers.MaxPooling2D((2, 2))(x)
@@ -197,6 +203,7 @@ def MDWF_Generator(
     x = _conv2d_block(
         inputs=x,
         filters=filters,
+        dropout=dropout
         )
 
     cont = 0
@@ -217,7 +224,8 @@ def MDWF_Generator(
             x2 = SelfAttention(ch=2*filters)(x2)
         x2 = _conv2d_block(
             inputs=x2,
-            filters=filters
+            filters=filters,
+            dropout=dropout
             )
 
         # R2* decoder
@@ -226,7 +234,8 @@ def MDWF_Generator(
             x3 = SelfAttention(ch=2*filters)(x3)
         x3 = _conv2d_block(
             inputs=x3,
-            filters=filters
+            filters=filters,
+            dropout=dropout
             )
 
         # Field map decoder
@@ -235,7 +244,8 @@ def MDWF_Generator(
             x4 = SelfAttention(ch=2*filters)(x4)
         x4 = _conv2d_block(
             inputs=x4,
-            filters=filters
+            filters=filters,
+            dropout=dropout
             )
 
         # Update counter
@@ -255,10 +265,12 @@ def MDWF_Generator(
 
 def PM_Generator(
     input_shape,
+    bayesian=False,
     te_input=False,
     te_shape=(6,),
     filters=72,
     num_layers=4,
+    dropout=0.0,
     R2_self_attention=False,
     FM_self_attention=True,
     norm='instance_norm'):
@@ -271,6 +283,7 @@ def PM_Generator(
     def _conv2d_block(
         inputs,
         filters=16,
+        dropout=0.0,
         kernel_size=(3, 3),
         kernel_initializer="he_normal",
         padding="same",
@@ -283,8 +296,9 @@ def PM_Generator(
             padding=padding,
             use_bias=False,
             )(inputs)
-        # c = tf.nn.relu6(c)
         c = Norm()(c)
+        if dropout > 0.0:
+            c = keras.layers.SpatialDropout2D(dropout)(c)
         c = keras.layers.Conv2D(
             filters,
             kernel_size,
@@ -293,7 +307,6 @@ def PM_Generator(
             padding=padding,
             use_bias=False,
             )(c)
-        # c = tf.nn.relu6(c)
         c = Norm()(c)
         return c
 
@@ -306,6 +319,7 @@ def PM_Generator(
         x = _conv2d_block(
             inputs=x,
             filters=filters,
+            dropout=dropout
             )
 
         if te_input:
@@ -322,6 +336,7 @@ def PM_Generator(
     x = _conv2d_block(
         inputs=x,
         filters=filters,
+        dropout=dropout
         )
 
     cont = 0
@@ -340,7 +355,8 @@ def PM_Generator(
             x2 = SelfAttention(ch=2*filters)(x2)
         x2 = _conv2d_block(
             inputs=x2,
-            filters=filters
+            filters=filters,
+            dropout=dropout
             )
 
         # Field map decoder
@@ -349,15 +365,19 @@ def PM_Generator(
             x3 = SelfAttention(ch=2*filters)(x3)
         x3 = _conv2d_block(
             inputs=x3,
-            filters=filters
+            filters=filters,
+            dropout=dropout
             )
 
         # Update counter
         cont += 1
 
-    x2 = keras.layers.Conv2D(1, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
-    # x2 = tf.nn.relu6(x2)
-    x3 = keras.layers.Conv2D(1, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
+    if not(bayesian):
+        x2 = keras.layers.Conv2D(1, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
+        x3 = keras.layers.Conv2D(1, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
+    else:
+        x2 = tfp.layers.Convolution2DFlipout(1, (1, 1), activation='sigmoid')(x2)
+        x3 = tfp.layers.Convolution2DFlipout(1, (1, 1), activation='tanh')(x3)
 
     outputs = keras.layers.concatenate([x2,x3])
 
