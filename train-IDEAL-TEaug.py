@@ -91,13 +91,12 @@ out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-n1_div = 248
-n3_div = 0
-n4_div = 434
+# n1_div = 248
+# n3_div = 0
+# n4_div = 434
 
-trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],out_maps_4[n4_div:,:,:,:]),axis=0)
-valY    = out_maps_2
-testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
+trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+valY    = out_maps_1
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,n_out = np.shape(trainY)
@@ -116,9 +115,6 @@ print('Training output shape:',trainY.shape)
 
 # Input and output dimensions (validations data)
 print('Validation output shape:',valY.shape)
-
-# Input and output dimensions (testing data)
-print('Testing output shape:',testY.shape)
 
 B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
 B_dataset = B_dataset.batch(args.batch_size).shuffle(len(trainY))
