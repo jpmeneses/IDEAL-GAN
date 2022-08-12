@@ -194,10 +194,11 @@ def sample_A2B(A,TE=None):
             A2B_abs = G_A2B([A,TE], training=False)
         else:
             A2B_abs = G_A2B(A, training=False)
-        A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
-        A2B_WF_abs = tf.reshape(A2B_WF_abs,A[:,:,:,:2].shape)
-        A2B_PM = tf.reshape(A2B_PM,A[:,:,:,:2].shape)
+        A2B_abs = tf.where(A[:,:,:,:4]!=0.0,A2B_abs,0.0)
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+            A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
+            A2B_WF_abs = tf.reshape(A2B_WF_abs,A[:,:,:,:2].shape)
+            A2B_PM = tf.reshape(A2B_PM,A[:,:,:,:2].shape)
             A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
             A2B_R2 = tf.reshape(A2B_R2,A[:,:,:,:1].shape)
             A2B_FM = tf.reshape(A2B_FM,A[:,:,:,:1].shape)

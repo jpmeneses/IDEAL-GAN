@@ -40,8 +40,9 @@ ws_unc = workbook.add_worksheet('Mean Unc')
 ws_unc.write(0,0,'Num. Sample')
 ws_unc.write(0,1,'Water')
 ws_unc.write(0,2,'Fat')
-ws_unc.write(0,3,'R2*')
-ws_unc.write(0,4,'FieldMap')
+ws_unc.write(0,3,'PDFF')
+ws_unc.write(0,4,'R2*')
+ws_unc.write(0,5,'FieldMap')
 
 # ==============================================================================
 # =                                    data                                    =
@@ -230,10 +231,10 @@ for d_lev in dropout_levels:
         X_batch = tf.expand_dims(X_batch,0)
         slice_d_lev_Y = sample_A2B(X_batch,TE=TE_smp)
         slice_d_lev_Y = tf.where(X_batch[:,:,:,:4]!=0.0,slice_d_lev_Y,0.0)
-        # PDFF_batch = X_batch[:,:,:,1]/(X_batch[:,:,:,0]+X_batch[:,:,:,1])
-        # PDFF_batch = tf.where(tf.math.is_nan(PDFF_batch),0.0,PDFF_batch)
-        # PDFF_batch = tf.expand_dims(PDFF_batch,axis=-1)
-        # slice_d_lev_Y = tf.concat([slice_d_lev_Y,PDFF_batch],axis=-1)
+        PDFF_batch = slice_d_lev_Y[:,:,:,1]/(slice_d_lev_Y[:,:,:,0]+slice_d_lev_Y[:,:,:,1])
+        PDFF_batch = tf.where(tf.math.is_nan(PDFF_batch),0.0,PDFF_batch)
+        PDFF_batch = tf.expand_dims(PDFF_batch,axis=-1)
+        slice_d_lev_Y = tf.concat([slice_d_lev_Y,PDFF_batch],axis=-1)
         if sl == 0:
             d_lev_Y = slice_d_lev_Y
         else:
@@ -257,6 +258,7 @@ for n_sample in range(len_dataset):
     fn_unc = uncertain_maps[n_sample,:,:,1]
     r2n_unc = uncertain_maps[n_sample,:,:,2]*np.square(r2_sc)
     FMn_unc = uncertain_maps[n_sample,:,:,3]*np.square(fm_sc)
+    PDFFn_unc = uncertain_maps[n_sample,:,:,4]
 
     out_Y_1 = dropout_Y[0]
     A2B_1 = out_Y_1[n_sample,:,:,:]
@@ -264,42 +266,54 @@ for n_sample in range(len_dataset):
     A2B_mid = out_Y_mid[n_sample,:,:,:]
     out_Y_end = dropout_Y[-1]
     A2B_end = out_Y_end[n_sample,:,:,:]
-    B = testY[n_sample,:,:,:]
+    # B = testY[n_sample,:,:,:]
 
     # ==========================================================================
     # =                           Fig 1: W/F images                            =
     # ==========================================================================
-    fig, axs = plt.subplots(figsize=(14, 6), nrows=2, ncols=4)
+    fig, axs = plt.subplots(figsize=(14, 9), nrows=3, ncols=4)
 
     # Smallest dropout W/F images in the first column
     wn_aux_1 = A2B_1[:,:,0]
     fn_aux_1 = A2B_1[:,:,1]
+    PDFFn_aux_1 = A2B_1[:,:,4]
     Wn_ok_1 = axs[0,0].imshow(wn_aux_1, cmap='bone', interpolation='none', vmin=0, vmax=1)
     fig.colorbar(Wn_ok_1, ax=axs[0,0])
     axs[0,0].axis('off')
     Fn_ok_1 = axs[1,0].imshow(fn_aux_1, cmap='pink', interpolation='none', vmin=0, vmax=1)
     fig.colorbar(Fn_ok_1, ax=axs[1,0])
     axs[1,0].axis('off')
+    PDFFn_ok_1 = axs[2,0].imshow(PDFFn_aux_1, cmap='gray', interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(PDFFn_ok_1, ax=axs[2,0])
+    axs[2,0].axis('off')
 
     # Medium dropout W/F images in the second column
     wn_aux_mid = A2B_mid[:,:,0]
     fn_aux_mid = A2B_mid[:,:,1]
+    PDFFn_aux_mid = A2B_mid[:,:,4]
     Wn_ok_mid = axs[0,1].imshow(wn_aux_mid, cmap='bone', interpolation='none', vmin=0, vmax=1)
     fig.colorbar(Wn_ok_mid, ax=axs[0,1])
     axs[0,1].axis('off')
     Fn_ok_mid = axs[1,1].imshow(fn_aux_mid, cmap='pink', interpolation='none', vmin=0, vmax=1)
     fig.colorbar(Fn_ok_mid, ax=axs[1,1])
     axs[1,1].axis('off')
+    PDFFn_ok_mid = axs[2,1].imshow(PDFFn_aux_mid, cmap='gray', interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(PDFFn_ok_mid, ax=axs[2,1])
+    axs[2,1].axis('off')
 
     # Largest dropout W/F images in the third column
     wn_aux_end = A2B_end[:,:,0]
     fn_aux_end = A2B_end[:,:,1]
+    PDFFn_aux_end = A2B_end[:,:,4]
     Wn_ok_end = axs[0,2].imshow(wn_aux_end, cmap='bone', interpolation='none', vmin=0, vmax=1)
     fig.colorbar(Wn_ok_end, ax=axs[0,2])
     axs[0,2].axis('off')
     Fn_ok_end = axs[1,2].imshow(fn_aux_end, cmap='pink', interpolation='none', vmin=0, vmax=1)
     fig.colorbar(Fn_ok_end, ax=axs[1,2])
     axs[1,2].axis('off')
+    PDFFn_ok_end = axs[2,2].imshow(PDFFn_aux_end, cmap='gray', interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(PDFFn_ok_end, ax=axs[2,2])
+    axs[2,2].axis('off')
 
     # Uncertainty images in the fourth column
     Wn_unc = axs[0,3].imshow(wn_unc, cmap='cividis', interpolation='none', vmin=0, vmax=0.001)
@@ -308,6 +322,9 @@ for n_sample in range(len_dataset):
     Fn_unc = axs[1,3].imshow(fn_unc, cmap='magma', interpolation='none', vmin=0, vmax=0.001)
     fig.colorbar(Fn_unc, ax=axs[1,3])
     axs[1,3].axis('off')
+    PDFF_n_unc = axs[2,3].imshow(PDFFn_unc, cmap='inferno', interpolation='none', vmin=0, vmax=0.001)
+    fig.colorbar(PDFF_n_unc, ax=axs[2,3])
+    axs[2,3].axis('off')
 
     plt.gca().set_axis_off()
     plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
@@ -378,13 +395,15 @@ for n_sample in range(len_dataset):
     # ==========================================================================
     unc_w = np.mean(wn_unc)
     unc_f = np.mean(fn_unc)
+    unc_pdff = np.mean(PDFFn_unc)
     unc_r2 = np.mean(r2n_unc)
     unc_fm = np.mean(FMn_unc)
 
     ws_unc.write(n_sample+1,0,n_sample)
     ws_unc.write(n_sample+1,1,unc_w)
     ws_unc.write(n_sample+1,2,unc_f)
-    ws_unc.write(n_sample+1,3,unc_r2)
-    ws_unc.write(n_sample+1,4,unc_fm)
+    ws_unc.write(n_sample+1,3,unc_pdff)
+    ws_unc.write(n_sample+1,4,unc_r2)
+    ws_unc.write(n_sample+1,5,unc_fm)
 
 workbook.close()
