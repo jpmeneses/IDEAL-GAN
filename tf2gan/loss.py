@@ -124,7 +124,8 @@ def R1_regularization(f, real_sample):
     return reg_loss
 
 def STDw_MSE(x,y,std):
-    msd = tf.math.squared_difference(x,y)
+    msd = tf.reduce_mean(tf.math.squared_difference(x,y),axis=-1)
+    std = tf.reduce_mean(std,axis=-1)
     std = tf.where(tf.abs(std)<1e-12,1e-12,std)
     STDw_msd = msd/std
     STDw_msd += tf.math.log(std)
