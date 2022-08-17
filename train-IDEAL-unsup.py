@@ -24,6 +24,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='encod-decod', choices=['encod-decod','complex','U-Net','MEBCRN'])
+py.arg('--UQ',type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=200)
@@ -135,9 +136,10 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 if args.G_model == 'encod-decod':
     G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                            filters=args.n_G_filters,
+                            bayesian=args.UQ,
                             te_input=False,
                             te_shape=(args.n_echoes,),
+                            filters=args.n_G_filters,
                             R2_self_attention=args.R2_SelfAttention,
                             FM_self_attention=args.FM_SelfAttention)
 elif args.G_model == 'complex':
@@ -181,9 +183,20 @@ def train_G(A):
     indx_PM =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
+    indx_mv =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
+
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        A2B_PM = G_A2B(A, training=True)
+        if not(args.UQ):
+            A2B_PM = G_A2B(A, training=True)
+        else:
+            A2B_PM, A2B_prob = G_A2B(A, training=True)
+            A2B_mean,A2B_std = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=2)
+            A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:2].shape)
+            A2B_std = tf.reshape(A2B_std,A[:,:,:,:2].shape)
         
         if args.G_model != 'complex':
             # A2B Mask
@@ -213,6 +226,8 @@ def train_G(A):
             A_imag = A[:,:,:,1::2]
             A_cplx = tf.complex(A_real,A_imag)
             A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
+        elif args.UQ:
+            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
@@ -246,8 +261,19 @@ def sample(A, B):
                         tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
     indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
+    indx_mv =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
-    A2B_PM = G_A2B(A, training=False)
+    if not(args.UQ):
+        A2B_PM = G_A2B(A, training=True)
+    else:
+        A2B_PM, A2B_prob = G_A2B(A, training=True)
+        A2B_mean,A2B_std = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=2)
+        A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:2].shape)
+        A2B_std = tf.reshape(A2B_std,A[:,:,:,:2].shape)
+        
     if args.G_model == 'U-Net':
         orig_shape = A2B_PM.shape
         A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
@@ -272,6 +298,8 @@ def sample(A, B):
         A_imag = A[:,:,:,1::2]
         A_cplx = tf.complex(A_real,A_imag)
         val_A2B2A_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
+    elif args.UQ:
+        val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
     else:
         val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
     return A2B, A2B2A, {'A2B2A_cycle_loss': val_A2B2A_loss}

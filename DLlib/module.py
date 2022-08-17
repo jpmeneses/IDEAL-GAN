@@ -375,14 +375,24 @@ def PM_Generator(
     if not(bayesian):
         x2 = keras.layers.Conv2D(1, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
         x3 = keras.layers.Conv2D(1, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
+        
     else:
-        x2 = tfp.layers.Convolution2DFlipout(1, (1, 1), activation='sigmoid')(x2)
-        x3 = tfp.layers.Convolution2DFlipout(1, (1, 1), activation='tanh')(x3)
-
+        x2_prob = keras.layers.Conv2D(2, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
+        x2 = tf.transpose(x2_prob,perm=[0,3,1,2])
+        x2 = tf.keras.layers.Flatten()(x2)
+        x2 = tfp.layers.IndependentNormal([input_shape[0],input_shape[1],1])(x2)
+        x3_prob = keras.layers.Conv2D(2, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
+        x3 = tf.transpose(x3_prob,perm=[0,3,1,2])
+        x3 = tf.keras.layers.Flatten()(x3)
+        x3 = tfp.layers.IndependentNormal([input_shape[0],input_shape[1],1])(x3)
+        out_prob = keras.layers.concatenate([x2_prob,x3_prob])
+    
     outputs = keras.layers.concatenate([x2,x3])
 
     if te_input:
         return keras.Model(inputs=[inputs,inputs2], outputs=outputs)
+    elif bayesian:
+        return keras.Model(inputs=inputs, outputs=[outputs,out_prob])
     else:
         return keras.Model(inputs=inputs, outputs=outputs)
 

@@ -20,8 +20,11 @@ from skimage.metrics import structural_similarity
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','phantom'])
+py.arg('--out_vars', default='PM', choices=['WF','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
-py.arg('--batch_size', type=int, default=1)
+py.arg('--n_filters', type=int, default=72)
+py.arg('--D1_SelfAttention',type=bool, default=False)
+py.arg('--D2_SelfAttention',type=bool, default=True)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
@@ -54,6 +57,8 @@ ws_MSE.write(0,6,'B2A2B Fat')
 ws_MSE.write(0,7,'B2A2B PDFF')
 ws_MSE.write(0,8,'B2A2B R2*')
 ws_MSE.write(0,9,'B2A2B FieldMap')
+ws_MSE.write(0,10,'TE1')
+ws_MSE.write(0,11,'dTE')
 
 ws_SSIM = workbook.add_worksheet('SSIM')
 ws_SSIM.write(0,0,'A2B Water')
@@ -77,8 +82,8 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../MRI-Datasets/'
-dataset_hdf5 = 'UNet-' + args.dataset + '/' + args.dataset + '_GC_192_complex_2D.hdf5'
+dataset_dir = '../MRI-Datasets/HDF5-DS/'
+dataset_hdf5 = args.dataset + '_GC_192_complex_2D.hdf5'
 testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
                                     acqs_data=True, te_data=True,
                                     complex_data=(args.G_model=='complex'))
@@ -104,12 +109,50 @@ A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,TEs,testY))
 A_B_dataset_test.batch(1)
 
 # model
-G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                        filters=args.n_G_filters,
-                        te_input=args.te_input,
-                        te_shape=(args.n_echoes,),
-                        R2_self_attention=args.R2_SelfAttention,
-                        FM_self_attention=args.FM_SelfAttention)
+if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
+    if args.out_vars == 'WF-PM':
+        G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
+                                te_input=args.te_input,
+                                filters=args.n_filters,
+                                dropout=0.0,
+                                WF_self_attention=args.D1_SelfAttention,
+                                R2_self_attention=args.D2_SelfAttention,
+                                FM_self_attention=args.D3_SelfAttention)
+    else:
+        G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+                                te_input=args.te_input,
+                                te_shape=(args.n_echoes,),
+                                filters=args.n_filters,
+                                dropout=0.0,
+                                R2_self_attention=args.D1_SelfAttention,
+                                FM_self_attention=args.D2_SelfAttention)
+
+elif args.G_model == 'U-Net':
+    if args.out_vars == 'WF-PM':
+        n_out = 4
+    else:
+        n_out = 2
+    G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
+                        num_classes=n_out,
+                        dropout=0.0,
+                        use_dropout_on_upsampling=True,
+                        use_attention=args.D1_SelfAttention,
+                        filters=args.n_filters)
+
+elif args.G_model == 'MEBCRN':
+    if args.out_vars == 'WF-PM':
+        n_out = 4
+    else:
+        n_out = 2
+    G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
+                    n_outputs=n_out,
+                    n_res_blocks=5,
+                    n_downsamplings=2,
+                    filters=args.n_filters,
+                    self_attention=args.D1_SelfAttention)
+
+else:
+    raise(NameError('Unrecognized Generator Architecture'))
 
 # restore
 tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
@@ -150,91 +193,96 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     B = tf.expand_dims(B,axis=0)
     A2B, A2B2A = sample_A2B(A,TE_smp)
     B2A, B2A2B = sample_B2A(B,TE_smp)
-    
-    fig,axs=plt.subplots(figsize=(14, 9), nrows=3, ncols=4)
 
-    # A2B maps in the first row
     w_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,0],A2B[:,:,:,1])))
-    W_ok = axs[0,0].imshow(w_aux, cmap='bone',
-                      interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(W_ok, ax=axs[0,0])
-    axs[0,0].axis('off')
-
     f_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,2],A2B[:,:,:,3])))
-    F_ok = axs[0,1].imshow(f_aux, cmap='pink',
-                      interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(F_ok, ax=axs[0,1])
-    axs[0,1].axis('off')
-
     r2_aux = np.squeeze(A2B[:,:,:,4])
-    r2_ok = axs[0,2].imshow(r2_aux*r2_sc, cmap='copper',
-                       interpolation='none', vmin=0, vmax=r2_sc)
-    fig.colorbar(r2_ok, ax=axs[0,2])
-    axs[0,2].axis('off')
-
     field_aux = np.squeeze(A2B[:,:,:,5])
-    field_ok = axs[0,3].imshow(field_aux*fm_sc, cmap='twilight',
-                          interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-    fig.colorbar(field_ok, ax=axs[0,3])
-    axs[0,3].axis('off')
 
-    # B2A2B maps in the second row
     w_aux_2 = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,0],B2A2B[:,:,:,1])))
-    W_ok_2 = axs[1,0].imshow(w_aux_2, cmap='bone',
-                      interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(W_ok_2, ax=axs[1,0])
-    axs[1,0].axis('off')
-
     f_aux_2 = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,2],B2A2B[:,:,:,3])))
-    F_ok_2 = axs[1,1].imshow(f_aux_2, cmap='pink',
-                      interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(F_ok_2, ax=axs[1,1])
-    axs[1,1].axis('off')
-
     r2_aux_2 = np.squeeze(B2A2B[:,:,:,4])
-    r2_ok_2 = axs[1,2].imshow(r2_aux_2*r2_sc, cmap='copper',
-                       interpolation='none', vmin=0, vmax=r2_sc)
-    fig.colorbar(r2_ok_2, ax=axs[1,2])
-    axs[1,2].axis('off')
-
     field_aux_2 = np.squeeze(B2A2B[:,:,:,5])
-    field_ok_2 = axs[1,3].imshow(field_aux_2*fm_sc, cmap='twilight',
-                          interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-    fig.colorbar(field_ok_2, ax=axs[1,3])
-    axs[1,3].axis('off')
 
-    # Ground-truth in the third row
     wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
-    W_unet = axs[2,0].imshow(wn_aux, cmap='bone',
-                        interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(W_unet, ax=axs[2,0])
-    axs[2,0].axis('off')
-
     fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
-    F_unet = axs[2,1].imshow(fn_aux, cmap='pink',
-                        interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(F_unet, ax=axs[2,1])
-    axs[2,1].axis('off')
-
     r2n_aux = np.squeeze(B[:,:,:,4])
-    r2_unet = axs[2,2].imshow(r2n_aux*r2_sc, cmap='copper',
-                         interpolation='none', vmin=0, vmax=r2_sc)
-    fig.colorbar(r2_unet, ax=axs[2,2])
-    axs[2,2].axis('off')
-
     fieldn_aux = np.squeeze(B[:,:,:,5])
-    field_unet = axs[2,3].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                            interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-    fig.colorbar(field_unet, ax=axs[2,3])
-    axs[2,3].axis('off')
+    
+    if i%50 == 0 or args.dataset == 'phantom':
+        fig,axs=plt.subplots(figsize=(14, 9), nrows=3, ncols=4)
 
-    fig.suptitle('TE1/dTE: '+str([TE_smp[0,0].numpy(),np.mean(np.diff(TE_smp))]), fontsize=18)
+        # A2B maps in the first row
+        W_ok = axs[0,0].imshow(w_aux, cmap='bone',
+                          interpolation='none', vmin=0, vmax=1)
+        fig.colorbar(W_ok, ax=axs[0,0])
+        axs[0,0].axis('off')
 
-    # plt.show()
-    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
-    tl.make_space_above(axs,topmargin=0.6)
-    plt.savefig(save_dir+'/sample'+str(i).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
-    plt.close(fig)
+        F_ok = axs[0,1].imshow(f_aux, cmap='pink',
+                          interpolation='none', vmin=0, vmax=1)
+        fig.colorbar(F_ok, ax=axs[0,1])
+        axs[0,1].axis('off')
+
+        r2_ok = axs[0,2].imshow(r2_aux*r2_sc, cmap='copper',
+                           interpolation='none', vmin=0, vmax=r2_sc)
+        fig.colorbar(r2_ok, ax=axs[0,2])
+        axs[0,2].axis('off')
+
+        field_ok = axs[0,3].imshow(field_aux*fm_sc, cmap='twilight',
+                              interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+        fig.colorbar(field_ok, ax=axs[0,3])
+        axs[0,3].axis('off')
+
+        # B2A2B maps in the second row
+        W_ok_2 = axs[1,0].imshow(w_aux_2, cmap='bone',
+                          interpolation='none', vmin=0, vmax=1)
+        fig.colorbar(W_ok_2, ax=axs[1,0])
+        axs[1,0].axis('off')
+
+        F_ok_2 = axs[1,1].imshow(f_aux_2, cmap='pink',
+                          interpolation='none', vmin=0, vmax=1)
+        fig.colorbar(F_ok_2, ax=axs[1,1])
+        axs[1,1].axis('off')
+
+        r2_ok_2 = axs[1,2].imshow(r2_aux_2*r2_sc, cmap='copper',
+                           interpolation='none', vmin=0, vmax=r2_sc)
+        fig.colorbar(r2_ok_2, ax=axs[1,2])
+        axs[1,2].axis('off')
+
+        field_ok_2 = axs[1,3].imshow(field_aux_2*fm_sc, cmap='twilight',
+                              interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+        fig.colorbar(field_ok_2, ax=axs[1,3])
+        axs[1,3].axis('off')
+
+        # Ground-truth in the third row
+        W_unet = axs[2,0].imshow(wn_aux, cmap='bone',
+                            interpolation='none', vmin=0, vmax=1)
+        fig.colorbar(W_unet, ax=axs[2,0])
+        axs[2,0].axis('off')
+
+        F_unet = axs[2,1].imshow(fn_aux, cmap='pink',
+                            interpolation='none', vmin=0, vmax=1)
+        fig.colorbar(F_unet, ax=axs[2,1])
+        axs[2,1].axis('off')
+
+        r2_unet = axs[2,2].imshow(r2n_aux*r2_sc, cmap='copper',
+                             interpolation='none', vmin=0, vmax=r2_sc)
+        fig.colorbar(r2_unet, ax=axs[2,2])
+        axs[2,2].axis('off')
+
+        field_unet = axs[2,3].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                                interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+        fig.colorbar(field_unet, ax=axs[2,3])
+        axs[2,3].axis('off')
+
+        fig.suptitle('TE1/dTE: '+str([TE_smp[0,0].numpy(),np.mean(np.diff(TE_smp))]), fontsize=18)
+
+        # plt.show()
+        plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+        tl.make_space_above(axs,topmargin=0.6)
+        plt.savefig(save_dir+'/sample'+str(i).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+        fig.clear()
+        plt.close(fig)
 
     PDFF_aux = f_aux/(w_aux+f_aux)
     PDFF_aux[np.isnan(PDFF_aux)] = 0.0
@@ -269,6 +317,8 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     ws_MSE.write(i+1,7,MSE_pdff)
     ws_MSE.write(i+1,8,MSE_r2)
     ws_MSE.write(i+1,9,MSE_fm)
+    ws_MSE.write(i+1,10,TE_smp[0,0].numpy())
+    ws_MSE.write(i+1,11,np.mean(np.diff(TE_smp)))
 
     # MAE
     MAE_w = np.mean(tf.abs(w_aux-wn_aux), axis=(0,1))
