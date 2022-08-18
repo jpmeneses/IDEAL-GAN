@@ -33,6 +33,7 @@ py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpo
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
+py.arg('--std_log_weight', type=float, default=1.0)
 py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--R2_L1_weight', type=float, default=0.0)
@@ -227,7 +228,7 @@ def train_G(A):
             A_cplx = tf.complex(A_real,A_imag)
             A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
         elif args.UQ:
-            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
+            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, args.std_log_weight)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
