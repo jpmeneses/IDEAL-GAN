@@ -381,7 +381,7 @@ def PM_Generator(
         x2 = tf.transpose(x2_prob,perm=[0,3,1,2])
         x2 = tf.keras.layers.Flatten()(x2)
         x2 = tfp.layers.IndependentNormal([input_shape[0],input_shape[1],1])(x2)
-        x3_prob = keras.layers.Conv2D(2, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
+        x3_prob = keras.layers.Conv2D(2, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x3)
         x3 = tf.transpose(x3_prob,perm=[0,3,1,2])
         x3 = tf.keras.layers.Flatten()(x3)
         x3 = tfp.layers.IndependentNormal([input_shape[0],input_shape[1],1])(x3)

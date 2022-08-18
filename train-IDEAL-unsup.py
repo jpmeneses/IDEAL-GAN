@@ -205,7 +205,7 @@ def train_G(A):
             A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
             A2B_R2 = tf.reshape(A2B_R2,A[:,:,:,:1].shape)
             A2B_FM = tf.reshape(A2B_FM,A[:,:,:,:1].shape)
-            if args.G_model == 'U-Net':
+            if args.G_model == 'U-Net' or args.UQ:
                 A2B_FM = (A2B_FM - 0.5) * 2
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
         else:
@@ -273,8 +273,8 @@ def sample(A, B):
         A2B_mean,A2B_std = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=2)
         A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:2].shape)
         A2B_std = tf.reshape(A2B_std,A[:,:,:,:2].shape)
-        
-    if args.G_model == 'U-Net':
+
+    if args.G_model == 'U-Net' or args.UQ:
         orig_shape = A2B_PM.shape
         A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
         A2B_R2 = tf.reshape(A2B_R2,A[:,:,:,:1].shape)
