@@ -25,8 +25,9 @@ from matplotlib.ticker import PercentFormatter
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--experiment_dir',default='output/WF-sep')
 py.arg('--te_input', type=bool, default=False)
-py.arg('--multi-TE', type=bool, default=False)
-py.arg('--mTE_frac', type=int, default=1)
+py.arg('--multi_TE', type=bool, default=False)
+py.arg('--TE1', type=float, default=0.0013)
+py.arg('--dTE', type=float, default=0.0021)
 py.arg('--batch_size', type=int, default=1)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
@@ -37,13 +38,9 @@ workbook = xlsxwriter.Workbook(py.join(args.experiment_dir,args.map+'_ROIs.xlsx'
 ws_ROI_1 = workbook.add_worksheet('RHL')
 ws_ROI_1.write(0,0,'Ground-truth')
 ws_ROI_1.write(0,1,'Model res.')
-ws_ROI_1.write(0,2,'TE1')
-ws_ROI_1.write(0,3,'dTE')
 ws_ROI_2 = workbook.add_worksheet('LHL')
 ws_ROI_2.write(0,0,'Ground-truth')
 ws_ROI_2.write(0,1,'Model res.')
-ws_ROI_2.write(0,2,'TE1')
-ws_ROI_2.write(0,3,'dTE')
 
 # data
 ech_idx = args.n_echoes * 2
@@ -60,15 +57,8 @@ elif args.n_echoes == 3:
   npy_file = 'slices_crops_3ech.npy'
 testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
                                   te_data=True,complex_data=(args.G_model=='complex'))
-
 if args.multi_TE:
-  idx_all = np.shape(testX)[0]
-  idx_part = np.floor(idx_all/5)
-  idx_ini = (args.mTE_frac-1)*idx_part
-  idx_end = args.mTE_frac*idx_part
-  testX = testX[idx_ini:idx_end,:,:,:]
-  testY = testY[idx_ini:idx_end,:,:,:]
-  TEs = TEs[idx_ini:idx_end,:]
+  testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE)
 
 len_dataset,hgt,wdt,d_ech = np.shape(testX)
 _,_,_,n_out = np.shape(testY)
@@ -114,23 +104,18 @@ def sample_A2B(A,TE=None):
   return A2B, A2B2A
 
 all_test_ans = np.zeros(testY.shape)
-all_TEs = np.zeros((len_dataset,2))
 i = 0
 
 for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
   A = tf.expand_dims(A,axis=0)
   B = tf.expand_dims(B,axis=0)
   TE= tf.expand_dims(TE,axis=0)
-  TE1 = TE[0,0].numpy()
-  dTE = np.mean(np.diff(TE))
   if args.te_input:
     A2B, A2B2A = sample_A2B(A,TE)
   else:
     A2B, A2B2A = sample_A2B(A)
 
   all_test_ans[i,:,:,:] = A2B
-  all_TEs[i,0] = TE1
-  all_TEs[i,1] = dTE
   i += 1
 
 w_all_ans = np.abs(tf.complex(all_test_ans[:,:,:,0],all_test_ans[:,:,:,1]))
@@ -187,8 +172,6 @@ if args.map != 'Water':
   XA_gt_all = []
   XB_res_all = []
   XB_gt_all = []
-  TE1_all = []
-  dTE_all = []
   for idx in range(len(tracker.frms)):
     k = tracker.frms[idx]
     # Crop A
@@ -205,9 +188,6 @@ if args.map != 'Water':
     c1_B,c2_B = left_x_B,(left_x_B+9)
     XB_all = X[r1_B:r2_B,c1_B:c2_B,k]
     XB_all_gt = X_gt[r1_B:r2_B,c1_B:c2_B,k]
-    # TEs (if available)
-    TE1_sel = all_TEs[k,0]
-    dTE_sel = all_TEs[k,1]
     if args.map == 'PDFF':
       # Crop A
       XA_res_aux = np.median(XA_all,axis=(0,1))
@@ -228,9 +208,6 @@ if args.map != 'Water':
     # Crop B
     XB_res_all.append(XB_res_aux)
     XB_gt_all.append(XB_gt_aux)
-    # TEs (if available)
-    TE1_all.append(TE1_sel)
-    dTE_all.append(dTE_sel)
   print('Max. measurements:\n',
         np.max(np.abs(XA_res_all)),
         np.max(np.abs(XB_res_all))
@@ -310,12 +287,8 @@ if args.map != 'Water':
   for idx1 in range(len(XA_gt_all)):
     ws_ROI_1.write(idx1+1,0,XA_gt_all[idx1])
     ws_ROI_1.write(idx1+1,1,XA_res_all[idx1])
-    ws_ROI_1.write(idx1+1,2,TE1_all[idx1])
-    ws_ROI_1.write(idx1+1,3,dTE_all[idx1])
   for idx2 in range(len(XB_gt_all)):
     ws_ROI_2.write(idx2+1,0,XB_gt_all[idx2])
     ws_ROI_2.write(idx2+1,1,XB_res_all[idx2])
-    ws_ROI_2.write(idx2+1,2,TE1_all[idx2])
-    ws_ROI_2.write(idx2+1,3,dTE_all[idx2])
 
 workbook.close()

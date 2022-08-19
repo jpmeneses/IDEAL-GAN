@@ -4,4 +4,5 @@ __pycache__/
 /deprecated/
 /output/
 DiscTest.py
+TE-idx.ipynb
 out_*
