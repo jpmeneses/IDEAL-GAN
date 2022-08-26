@@ -1,29 +1,23 @@
-from __future__ import print_function
-
 import tensorflow as tf
-from utils import *
+import numpy as np
 
 import DLlib as dl
 import pylib as py
 import tf2lib as tl
 import wflib as wf
 import data
+from utils import *
 
-import numpy as np
 import statsmodels.api as sm
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import matplotlib.gridspec as gridspec
 import tqdm
-import h5py
 import xlsxwriter
-import os
 
+import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import PercentFormatter
 
-py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--experiment_dir',default='output/WF-sep')
+py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--te_input', type=bool, default=False)
 py.arg('--multi_TE', type=bool, default=False)
 py.arg('--TE1', type=float, default=0.0013)
@@ -34,7 +28,12 @@ args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
 
 # Excel file for saving ROIs values
-workbook = xlsxwriter.Workbook(py.join(args.experiment_dir,args.map+'_ROIs.xlsx'))
+if args.multi_TE:
+  workbook =xlsxwriter.Workbook(py.join(args.experiment_dir,args.map + '_ROIs_'
+                                + str(int(np.round(args.TE1*1e4))) + '_' + str(int(np.round(args.dTE*1e4))) 
+                                + '.xlsx'))
+else:
+  workbook = xlsxwriter.Workbook(py.join(args.experiment_dir,args.map+'_ROIs.xlsx'))
 ws_ROI_1 = workbook.add_worksheet('RHL')
 ws_ROI_1.write(0,0,'Ground-truth')
 ws_ROI_1.write(0,1,'Model res.')
@@ -48,17 +47,17 @@ ech_idx = args.n_echoes * 2
 dataset_dir = '../MRI-Datasets/'
 if args.n_echoes == 6 and not(args.multi_TE):
   dataset_hdf5 = 'UNet-multiTE/6ech_GC_192_origTEs_complex_2D.hdf5'
-  npy_file = 'slices_crops_3ech.npy'
 elif args.n_echoes == 6 and args.multi_TE:
   dataset_hdf5 = 'HDF5-DS/multiTE_GC_192_complex_2D.hdf5'
-  npy_file = 'slices_crops_multiTE.npy'
 elif args.n_echoes == 3:
   dataset_hdf5 = 'UNet-multiTE/3ech_GC_192_complex_2D.hdf5'
-  npy_file = 'slices_crops_3ech.npy'
 testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
-                                  te_data=True,complex_data=(args.G_model=='complex'))
+                                  te_data=True,complex_data=(args.G_model=='complex'),remove_zeros=False)
 if args.multi_TE:
   testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE)
+  npy_file = 'slices_crops_multiTE.npy'
+else:
+  npy_file = 'slices_crops_3ech.npy'
 
 len_dataset,hgt,wdt,d_ech = np.shape(testX)
 _,_,_,n_out = np.shape(testY)
@@ -81,16 +80,15 @@ A_B_dataset_test.batch(1)
 #################################################################################
 
 # model
-with tf.device('/cpu:0'):
-  G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                          filters=args.n_G_filters,
-                          te_input=args.te_input,
-                          te_shape=(args.n_echoes,),
-                          R2_self_attention=args.R2_SelfAttention,
-                          FM_self_attention=args.FM_SelfAttention)
+G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+                        filters=args.n_G_filters,
+                        te_input=args.te_input,
+                        te_shape=(args.n_echoes,),
+                        R2_self_attention=args.R2_SelfAttention,
+                        FM_self_attention=args.FM_SelfAttention)
 
-  # restore
-  tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+# restore
+tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
 def sample_A2B(A,TE=None):
@@ -162,7 +160,7 @@ fig.canvas.mpl_connect('key_press_event', tracker.key_press)
 plt.show()
 
 # Save slices indexes and crops coordinates
-with open('slices_crops_3ech.npy', 'wb') as f:
+with open(npy_file, 'wb') as f:
   np.save(f,np.array(tracker.frms))
   np.save(f,np.array(tracker.crops_1))
   np.save(f,np.array(tracker.crops_2))

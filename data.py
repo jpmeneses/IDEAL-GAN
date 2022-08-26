@@ -28,7 +28,7 @@ class ItemPool:
                     out_items.append(in_item)
         return tf.stack(out_items, axis=0)
 
-def load_hdf5(ds_dir,hdf5_file,ech_idx,acqs_data=True,te_data=False,complex_data=False):
+def load_hdf5(ds_dir,hdf5_file,ech_idx,acqs_data=True,te_data=False,complex_data=False,remove_zeros=True):
     f = h5py.File(ds_dir + hdf5_file, 'r')
     if acqs_data:
         acqs = f['Acquisitions'][...]
@@ -37,10 +37,13 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx,acqs_data=True,te_data=False,complex_data
         TEs = f['TEs'][...]
     f.close()
 
-    idxs_list = []
-    for nd in range(len(out_maps)):
-        if np.sum(out_maps[nd,:,:,0])!=0.0:
-            idxs_list.append(nd)
+    if remove_zeros:
+        idxs_list = []
+        for nd in range(len(out_maps)):
+            if np.sum(out_maps[nd,:,:,0])!=0.0:
+                idxs_list.append(nd)
+    else:
+        idxs_list = [i for i in range(len(out_maps))]
 
     out_maps = out_maps[idxs_list,:,:,:]
 
@@ -87,15 +90,21 @@ def group_TEs(A,B,TEs,TE1,dTE):
     flag_sel = False
     flag_noTE = True
 
-    for idx in range(len_dataset):
-        TE1_i = np.round(TEs[idx,0],4)
-        dTE_i = np.round(np.mean(np.diff(TEs[idx,:])),4)
+    for idx in range(len_dataset+1):
+        if idx < len_dataset:
+            TE1_i = np.round(TEs[idx,0],4)
+            dTE_i = np.round(np.mean(np.diff(TEs[idx,:])),4)
+        else:
+            TE1_i = TE1_orig
+            dTE_i = dTE_orig
 
         # Check if it corresponds to original TEs
         if TE1_i==TE1_orig and dTE_i==dTE_orig:
             if not(flag_orig):
                 flag_orig = True
                 if num_pat > 0:
+                    # Si paciente anterior no tenía imags en comb TEs seleccionada:
+                    # Guardar índices de slice orig (paciente anterior) y convertir a 0
                     if flag_noTE:
                         for os in orig_slices:
                             all_null_slices.append(os)
