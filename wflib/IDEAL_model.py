@@ -192,7 +192,7 @@ def get_Ps_norm(acqs,param_maps,te=None):
         te = tf.expand_dims(te,0)
         te = tf.tile(te,[n_batch,1])
 
-    ne = len(te)
+    ne = te.shape[1]
     M, M_pinv, P0 = gen_M(te,get_P0=True)
 
     te_complex = tf.complex(0.0,te)
