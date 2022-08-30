@@ -24,6 +24,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='encod-decod', choices=['encod-decod','complex','U-Net','MEBCRN'])
+py.arg('--Ps_norm', type=bool, default=False)
 py.arg('--UQ',type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=1)
