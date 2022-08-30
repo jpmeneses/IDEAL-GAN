@@ -12,7 +12,7 @@ library(emmeans)
 ############################################################################
 
 model = "/TEaug-002/"
-epoch = "90"
+epoch = "100"
 
 dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
@@ -34,7 +34,7 @@ for (i in c(1:length(ls_sheets)))
 		im_id = append(im_id,rep(c(i),length(t(roi_data[,1]))))
 	}
 }
-meas = meas/length(ls_sheets)
+# meas = meas/length(ls_sheets)
 n_data = length(refs)
 
 # Create a data frame

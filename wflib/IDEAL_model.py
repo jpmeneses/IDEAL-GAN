@@ -41,90 +41,6 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
     elif not(get_Mpinv) and not(get_P0):
         return M
 
-def acq_add_te(acqs,out_maps,te_orig,te_mod,complex_data=False):
-    n_batch,hgt,wdt,d_ech = acqs.shape
-    if complex_data:
-        n_ech = d_ech
-    else:
-        n_ech = d_ech//2
-
-    ne = te_orig.shape[1]
-
-    # Generate complex signal
-    if not(complex_data):
-        real_S = acqs[:,:,:,0::2]
-        imag_S = acqs[:,:,:,1::2]
-        S = tf.complex(real_S,imag_S)
-    else:
-        S = acqs
-
-    voxel_shape = tf.convert_to_tensor((hgt,wdt))
-    num_voxel = tf.math.reduce_prod(voxel_shape)
-    Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # shape: (bs,ne,nv)
-
-    # Split water/fat images (orig_rho) and param. maps
-    orig_rho = out_maps[:,:,:,:4]
-    param_maps = out_maps[:,:,:,4:]
-    r2s = param_maps[:,:,:,0] * r2_sc
-    phi = param_maps[:,:,:,1] * fm_sc
-    
-    # Generate complex water/fat signals
-    real_rho = orig_rho[:,:,:,0::2]
-    imag_rho = orig_rho[:,:,:,1::2]
-    rho = tf.complex(real_rho,imag_rho) * rho_sc 
-
-    rho_mtx = tf.transpose(tf.reshape(rho, [n_batch, num_voxel, ns]), perm=[0,2,1]) # shape: (bs,ns,nv)
-
-    Arho = tf.linalg.matmul(A_p,rho_mtx) # shape: (bs,np,nv)
-
-    # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi,r2s/(2*np.pi))
-    xi_rav = tf.reshape(xi,[n_batch, num_voxel]) # shape: (bs,nv)
-
-    D_xi = 2j*np.pi*xi_rav # shape: (bs,nv)
-    D_xi = tf.expand_dims(D_xi,1) # shape: (bs,1,nv)
-    D_p = tf.linalg.diag(2j*np.pi*tf.squeeze(f_p)) # shape: (np,np)
-    DpArho = tf.linalg.matmul(D_p,Arho) # shape: (bs,np,nv)
-
-    dt = 0.00001e-3
-
-    for ech_idx in range(ne):
-        S_ech = Smtx[:,ech_idx,:] # shape: (bs,nv)
-        S_ech = tf.expand_dims(S_ech,1) # shape: (bs,1,nv)
-        te_ini = tf.cast(tf.squeeze(te_orig[:,ech_idx]),tf.float32)
-        te_end = tf.cast(tf.squeeze(te_mod[:,ech_idx]),tf.float32)
-        if te_ini <= te_end:
-            t_vec = tf.range(start=te_ini,limit=te_end,delta=dt)
-        else:
-            t_vec = tf.range(start=te_end,limit=te_ini,delta=dt)
-        for t in t_vec:
-            t = tf.cast(t,tf.complex64)
-            P_ech = tf.math.exp(2j*np.pi*t*f_p) # shape: (1,np)
-            W_ech = tf.math.exp(xi_rav*t) # shape: (bs,nv)
-            W_ech = tf.expand_dims(W_ech,1) # shape: (bs,1,nv)
-            PDpArho = tf.linalg.matmul(P_ech,DpArho) # shape: (bs,1,nv)
-            WPDpArho = W_ech * PDpArho # shape: (bs,1,nv)
-            S_dt = D_xi*S_ech + WPDpArho
-            S_ech += S_dt*dt
-        if ech_idx == 0:
-            Smtx_hat = S_ech
-        else:
-            Smtx_hat = tf.concat([Smtx_hat, S_ech], axis=1)
-
-    # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(tf.transpose(Smtx_hat, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
-
-    Re_gt = tf.math.real(S_hat)
-    Im_gt = tf.math.imag(S_hat)
-    zero_fill = tf.zeros_like(Re_gt)
-    re_stack = tf.stack([Re_gt,zero_fill],4)
-    re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*n_ech])
-    im_stack = tf.stack([zero_fill,Im_gt],4)
-    im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*n_ech])
-    res_gt = re_aux + im_aux
-    
-    return res_gt
-
 
 def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
@@ -264,6 +180,7 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False):
     else:
         return S_hat
 
+
 def get_Ps_norm(acqs,param_maps,te=None):
     n_batch,hgt,wdt,d_ech = acqs.shape
     n_ech = d_ech//2
@@ -290,8 +207,9 @@ def get_Ps_norm(acqs,param_maps,te=None):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1])
 
-    r2s = param_maps[:,:,:,0] * r2_sc
+    # r2s = param_maps[:,:,:,0] * r2_sc
     phi = param_maps[:,:,:,1] * fm_sc
+    r2s = tf.zeros_like(phi)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
@@ -315,6 +233,7 @@ def get_Ps_norm(acqs,param_maps,te=None):
     L2_norm = tf.abs(tf.reduce_sum(L2_norm_vec))
 
     return L2_norm
+
 
 def get_rho(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape

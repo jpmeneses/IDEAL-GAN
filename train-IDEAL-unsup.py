@@ -217,9 +217,8 @@ def train_G(A):
         
         if args.FM_fix:
             A2B_WF, A2B2A = wf.abs_acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-        else:
+        elif not args.Ps_norm:
             A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-        A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
         ############ Cycle-Consistency Losses #############
         if args.FM_fix:
@@ -229,6 +228,8 @@ def train_G(A):
             A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
         elif args.UQ:
             A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, args.std_log_weight)
+        elif args.Ps_norm:
+            A2B2A_cycle_loss = wf.get_Ps_norm(A, A2B_PM)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
