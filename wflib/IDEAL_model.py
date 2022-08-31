@@ -74,8 +74,9 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # shape: (bs,nv,ne)
 
-    r2s = param_maps[:,:,:,0] * r2_sc
+    # r2s = param_maps[:,:,:,0] * r2_sc
     phi = param_maps[:,:,:,1] * fm_sc
+    r2s = tf.zeros_like(phi)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))

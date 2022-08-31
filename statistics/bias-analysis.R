@@ -12,7 +12,7 @@ library(emmeans)
 ############################################################################
 
 model = "/TEaug-002/"
-epoch = "100"
+epoch = "80"
 
 dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
@@ -41,9 +41,11 @@ n_data = length(refs)
 pdff_Data <- data.frame(
 mean = c(meas),
 refs = c(refs),
-Site_Protocol = factor(c(im_id),labels=c("S1-P1(V1)","S1-P2(V1)","S1-P1(V2)","S1-P2(V2)",
-		   "S2-P1","S2-P2","S3-P1","S3-P2","S4-P2","S6-P1","S6-P2"))
+Site_Protocol = factor(c(im_id),labels=c("S1-P1","S1-P2",
+		   "S2-P1","S2-P2","S3-P1","S3-P2","S6-P1","S6-P2"))
 )
+# factor(c(im_id),labels=c("S1-P1(V1)","S1-P2(V1)","S1-P1(V2)","S1-P2(V2)",
+		   "S2-P1","S2-P2","S3-P1","S3-P2","S4-P2","S6-P1","S6-P2"))
 
 # Dataset summary stats
 pdff_Data %>%
@@ -60,4 +62,4 @@ q = ggplot(pdff_Data, aes(refs, mean)) +
     aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"))
     )
 fn1 = "LS-corr.png"
-ggsave(plot=q, width=6, height=4, dpi=400, filename=fn1)
+ggsave(plot=q, width=6, height=4, dpi=1200, filename=fn1)
