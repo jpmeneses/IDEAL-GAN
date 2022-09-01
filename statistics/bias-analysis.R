@@ -11,8 +11,8 @@ library(emmeans)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-002/"
-epoch = "80"
+model = "/TEaug-005/"
+epoch = "150"
 
 dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
