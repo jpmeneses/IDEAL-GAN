@@ -215,10 +215,7 @@ def train_G(A):
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
             A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
         
-        if args.FM_fix:
-            A2B_WF, A2B2A = wf.abs_acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-        else:
-            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
 
         ############ Cycle-Consistency Losses #############
         if args.FM_fix:
@@ -287,10 +284,7 @@ def sample(A, B):
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     # A2B Mask
     A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
-    if args.FM_fix:
-        A2B_WF, A2B2A = wf.abs_acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-    else:
-        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+    A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
     A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
     if args.FM_fix:
