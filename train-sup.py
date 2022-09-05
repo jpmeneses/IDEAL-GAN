@@ -24,7 +24,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--out_vars', default='WF', choices=['WF','PM','WF-PM'])
-py.arg('--G_model', default='encod-decod', choices=['multi-decod','U-Net','MEBCRN'])
+py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
 py.arg('--n_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=32)
 py.arg('--epochs', type=int, default=100)
@@ -94,13 +94,17 @@ n1_div = 248
 n3_div = 0
 n4_div = 434
 
-trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
-valX    = acqs_2
-testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
+trainX = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+valX = acqs_1
+# trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
+# valX    = acqs_2
+# testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
 
-trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
-valY    = out_maps_2
-testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
+trainY = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+valY = out_maps_1
+# trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
+# valY    = out_maps_2
+# testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(trainX)
@@ -120,8 +124,8 @@ print('Validation input shape:',valX.shape)
 print('Validation output shape:',valY.shape)
 
 # Input and output dimensions (testing data)
-print('Testing input shape:',testX.shape)
-print('Testing output shape:',testY.shape)
+# print('Testing input shape:',testX.shape)
+# print('Testing output shape:',testY.shape)
 
 A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
