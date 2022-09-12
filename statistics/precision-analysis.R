@@ -11,7 +11,7 @@ library(emmeans)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-004/"
+model = "/Sup-007/"
 epoch = "200"
 
 dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")

@@ -23,7 +23,8 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='encod-decod', choices=['encod-decod','complex'])
+py.arg('--G_model', default='encod-decod', choices=['encod-decod','U-Net','complex'])
+py.arg('--out_vars', default='WF', choices=['WF','PM','WF-PM'])
 py.arg('--n_G_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=200)
@@ -36,8 +37,9 @@ py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--R2_L1_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
-py.arg('--R2_SelfAttention',type=bool, default=False)
-py.arg('--FM_SelfAttention',type=bool, default=True)
+py.arg('--D1_SelfAttention',type=bool, default=False)
+py.arg('--D2_SelfAttention',type=bool, default=True)
+py.arg('--D3_SelfAttention',type=bool, default=True)
 args = py.args()
 
 # output_dir
@@ -132,14 +134,25 @@ if args.G_model == 'encod-decod':
                             filters=args.n_G_filters,
                             te_input=True,
                             te_shape=(args.n_echoes,),
-                            R2_self_attention=args.R2_SelfAttention,
-                            FM_self_attention=args.FM_SelfAttention)
+                            R2_self_attention=args.D1_SelfAttention,
+                            FM_self_attention=args.D2_SelfAttention)
+elif args.G_model == 'U-Net':
+    if args.out_vars == 'WF-PM':
+        n_out = 4
+    else:
+        n_out = 2
+    G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+                    n_out=n_out,
+                    te_input=True,
+                    te_shape=(args.n_echoes,),
+                    filters=args.n_G_filters,
+                    self_attention=args.D1_SelfAttention)
 elif args.G_model == 'complex':
     G_A2B=dl.PM_complex(input_shape=(hgt,wdt,d_ech),
                         filters=args.n_G_filters,
                         te_input=True,
                         te_shape=(args.n_echoes,),
-                        self_attention=(args.R2_SelfAttention and args.FM_SelfAttention))
+                        self_attention=(args.D1_SelfAttention and args.D2_SelfAttention))
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
@@ -164,20 +177,27 @@ def train_G(B, te=None):
         ##################### B Cycle #####################
         # Split B outputs
         B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
+        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
         B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
 
         B2A = wf.IDEAL_model(B,echoes,te=te)
         B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
-        B2A2B_PM = G_A2B([B2A,te], training=True)
-        # B2A2B_WF = wf.get_rho(B2A,B2A2B_PM)
-
         if args.G_model != 'complex':
-            # B2A2B Mask
-            B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
-            # Split A2B param maps
-            B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+            if args.out_vars == 'WF':
+                r_B_WF = B_WF[:,:,:,0::2]
+                i_B_WF = B_WF[:,:,:,1::2]
+                B_WF_abs = tf.abs(tf.complex(r_B_WF,i_B_WF))
+                B2A2B_WF_abs = G_A2B([B2A,te], training=True)
+                B2A2B_WF_abs = tf.where(B_PM!=0.0,B2A2B_WF_abs,0.0)
+                B2A2B_PM = tf.zeros_like(B2A2B_WF)
+                ############### Cycle-Consistency Loss #################
+                B2A2B_cycle_loss = cycle_loss_fn(B_WF_abs, B2A2B_WF_abs)
+            elif args.out_vars == 'PM':
+                B2A2B_PM = G_A2B([B2A,te], training=True)
+                B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
+                # B2A2B_WF = wf.get_rho(B2A,B2A2B_PM)
+                ############ Cycle-Consistency Loss ############
+                B2A2B_cycle_loss = cycle_loss_fn(B_PM, B2A2B_PM)
         else:
             B2A2B_R2 = tf.math.real(B2A2B_PM)
             B2A2B_FM = tf.math.imag(B2A2B_PM)
@@ -188,10 +208,12 @@ def train_G(B, te=None):
         # Merge B2A2B output maps 
         # B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
 
-        ############ Cycle-Consistency Losses #############
-        B2A2B_cycle_loss = cycle_loss_fn(B_PM, B2A2B_PM)
-
         ################ Regularizers #####################
+        # Split A2B param maps
+        B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+        B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
+        B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+
         R2_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_R2)) * args.R2_TV_weight
         FM_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_FM)) * args.FM_TV_weight
         R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
@@ -223,17 +245,36 @@ def sample(B, te=None):
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     # Split B
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
+    B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
     B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
+
     # Compute B2A (+ noise) and estimate B2A2B
     B2A = wf.IDEAL_model(B,echoes,te=te)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
-    B2A2B_PM = G_A2B([B2A,te], training=False)
-    # B2A2B Mask and compute rho
-    B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
-    B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te)
+    
+    if args.G_model != 'complex':
+        if args.out_vars == 'WF':
+            r_B_WF = B_WF[:,:,:,0::2]
+            i_B_WF = B_WF[:,:,:,1::2]
+            B_WF_abs = tf.abs(tf.complex(r_B_WF,i_B_WF))
+            B2A2B_WF_abs = G_A2B([B2A,te], training=False)
+            # B2A2B_abs Mask and compute "complex" B2A2B
+            B2A2B_WF_abs = tf.where(B_PM!=0.0,B2A2B_WF_abs,0.0)
+            zero_fill = tf.zeros_like(B2A2B_WF_abs)
+            re_stack = tf.stack([B2A2B_WF_abs,zero_fill],4)
+            B2A2B_WF = tf.reshape(re_stack,[n_batch,hgt,wdt,4])
+            B2A2B_PM = tf.zeros_like(B2A2B_WF_abs)
+            # Validation loss
+            val_B2A2B_loss = cycle_loss_fn(B_WF_abs, B2A2B_WF_abs)
+        elif args.out_vars == 'PM':
+            B2A2B_PM = G_A2B([B2A,te], training=False)
+            # B2A2B Mask and compute rho
+            B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
+            B2A2B_WF = wf.get_rho(B2A,B2A2B_PM,te=te)
+            # Validation loss
+            val_B2A2B_loss = cycle_loss_fn(B_PM, B2A2B_PM)
+            # Concatenate output
     B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
-
-    val_B2A2B_loss = cycle_loss_fn(B_PM, B2A2B_PM)
     return B2A, B2A2B, {'B2A2B_cycle_loss': val_B2A2B_loss}
 
 def validation_step(B, TE):

@@ -21,64 +21,6 @@ def _get_norm_layer(norm):
         return keras.layers.LayerNormalization
 
 
-def ResnetGenerator(input_shape=(256, 256, 3),
-                    output_channels=3,
-                    dim=64,
-                    n_downsamplings=3,
-                    n_blocks=9,
-                    norm='instance_norm'):
-    Norm = _get_norm_layer(norm)
-
-    def _residual_block(x):
-        dim = x.shape[-1]
-        h = x
-
-        h = tf.pad(h, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
-        h = keras.layers.Conv2D(dim, 3, padding='valid', use_bias=False)(h)
-        h = Norm()(h)
-        h = tf.nn.relu(h)
-
-        h = tf.pad(h, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
-        h = keras.layers.Conv2D(dim, 3, padding='valid', use_bias=False)(h)
-        h = Norm()(h)
-
-        return keras.layers.add([x, h])
-
-    # 0
-    h = inputs = keras.Input(shape=input_shape)
-
-    # 1
-    h = tf.pad(h, [[0, 0], [3, 3], [3, 3], [0, 0]], mode='REFLECT')
-    h = keras.layers.Conv2D(dim, 7, padding='valid', use_bias=False)(h)
-    h = Norm()(h)
-    h = tf.nn.relu(h)
-
-    # 2
-    for _ in range(n_downsamplings):
-        dim *= 2
-        h = keras.layers.Conv2D(dim, 3, strides=2, padding='same', use_bias=False)(h)
-        h = Norm()(h)
-        h = tf.nn.relu(h)
-
-    # 3
-    for _ in range(n_blocks):
-        h = _residual_block(h)
-
-    # 4
-    for _ in range(n_downsamplings):
-        dim //= 2
-        h = keras.layers.Conv2DTranspose(dim, 3, strides=2, padding='same', use_bias=False)(h)
-        h = Norm()(h)
-        h = tf.nn.relu(h)
-
-    # 5
-    h = tf.pad(h, [[0, 0], [3, 3], [3, 3], [0, 0]], mode='REFLECT')
-    h = keras.layers.Conv2D(output_channels, 7, padding='valid')(h)
-    h = tf.tanh(h)
-
-    return keras.Model(inputs=inputs, outputs=h)
-
-
 def PatchGAN(input_shape,
             dim=64,
             n_downsamplings=3,
@@ -123,8 +65,113 @@ def PatchGAN(input_shape,
 
 
 # ==============================================================================
-# =                                 MDWF-Net                                   =
+# =                               Custom CNNs                                  =
 # ==============================================================================
+
+def UNet(
+    input_shape,
+    n_out=2,
+    te_input=False,
+    te_shape=(6,),
+    filters=72,
+    num_layers=4,
+    dropout=0.0,
+    self_attention=False,
+    norm='instance_norm'):
+    
+    Norm = _get_norm_layer(norm)
+
+    def _upsample(filters, kernel_size, strides, padding):
+        return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+
+    def _conv2d_block(
+        inputs,
+        filters=16,
+        dropout=0.0,
+        kernel_size=(3, 3),
+        kernel_initializer="he_normal",
+        padding="same",
+    ):
+        c = keras.layers.Conv2D(
+            filters,
+            kernel_size,
+            activation='relu',
+            kernel_initializer=kernel_initializer,
+            padding=padding,
+            use_bias=False,
+            )(inputs)
+        c = Norm()(c)
+        if dropout > 0.0:
+            c = keras.layers.SpatialDropout2D(dropout)(c)
+        c = keras.layers.Conv2D(
+            filters,
+            kernel_size,
+            activation='relu',
+            kernel_initializer=kernel_initializer,
+            padding=padding,
+            use_bias=False,
+            )(c)
+        c = Norm()(c)
+        return c
+
+    x = inputs1 = keras.Input(input_shape)
+    if te_input:
+        te = inputs2 = keras.Input(te_shape)
+
+    down_layers = []
+    for l in range(num_layers):
+        x = _conv2d_block(
+            inputs=x,
+            filters=filters,
+            dropout=dropout
+            )
+        down_layers.append(x)
+        x = keras.layers.MaxPooling2D((2, 2))(x)
+        
+        if te_input and l==1:
+            # Fully-connected network for processing the vector with echo-times
+            hgt_dim = input_shape[0] // (2**(l+1))
+            wdt_dim = input_shape[1] // (2**(l+1))
+            y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
+            y = keras.layers.RepeatVector(hgt_dim*wdt_dim)(y)
+            y = keras.layers.Reshape((hgt_dim,wdt_dim,filters))(y)
+
+            # Add fully-connected output with latent space
+            x = keras.layers.add([x,y])
+
+        filters = filters * 2  # double the number of filters with each layer
+
+    x = _conv2d_block(
+        inputs=x,
+        filters=filters,
+        dropout=dropout
+        )
+
+    cont = 0
+    for conv in reversed(down_layers):
+        filters //= 2  # decreasing number of filters with each layer
+        x = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
+
+        # Water/Fat decoder
+        x = keras.layers.concatenate([x, conv])
+        if self_attention and cont == 0:
+            x = SelfAttention(ch=2*filters)(x)
+        x = _conv2d_block(
+            inputs=x,
+            filters=filters,
+            dropout=dropout
+            )
+
+        # Update counter
+        cont += 1
+
+    output = keras.layers.Conv2D(n_out, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x)
+
+    if te_input:
+        return keras.Model(inputs=[inputs1,inputs2], outputs=output)
+    else:
+        return keras.Model(inputs=inputs1, outputs=output)
+
 
 def MDWF_Generator(
     input_shape,

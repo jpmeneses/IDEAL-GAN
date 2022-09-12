@@ -7,6 +7,7 @@ import tf2lib as tl
 import wflib as wf
 import data
 from utils import *
+from keras_unet.models import custom_unet
 
 import statsmodels.api as sm
 import tqdm
@@ -33,8 +34,8 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../MRI-Datasets/'
-dataset_hdf5 = 'HDF5-DS/phantom_GC_192_complex_2D.hdf5'
+dataset_dir = '../../OneDrive/Documents/datasets/'
+dataset_hdf5 = 'phantom_GC_192_complex_2D.hdf5'
 testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
                                     acqs_data=True, te_data=True,
                                     complex_data=(args.G_model=='complex'))
@@ -64,28 +65,43 @@ A_B_dataset_test.batch(1)
 #################################################################################
 
 # model
-G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                        filters=args.n_G_filters,
-                        te_input=args.te_input,
-                        te_shape=(args.n_echoes,),
-                        R2_self_attention=args.R2_SelfAttention,
-                        FM_self_attention=args.FM_SelfAttention)
+if args.G_model == 'multi-decod':
+  G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+                          filters=args.n_filters,
+                          te_input=args.te_input,
+                          te_shape=(args.n_echoes,),
+                          R2_self_attention=args.D1_SelfAttention,
+                          FM_self_attention=args.D2_SelfAttention)
+elif args.G_model == 'U-Net':
+  G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
+                      num_classes=2,
+                      dropout=0,
+                      use_attention=args.D1_SelfAttention,
+                      filters=args.n_filters)
 
 # restore
 tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
 def sample_A2B(A,TE):
-  if args.te_input:
-        A2B_PM = G_A2B([A,TE], training=False)
+  if args.out_vars == 'WF':
+    A2B_WF = G_A2B(A, training=False)
+    A2B_PM = tf.zeros_like(A2B_WF)
+    A2B2A = tf.zeros_like(A)
   else:
-    A2B_PM = G_A2B(A, training=False)
-  A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0)
-  A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,TE)
+    if args.te_input:
+      A2B_PM = G_A2B([A,TE], training=False)
+    else:
+      A2B_PM = G_A2B(A, training=False)
+    A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0)
+    A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,TE)
   A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
   return A2B, A2B2A
 
-all_test_ans = np.zeros(testY.shape)
+if args.out_vars == 'WF':
+  all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
+else:
+  all_test_ans = np.zeros(testY.shape)
 i = 0
 
 for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
@@ -98,9 +114,14 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   all_test_ans[i,:,:,:] = A2B
   i += 1
 
-w_all_ans = np.abs(tf.complex(all_test_ans[:,:,:,0],all_test_ans[:,:,:,1]))
-f_all_ans = np.abs(tf.complex(all_test_ans[:,:,:,2],all_test_ans[:,:,:,3]))
-r2_all_ans = all_test_ans[:,:,:,4]*r2_sc
+if args.out_vars == 'WF':
+  w_all_ans = all_test_ans[:,:,:,0]
+  f_all_ans = all_test_ans[:,:,:,1]
+  r2_all_ans = all_test_ans[:,:,:,2]*r2_sc
+else:
+  w_all_ans = np.abs(tf.complex(all_test_ans[:,:,:,0],all_test_ans[:,:,:,1]))
+  f_all_ans = np.abs(tf.complex(all_test_ans[:,:,:,2],all_test_ans[:,:,:,3]))
+  r2_all_ans = all_test_ans[:,:,:,4]*r2_sc
 
 # Ground truth
 w_all_gt = np.abs(tf.complex(testY[:,:,:,0],testY[:,:,:,1]))
