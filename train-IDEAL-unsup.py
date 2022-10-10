@@ -208,7 +208,7 @@ def train_G(A):
                 A2B_FM = (A2B_FM - 0.5) * 2
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
             if args.R2_log:
-                A2B_R2 = tf.where(A2B_R2>=1e-37,-tf.math.log(A2B_R2),0.0)
+                A2B_R2 = tf.where(A2B_R2>=1e-1,-tf.math.log(A2B_R2),0.0)
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
         else:
             A2B_R2 = tf.math.real(A2B_PM)
@@ -275,7 +275,7 @@ def sample(A, B):
         A2B_FM = (A2B_FM - 0.5) * 2
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     elif args.R2_log:
-        A2B_R2 = tf.where(A2B_R2>=1e-37,-tf.math.log(A2B_R2),0.0)
+        A2B_R2 = tf.where(A2B_R2>=1e-1,-tf.math.log(A2B_R2),0.0)
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     elif args.G_model == 'complex':
         A2B_R2 = tf.math.real(A2B_PM)
