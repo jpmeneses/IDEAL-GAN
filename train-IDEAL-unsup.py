@@ -24,8 +24,9 @@ from itertools import cycle
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='encod-decod', choices=['encod-decod','complex','U-Net','MEBCRN'])
-py.arg('--UQ',type=bool, default=False)
-py.arg('--n_G_filters', type=int, default=72)
+py.arg('--UQ', type=bool, default=False)
+py.arg('--R2_log', type=bool, default=False)
+py.arg('--n_G_filters', type=int, default=32)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=200)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
@@ -155,9 +156,6 @@ elif args.G_model == 'U-Net':
                         dropout=0.0,
                         use_attention=args.FM_SelfAttention,
                         filters=args.n_G_filters)
-    trainY[:,:,:,-1]    = 0.5*trainY[:,:,:,-1] + 0.5
-    valY[:,:,:,-1]      = 0.5*valY[:,:,:,-1] + 0.5
-    testY[:,:,:,-1]     = 0.5*testY[:,:,:,-1] + 0.5
 elif args.G_model == 'MEBCRN':
     G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
                     n_res_blocks=5,
@@ -209,6 +207,9 @@ def train_G(A):
             if args.G_model == 'U-Net' or args.UQ:
                 A2B_FM = (A2B_FM - 0.5) * 2
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+            if args.R2_log:
+                A2B_R2 = tf.math.log(A2B_R2)
+                A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
         else:
             A2B_R2 = tf.math.real(A2B_PM)
             A2B_FM = tf.math.imag(A2B_PM)
@@ -218,12 +219,7 @@ def train_G(A):
         A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
 
         ############ Cycle-Consistency Losses #############
-        if args.FM_fix:
-            A_real = A[:,:,:,0::2]
-            A_imag = A[:,:,:,1::2]
-            A_cplx = tf.complex(A_real,A_imag)
-            A2B2A_cycle_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
-        elif args.UQ:
+        if args.UQ:
             A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, args.std_log_weight)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -271,12 +267,15 @@ def sample(A, B):
         A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:2].shape)
         A2B_std = tf.reshape(A2B_std,A[:,:,:,:2].shape)
 
+    A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+    A2B_R2 = tf.reshape(A2B_R2,A[:,:,:,:1].shape)
+    A2B_FM = tf.reshape(A2B_FM,A[:,:,:,:1].shape)
+
     if args.G_model == 'U-Net' or args.UQ:
-        orig_shape = A2B_PM.shape
-        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,A[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,A[:,:,:,:1].shape)
         A2B_FM = (A2B_FM - 0.5) * 2
+        A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+    elif args.R2_log:
+        A2B_R2 = tf.math.log(A2B_R2)
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     elif args.G_model == 'complex':
         A2B_R2 = tf.math.real(A2B_PM)
@@ -287,12 +286,7 @@ def sample(A, B):
     A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
     A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
-    if args.FM_fix:
-        A_real = A[:,:,:,0::2]
-        A_imag = A[:,:,:,1::2]
-        A_cplx = tf.complex(A_real,A_imag)
-        val_A2B2A_loss = cycle_loss_fn(tf.abs(A_cplx), A2B2A)
-    elif args.UQ:
+    if args.UQ:
         val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
     else:
         val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
