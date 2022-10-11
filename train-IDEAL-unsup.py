@@ -357,7 +357,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for A, B in A_dataset:
+    for A, B in A_B_dataset:
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
