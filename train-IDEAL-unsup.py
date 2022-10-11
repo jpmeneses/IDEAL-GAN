@@ -204,6 +204,8 @@ def train_G(A, B):
             # A2B Mask
             A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
         
+        # Build A2B_PM array with zero-valued R2*
+        A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM])
         if args.fat_char:
             A2B_P, A2B2A = fa.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
             A2B_WF = A2B_P[:,:,:,0:4]

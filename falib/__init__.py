@@ -1,1 +1,1 @@
-from falib.IDEAL_model import *
+from falib.FA_model import *

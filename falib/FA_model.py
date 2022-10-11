@@ -82,8 +82,9 @@ def acq_to_acq(acqs,param_maps,te=None):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.transpose(tf.reshape(S, [num_voxel, ne]))
 
-    r2s = param_maps[:,:,:,0] * r2_sc
+    # r2s = param_maps[:,:,:,0] * r2_sc
     phi = param_maps[:,:,:,1] * fm_sc
+    r2s = tf.zeros_like(phi)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
@@ -155,8 +156,9 @@ def IDEAL_model(out_maps,n_ech,te=None):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.transpose(tf.reshape(rho, [num_voxel, ns]))
 
-    r2s = param_maps[:,:,:,0] * r2_sc
+    # r2s = param_maps[:,:,:,0] * r2_sc
     phi = param_maps[:,:,:,1] * fm_sc
+    r2s = tf.zeros_like(phi)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
@@ -210,8 +212,9 @@ def get_rho(acqs,param_maps,te=None):
     voxel_ns_shape = voxel_shape + (ns,)
     Smtx = tf.transpose(tf.reshape(S, [num_voxel, ne]))
 
-    r2s = param_maps[:,:,:,0] * r2_sc
+    # r2s = param_maps[:,:,:,0] * r2_sc
     phi = param_maps[:,:,:,1] * fm_sc
+    r2s = tf.zeros_like(phi)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
