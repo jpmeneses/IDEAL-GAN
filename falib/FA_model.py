@@ -56,7 +56,7 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
         return M
 
 
-def acq_to_acq(acqs,param_maps,te=None):
+def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
     n_ech = d_ech//2
 
@@ -127,7 +127,7 @@ def acq_to_acq(acqs,param_maps,te=None):
     return (res_rho,res_gt)
 
 
-def IDEAL_model(out_maps,n_ech,te=None):
+def IDEAL_model(out_maps,n_ech,te=None,complex_data=False):
     n_batch,hgt,wdt,_ = out_maps.shape
 
     if te is None:
@@ -185,7 +185,7 @@ def IDEAL_model(out_maps,n_ech,te=None):
     return res_gt
 
 
-def get_rho(acqs,param_maps,te=None):
+def get_rho(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
     n_ech = d_ech//2
 
