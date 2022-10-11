@@ -101,6 +101,7 @@ trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acq
 valX    = acqs_2
 testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
 
+trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3,out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
 valY    = out_maps_2
 
 # Overall dataset statistics
@@ -118,8 +119,8 @@ print('Output Maps:',n_out)
 # Input and output dimensions (validations data)
 print('Validation output shape:',valY.shape)
 
-A_dataset = tf.data.Dataset.from_tensor_slices((trainX))
-A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
+A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
+A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
 A_B_dataset_val.batch(1)
 
@@ -244,8 +245,8 @@ def train_G(A, B):
             'L1_FM': FM_L1}
 
 
-def train_step(A):
-    G_loss_dict = train_G(A)
+def train_step(A, B):
+    G_loss_dict = train_G(A, B)
     return G_loss_dict
 
 
@@ -356,7 +357,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for A in A_dataset:
+    for A, B in A_dataset:
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
@@ -377,7 +378,7 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        G_loss_dict = train_step(A)
+        G_loss_dict = train_step(A, B)
 
         # # summary
         with train_summary_writer.as_default():
