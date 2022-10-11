@@ -70,7 +70,7 @@ def PatchGAN(input_shape,
 
 def UNet(
     input_shape,
-    n_out=2,
+    n_out=1,
     te_input=False,
     te_shape=(6,),
     filters=72,
@@ -165,7 +165,7 @@ def UNet(
         # Update counter
         cont += 1
 
-    output = keras.layers.Conv2D(n_out, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x)
+    output = keras.layers.Conv2D(n_out, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x)
 
     if te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)

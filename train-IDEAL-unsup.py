@@ -10,6 +10,8 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
+
+import falib as fa
 import wflib as wf
 
 import data
@@ -23,9 +25,9 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='encod-decod', choices=['encod-decod','complex','U-Net','MEBCRN'])
+py.arg('--G_model', default='U-Net', choices=['complex','U-Net','MEBCRN'])
+py.arg('--fat_char', type=bool, default=False)
 py.arg('--UQ', type=bool, default=False)
-py.arg('--R2_log', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=32)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=200)
@@ -35,14 +37,9 @@ py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
 py.arg('--std_log_weight', type=float, default=1.0)
-py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
-py.arg('--R2_L1_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
-py.arg('--R2_SelfAttention',type=bool, default=False)
-py.arg('--FM_SelfAttention',type=bool, default=True)
-py.arg('--R2_fix',type=bool, default=False)
-py.arg('--FM_fix',type=bool, default=False)
+py.arg('--SelfAttention',type=bool, default=True)
 args = py.args()
 
 # output_dir
@@ -105,7 +102,6 @@ valX    = acqs_2
 testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
 
 valY    = out_maps_2
-testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(trainX)
@@ -122,9 +118,6 @@ print('Output Maps:',n_out)
 # Input and output dimensions (validations data)
 print('Validation output shape:',valY.shape)
 
-# Input and output dimensions (testing data)
-print('Testing output shape:',testY.shape)
-
 A_dataset = tf.data.Dataset.from_tensor_slices((trainX))
 A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
@@ -136,32 +129,25 @@ A_B_dataset_val.batch(1)
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
-if args.G_model == 'encod-decod':
-    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                            bayesian=args.UQ,
+if args.G_model == 'complex':
+    G_A2B = dl.complex_unet(input_shape=(hgt,wdt,d_ech),
+                            filters=args.n_G_filters,
                             te_input=False,
                             te_shape=(args.n_echoes,),
-                            filters=args.n_G_filters,
-                            R2_self_attention=args.R2_SelfAttention,
-                            FM_self_attention=args.FM_SelfAttention)
-elif args.G_model == 'complex':
-    G_A2B=dl.PM_complex(input_shape=(hgt,wdt,d_ech),
-                        filters=args.n_G_filters,
-                        te_input=False,
-                        te_shape=(args.n_echoes,),
-                        self_attention=(args.R2_SelfAttention and args.FM_SelfAttention))
+                            self_attention=args.SelfAttention)
 elif args.G_model == 'U-Net':
-    G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
-                        num_classes=2,
-                        dropout=0.0,
-                        use_attention=args.FM_SelfAttention,
-                        filters=args.n_G_filters)
+    G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+                    te_input=False,
+                    te_shape=(args.n_echoes),
+                    filters=args.n_G_filters,
+                    dropout=0.0,
+                    self_attention=args.SelfAttention)
 elif args.G_model == 'MEBCRN':
     G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
                     n_res_blocks=5,
                     n_downsamplings=2,
                     filters=args.n_G_filters,
-                    self_attention=args.FM_SelfAttention)
+                    self_attention=args.SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
@@ -175,7 +161,7 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 # ==============================================================================
 
 @tf.function
-def train_G(A):
+def train_G(A, B):
     indx_B = tf.concat([tf.zeros_like(A[:,:,:,:4],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:2],dtype=tf.int32)],axis=-1)
 
@@ -188,35 +174,46 @@ def train_G(A):
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     with tf.GradientTape() as t:
+        # Split B outputs
+        B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
+        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
+        B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
+
+        # Split B param maps
+        B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
+        B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
+        B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+
+        # Magnitude of water/fat images
+        B_WF_real = B_WF[:,:,:,0::2]
+        B_WF_imag = B_WF[:,:,:,1::2]
+        B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
+
         ##################### A Cycle #####################
-        if not(args.UQ):
-            A2B_PM = G_A2B(A, training=True)
-        else:
-            A2B_PM, A2B_prob = G_A2B(A, training=True)
+        if args.UQ:
+            A2B_FM, A2B_prob = G_A2B(A, training=True)
+            # A2B & A2B_prob Masks
+            A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+            A2B_prob = tf.where(A[:,:,:,:2]!=0.0,A2B_prob,0.0)
+            # Split mean and STD
             A2B_mean,A2B_std = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=2)
-            A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:2].shape)
-            A2B_std = tf.reshape(A2B_std,A[:,:,:,:2].shape)
-        
-        if args.G_model != 'complex':
-            # A2B Mask
-            A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
-            # Split A2B param maps
-            A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-            A2B_R2 = tf.reshape(A2B_R2,A[:,:,:,:1].shape)
-            A2B_FM = tf.reshape(A2B_FM,A[:,:,:,:1].shape)
-            if args.G_model == 'U-Net' or args.UQ:
-                A2B_FM = (A2B_FM - 0.5) * 2
-                A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-            if args.R2_log:
-                A2B_R2 = tf.where(A2B_R2>=1e-1,-tf.math.log(A2B_R2),0.0)
-                A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+            A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:1].shape)
+            A2B_std = tf.reshape(A2B_std,A[:,:,:,:1].shape)
         else:
-            A2B_R2 = tf.math.real(A2B_PM)
-            A2B_FM = tf.math.imag(A2B_PM)
-            A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-            A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
+            A2B_FM = G_A2B(A, training=True)
+            # A2B Mask
+            A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
         
-        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        if args.fat_char:
+            A2B_P, A2B2A = fa.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+            A2B_WF = A2B_P[:,:,:,0:4]
+        else:
+            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+
+        # Magnitude of water/fat images
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
@@ -224,12 +221,14 @@ def train_G(A):
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
+        ########### Splitted R2s and FM Losses ############
+        WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
+        FM_loss = cycle_loss_fn(B_FM, A2B_FM)
+
         ################ Regularizers #####################
-        R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
         FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
-        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
-        reg_term = R2_TV + FM_TV + R2_L1 + FM_L1
+        reg_term = FM_TV + FM_L1
         
         G_loss = A2B2A_cycle_loss + reg_term
         
@@ -237,9 +236,9 @@ def train_G(A):
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
-            'TV_R2': R2_TV,
+            'WF_loss': WF_abs_loss,
+            'FM_loss': FM_loss,
             'TV_FM': FM_TV,
-            'L1_R2': R2_L1,
             'L1_FM': FM_L1}
 
 
@@ -259,38 +258,59 @@ def sample(A, B):
                         tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
-    if not(args.UQ):
-        A2B_PM = G_A2B(A, training=True)
-    else:
-        A2B_PM, A2B_prob = G_A2B(A, training=True)
+    # Split B outputs
+    B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
+    B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
+    B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
+
+    # Split B param maps
+    B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
+    B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
+    B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+
+    # Magnitude of water/fat images
+    B_WF_real = B_WF[:,:,:,0::2]
+    B_WF_imag = B_WF[:,:,:,1::2]
+    B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
+
+    if args.UQ:
+        A2B_FM, A2B_prob = G_A2B(A, training=True)
+        # A2B & A2B_prob Masks
+        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        A2B_prob = tf.where(A[:,:,:,:2]!=0.0,A2B_prob,0.0)
+        # Split mean and STD
         A2B_mean,A2B_std = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=2)
-        A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:2].shape)
-        A2B_std = tf.reshape(A2B_std,A[:,:,:,:2].shape)
+        A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:1].shape)
+        A2B_std = tf.reshape(A2B_std,A[:,:,:,:1].shape)
+    else:
+        A2B_FM = G_A2B(A, training=True)
+        # A2B Mask
+        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
 
-    A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-    A2B_R2 = tf.reshape(A2B_R2,A[:,:,:,:1].shape)
-    A2B_FM = tf.reshape(A2B_FM,A[:,:,:,:1].shape)
-
-    if args.G_model == 'U-Net' or args.UQ:
-        A2B_FM = (A2B_FM - 0.5) * 2
-        A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    elif args.R2_log:
-        A2B_R2 = tf.where(A2B_R2>=1e-1,-tf.math.log(A2B_R2),0.0)
-        A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    elif args.G_model == 'complex':
-        A2B_R2 = tf.math.real(A2B_PM)
-        A2B_FM = tf.math.imag(A2B_PM)
-        A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    # A2B Mask
-    A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
-    A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+    if args.fat_char:
+        A2B_P, A2B2A = fa.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B_WF = A2B_P[:,:,:,0:4]
+    else:
+        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
     A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
+
+    # Magnitude of water/fat images
+    A2B_WF_real = A2B_WF[:,:,:,0::2]
+    A2B_WF_imag = A2B_WF[:,:,:,1::2]
+    A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+
+    ########### Splitted R2s and FM Losses ############
+    WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
+    FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
     if args.UQ:
         val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
     else:
         val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
-    return A2B, A2B2A, {'A2B2A_cycle_loss': val_A2B2A_loss}
+
+    return A2B, A2B2A, {'A2B2A_cycle_loss': val_A2B2A_loss,
+                        'WF_loss': WF_abs_loss,
+                        'FM_loss': FM_loss,}
 
 def validation_step(A, B):
     A2B, A2B2A, val_A2B2A_dict = sample(A, B)
@@ -324,25 +344,6 @@ val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
 n_div = np.ceil(total_steps/len(valY))
-
-# ==============================================================================
-# =                         Fix R2s/FM decoder weights                         =
-# ==============================================================================
-
-if args.R2_fix:
-    # Fix generator weights
-    FM_idxs = dl.PM_decoder_idxs(2,2,4,args.R2_SelfAttention,args.FM_SelfAttention)
-    for p_idx in range(len(G_A2B.layers)):
-        idx = p_idx + 1
-        if not(idx in FM_idxs):
-            G_A2B.layers[-idx].trainable = False
-if args.FM_fix:
-    # Fix generator weights
-    R2_idxs = dl.PM_decoder_idxs(1,2,4,args.R2_SelfAttention,args.FM_SelfAttention)
-    for p_idx in range(len(G_A2B.layers)):
-        idx = p_idx + 1
-        if not(idx in R2_idxs):
-            G_A2B.layers[-idx].trainable = False
 
 # main loop
 for ep in range(args.epochs):
