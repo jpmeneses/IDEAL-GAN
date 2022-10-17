@@ -10,10 +10,10 @@ library(rstatix)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/Sup-009/"
+model = "/TEaug-007/"
 epoch = "200"
 
-dir = paste("C:/Users/jpmen/Documents/IDEAL-GAN/output",model,"Ep-",epoch,sep="")
+dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
 
 ls_sheets = excel_sheets('PDFF_phantom_ROIs.xlsx')
@@ -78,6 +78,6 @@ q2= ggplot(pdff_Data, aes(refs, bias)) +
   geom_hline(yintercept = upper, color = "red", linetype="dashed") +
   ylab("Difference Between Measurements") +
   xlab("Ground-Truth") + 
-  ylim(-0.3,0.3)
+  ylim(-0.8,0.8)
 fn2 = "Bias-BlandAltman.png"
 ggsave(plot=q2, width=6, height=4, dpi=1200, filename=fn2)

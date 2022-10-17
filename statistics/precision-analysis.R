@@ -83,3 +83,18 @@ cat('Mean wSD:',mean_wSD,'+-',1.96*std_wSD,
 	'\nMean wCV:',mean_wCV,'+-',1.96*std_wCV,
 	'\nMean RDC:',mean_RDC,'+-',1.96*std_RDC,
 	'\nMean %RDC:',mean_pRDC,'+-',1.96*std_pRDC,'\n')
+
+############################################################################
+############################## SCATTERPLOT #################################
+############################################################################
+upper_sd <- mean_wSD + 1.65*std_wSD
+q2= ggplot(res_id, aes(wXs, wSDs)) +
+  geom_point(size=1)+
+  geom_hline(yintercept = mean_wSD) +
+  geom_hline(yintercept = mean_RDC, color = "green", linetype="dotdash") +
+  geom_hline(yintercept = upper_sd, color = "red", linetype="dashed") +
+  ylab("Within-Subject/ROI PDFF SD") +
+  xlab("Per-Subject/ROI Average PDFF") + 
+  ylim(0,0.04)
+fn2 = "Precision-ScatPlot.png"
+ggsave(plot=q2, width=3.75, height=3, dpi=600, filename=fn2)

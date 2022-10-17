@@ -94,16 +94,16 @@ n1_div = 248
 n3_div = 0
 n4_div = 434
 
-trainX = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-valX = acqs_1
-# trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
-# valX    = acqs_2
+# trainX = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+# valX = acqs_1
+trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
+valX    = acqs_2
 # testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
 
-trainY = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
-valY = out_maps_1
-# trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
-# valY    = out_maps_2
+# trainY = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+# valY = out_maps_1
+trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
+valY    = out_maps_2
 # testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
 
 # Overall dataset statistics
@@ -216,10 +216,23 @@ def train_G(A, B):
         B_WF_imag = B_WF[:,:,:,1::2]
         B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
 
+        # Split B param maps
+        B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
+        B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
+        B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+
         if args.out_vars == 'WF':
             # Compute model's output
             A2B_WF_abs = G_A2B(A, training=True)
             A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+
+            # Compute zero-valued param maps
+            A2B_PM = tf.zeros_like(A2B_WF_abs)
+
+            # Split A2B param maps
+            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
 
             # Compute loss
             sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -276,6 +289,11 @@ def train_G(A, B):
             # Compute loss
             sup_loss = sup_loss_fn(B_abs, A2B_abs)
 
+        ############### Splited losses ####################
+        WF_abs_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
+        R2_loss = sup_loss_fn(B_R2, A2B_R2)
+        FM_loss = sup_loss_fn(B_FM, A2B_FM)
+
         ################ Regularizers #####################
         if not(args.out_vars=='WF'):
             R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
@@ -295,6 +313,9 @@ def train_G(A, B):
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
     return {'sup_loss': sup_loss,
+            'WF_loss': WF_abs_loss,
+            'R2_loss': R2_loss,
+            'FM_loss': FM_loss,
             'TV_R2': R2_TV,
             'TV_FM': FM_TV,
             'L1_R2': R2_L1,
@@ -322,20 +343,28 @@ def sample(A, B):
     B_WF_real = B_WF[:,:,:,0::2]
     B_WF_imag = B_WF[:,:,:,1::2]
     B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
+    # Split B param maps
+    B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
+    B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
+    B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
     # Estimate A2B
     if args.out_vars == 'WF':
         A2B_WF_abs = G_A2B(A, training=True)
         A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
         A2B_PM = tf.zeros_like(B_PM)
+        # Split A2B param maps
+        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
         val_sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
     elif args.out_vars == 'PM':
         A2B_PM = G_A2B(A, training=True)
         A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
+        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
             A2B_FM = (A2B_FM - 0.5) * 2
             A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
@@ -349,19 +378,27 @@ def sample(A, B):
         B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
         A2B_abs = G_A2B(A, training=True)
         A2B_abs = tf.where(B_abs!=0.0,A2B_abs,0.0)
+        A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
+        A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
+        A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
+        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-            A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
-            A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
-            A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
-            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
             A2B_FM = (A2B_FM - 0.5) * 2
             A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,A2B_FM,0.0)
             A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
         val_sup_loss = sup_loss_fn(B_abs, A2B_abs)
 
-    return A2B_abs, {'sup_loss': val_sup_loss}
+    ############### Splited losses ####################
+    WF_abs_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
+    R2_loss = sup_loss_fn(B_R2, A2B_R2)
+    FM_loss = sup_loss_fn(B_FM, A2B_FM)
+
+    return A2B_abs,{'sup_loss': val_sup_loss,
+                    'WF_loss': WF_abs_loss,
+                    'R2_loss': R2_loss,
+                    'FM_loss': FM_loss}
 
 def validation_step(A, B):
     A2B_abs, val_sup_dict = sample(A, B)

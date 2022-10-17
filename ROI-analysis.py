@@ -45,11 +45,12 @@ ws_ROI_2.write(0,1,'Model res.')
 # data
 ech_idx = args.n_echoes * 2
 
-dataset_dir = '../../OneDrive/Documents/datasets/'
+# dataset_dir = '../../OneDrive/Documents/datasets/'
+dataset_dir = '../MRI-Datasets/'
 if args.n_echoes == 6 and not(args.multi_TE):
   dataset_hdf5 = 'UNet-multiTE/6ech_GC_192_origTEs_complex_2D.hdf5'
 elif args.n_echoes == 6 and args.multi_TE:
-  dataset_hdf5 = 'multiTE_GC_192_complex_2D.hdf5'
+  dataset_hdf5 = 'HDF5-DS/multiTE_GC_192_complex_2D.hdf5'
 elif args.n_echoes == 3:
   dataset_hdf5 = 'UNet-multiTE/3ech_GC_192_complex_2D.hdf5'
 testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,

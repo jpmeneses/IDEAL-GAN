@@ -40,11 +40,11 @@ ws_MAE.write(0,1,'A2B Fat')
 ws_MAE.write(0,2,'A2B PDFF')
 ws_MAE.write(0,3,'A2B R2*')
 ws_MAE.write(0,4,'A2B FieldMap')
-ws_MAE.write(0,5,'B2A2B Water')
-ws_MAE.write(0,6,'B2A2B Fat')
-ws_MAE.write(0,7,'B2A2B PDFF')
-ws_MAE.write(0,8,'B2A2B R2*')
-ws_MAE.write(0,9,'B2A2B FieldMap')
+# ws_MAE.write(0,5,'B2A2B Water')
+# ws_MAE.write(0,6,'B2A2B Fat')
+# ws_MAE.write(0,7,'B2A2B PDFF')
+# ws_MAE.write(0,8,'B2A2B R2*')
+# ws_MAE.write(0,9,'B2A2B FieldMap')
 
 ws_MSE = workbook.add_worksheet('RMSE')
 ws_MSE.write(0,0,'A2B Water')
@@ -52,13 +52,13 @@ ws_MSE.write(0,1,'A2B Fat')
 ws_MSE.write(0,2,'A2B PDFF')
 ws_MSE.write(0,3,'A2B R2*')
 ws_MSE.write(0,4,'A2B FieldMap')
-ws_MSE.write(0,5,'B2A2B Water')
-ws_MSE.write(0,6,'B2A2B Fat')
-ws_MSE.write(0,7,'B2A2B PDFF')
-ws_MSE.write(0,8,'B2A2B R2*')
-ws_MSE.write(0,9,'B2A2B FieldMap')
-ws_MSE.write(0,10,'TE1')
-ws_MSE.write(0,11,'dTE')
+# ws_MSE.write(0,5,'B2A2B Water')
+# ws_MSE.write(0,6,'B2A2B Fat')
+# ws_MSE.write(0,7,'B2A2B PDFF')
+# ws_MSE.write(0,8,'B2A2B R2*')
+# ws_MSE.write(0,9,'B2A2B FieldMap')
+ws_MSE.write(0,5,'TE1')
+ws_MSE.write(0,6,'dTE')
 
 ws_SSIM = workbook.add_worksheet('SSIM')
 ws_SSIM.write(0,0,'A2B Water')
@@ -66,11 +66,11 @@ ws_SSIM.write(0,1,'A2B Fat')
 ws_SSIM.write(0,2,'A2B PDFF')
 ws_SSIM.write(0,3,'A2B R2*')
 ws_SSIM.write(0,4,'A2B FieldMap')
-ws_SSIM.write(0,5,'B2A2B Water')
-ws_SSIM.write(0,6,'B2A2B Fat')
-ws_SSIM.write(0,7,'B2A2B PDFF')
-ws_SSIM.write(0,8,'B2A2B R2*')
-ws_SSIM.write(0,9,'B2A2B FieldMap')
+# ws_SSIM.write(0,5,'B2A2B Water')
+# ws_SSIM.write(0,6,'B2A2B Fat')
+# ws_SSIM.write(0,7,'B2A2B PDFF')
+# ws_SSIM.write(0,8,'B2A2B R2*')
+# ws_SSIM.write(0,9,'B2A2B FieldMap')
 
 # ==============================================================================
 # =                                    test                                    =
@@ -198,82 +198,78 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     f_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,2],A2B[:,:,:,3])))
     r2_aux = np.squeeze(A2B[:,:,:,4])
     field_aux = np.squeeze(A2B[:,:,:,5])
+    PDFF_aux = f_aux/(w_aux+f_aux)
+    PDFF_aux[np.isnan(PDFF_aux)] = 0.0
 
-    w_aux_2 = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,0],B2A2B[:,:,:,1])))
-    f_aux_2 = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,2],B2A2B[:,:,:,3])))
-    r2_aux_2 = np.squeeze(B2A2B[:,:,:,4])
-    field_aux_2 = np.squeeze(B2A2B[:,:,:,5])
+    # w_aux_2 = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,0],B2A2B[:,:,:,1])))
+    # f_aux_2 = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,2],B2A2B[:,:,:,3])))
+    # r2_aux_2 = np.squeeze(B2A2B[:,:,:,4])
+    # field_aux_2 = np.squeeze(B2A2B[:,:,:,5])
+    # PDFF_aux_2 = f_aux_2/(w_aux_2+f_aux_2)
+    # PDFF_aux_2[np.isnan(PDFF_aux_2)] = 0.0
 
     wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
     fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
     r2n_aux = np.squeeze(B[:,:,:,4])
     fieldn_aux = np.squeeze(B[:,:,:,5])
+    PDFFn_aux = fn_aux/(wn_aux+fn_aux)
+    PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
     
     if i%50 == 0 or args.dataset == 'phantom':
-        fig,axs=plt.subplots(figsize=(14, 9), nrows=3, ncols=4)
+        fig,axs=plt.subplots(figsize=(16, 9), nrows=2, ncols=3)
 
         # A2B maps in the first row
-        W_ok = axs[0,0].imshow(w_aux, cmap='bone',
+        F_ok = axs[0,0].imshow(PDFF_aux, cmap='jet',
                           interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(W_ok, ax=axs[0,0])
+        fig.colorbar(F_ok, ax=axs[0,0])
         axs[0,0].axis('off')
 
-        F_ok = axs[0,1].imshow(f_aux, cmap='pink',
-                          interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_ok, ax=axs[0,1])
+        r2_ok = axs[0,1].imshow(r2_aux*r2_sc, cmap='copper',
+                                interpolation='none', vmin=0, vmax=r2_sc)
+        fig.colorbar(r2_ok, ax=axs[0,1])
         axs[0,1].axis('off')
 
-        r2_ok = axs[0,2].imshow(r2_aux*r2_sc, cmap='copper',
-                           interpolation='none', vmin=0, vmax=r2_sc)
-        fig.colorbar(r2_ok, ax=axs[0,2])
+        field_ok = axs[0,2].imshow(field_aux*fm_sc, cmap='twilight',
+                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+        fig.colorbar(field_ok, ax=axs[0,2])
         axs[0,2].axis('off')
 
-        field_ok = axs[0,3].imshow(field_aux*fm_sc, cmap='twilight',
-                              interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_ok, ax=axs[0,3])
-        axs[0,3].axis('off')
-
         # B2A2B maps in the second row
-        W_ok_2 = axs[1,0].imshow(w_aux_2, cmap='bone',
-                          interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(W_ok_2, ax=axs[1,0])
-        axs[1,0].axis('off')
+        # W_ok_2 = axs[1,0].imshow(w_aux_2, cmap='bone',
+        #                   interpolation='none', vmin=0, vmax=1)
+        # fig.colorbar(W_ok_2, ax=axs[1,0])
+        # axs[1,0].axis('off')
 
-        F_ok_2 = axs[1,1].imshow(f_aux_2, cmap='pink',
-                          interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_ok_2, ax=axs[1,1])
-        axs[1,1].axis('off')
+        # F_ok_2 = axs[1,1].imshow(f_aux_2, cmap='pink',
+        #                   interpolation='none', vmin=0, vmax=1)
+        # fig.colorbar(F_ok_2, ax=axs[1,1])
+        # axs[1,1].axis('off')
 
-        r2_ok_2 = axs[1,2].imshow(r2_aux_2*r2_sc, cmap='copper',
-                           interpolation='none', vmin=0, vmax=r2_sc)
-        fig.colorbar(r2_ok_2, ax=axs[1,2])
-        axs[1,2].axis('off')
+        # r2_ok_2 = axs[1,2].imshow(r2_aux_2*r2_sc, cmap='copper',
+        #                    interpolation='none', vmin=0, vmax=r2_sc)
+        # fig.colorbar(r2_ok_2, ax=axs[1,2])
+        # axs[1,2].axis('off')
 
-        field_ok_2 = axs[1,3].imshow(field_aux_2*fm_sc, cmap='twilight',
-                              interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_ok_2, ax=axs[1,3])
-        axs[1,3].axis('off')
+        # field_ok_2 = axs[1,3].imshow(field_aux_2*fm_sc, cmap='twilight',
+        #                       interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+        # fig.colorbar(field_ok_2, ax=axs[1,3])
+        # axs[1,3].axis('off')
 
         # Ground-truth in the third row
-        W_unet = axs[2,0].imshow(wn_aux, cmap='bone',
-                            interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(W_unet, ax=axs[2,0])
-        axs[2,0].axis('off')
+        F_unet = axs[1,0].imshow(PDFFn_aux, cmap='jet',
+                                interpolation='none', vmin=0, vmax=1)
+        fig.colorbar(F_unet, ax=axs[1,0])
+        axs[1,0].axis('off')
 
-        F_unet = axs[2,1].imshow(fn_aux, cmap='pink',
-                            interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_unet, ax=axs[2,1])
-        axs[2,1].axis('off')
+        r2_unet=axs[1,1].imshow(r2n_aux*r2_sc, cmap='copper',
+                                interpolation='none', vmin=0, vmax=r2_sc)
+        fig.colorbar(r2_unet, ax=axs[1,1])
+        axs[1,1].axis('off')
 
-        r2_unet = axs[2,2].imshow(r2n_aux*r2_sc, cmap='copper',
-                             interpolation='none', vmin=0, vmax=r2_sc)
-        fig.colorbar(r2_unet, ax=axs[2,2])
-        axs[2,2].axis('off')
-
-        field_unet = axs[2,3].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                                interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_unet, ax=axs[2,3])
-        axs[2,3].axis('off')
+        field_unet =axs[1,2].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+        fig.colorbar(field_unet, ax=axs[1,2])
+        axs[1,2].axis('off')
 
         fig.suptitle('TE1/dTE: '+str([TE_smp[0,0].numpy(),np.mean(np.diff(TE_smp))]), fontsize=18)
 
@@ -284,15 +280,6 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
         fig.clear()
         plt.close(fig)
 
-    PDFF_aux = f_aux/(w_aux+f_aux)
-    PDFF_aux[np.isnan(PDFF_aux)] = 0.0
-
-    PDFF_aux_2 = f_aux_2/(w_aux_2+f_aux_2)
-    PDFF_aux_2[np.isnan(PDFF_aux_2)] = 0.0
-
-    PDFFn_aux = fn_aux/(wn_aux+fn_aux)
-    PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
-
     # Export to Excel file
     # MSE
     MSE_w = np.sqrt(np.mean(tf.square(w_aux-wn_aux), axis=(0,1)))
@@ -301,24 +288,26 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     MSE_r2 = np.sqrt(np.mean(tf.square(r2_aux-r2n_aux), axis=(0,1)))
     MSE_fm = np.sqrt(np.mean(tf.square(field_aux-fieldn_aux), axis=(0,1)))
 
-    MSE_w_2 = np.sqrt(np.mean(tf.square(w_aux_2-wn_aux), axis=(0,1)))
-    MSE_f_2 = np.sqrt(np.mean(tf.square(f_aux_2-fn_aux), axis=(0,1)))
-    MSE_pdff_2 = np.sqrt(np.mean(tf.square(PDFF_aux_2-PDFFn_aux), axis=(0,1)))
-    MSE_r2_2 = np.sqrt(np.mean(tf.square(r2_aux_2-r2n_aux), axis=(0,1)))
-    MSE_fm_2 = np.sqrt(np.mean(tf.square(field_aux_2-fieldn_aux), axis=(0,1)))
+    # MSE_w_2 = np.sqrt(np.mean(tf.square(w_aux_2-wn_aux), axis=(0,1)))
+    # MSE_f_2 = np.sqrt(np.mean(tf.square(f_aux_2-fn_aux), axis=(0,1)))
+    # MSE_pdff_2 = np.sqrt(np.mean(tf.square(PDFF_aux_2-PDFFn_aux), axis=(0,1)))
+    # MSE_r2_2 = np.sqrt(np.mean(tf.square(r2_aux_2-r2n_aux), axis=(0,1)))
+    # MSE_fm_2 = np.sqrt(np.mean(tf.square(field_aux_2-fieldn_aux), axis=(0,1)))
 
     ws_MSE.write(i+1,0,MSE_w)
     ws_MSE.write(i+1,1,MSE_f)
     ws_MSE.write(i+1,2,MSE_pdff)
     ws_MSE.write(i+1,3,MSE_r2)
     ws_MSE.write(i+1,4,MSE_fm)
-    ws_MSE.write(i+1,5,MSE_w)
-    ws_MSE.write(i+1,6,MSE_f)
-    ws_MSE.write(i+1,7,MSE_pdff)
-    ws_MSE.write(i+1,8,MSE_r2)
-    ws_MSE.write(i+1,9,MSE_fm)
-    ws_MSE.write(i+1,10,TE_smp[0,0].numpy())
-    ws_MSE.write(i+1,11,np.mean(np.diff(TE_smp)))
+    
+    # ws_MSE.write(i+1,5,MSE_w_2)
+    # ws_MSE.write(i+1,6,MSE_f_2)
+    # ws_MSE.write(i+1,7,MSE_pdff_2)
+    # ws_MSE.write(i+1,8,MSE_r2_2)
+    # ws_MSE.write(i+1,9,MSE_fm_2)
+    
+    ws_MSE.write(i+1,5,TE_smp[0,0].numpy())
+    ws_MSE.write(i+1,6,np.mean(np.diff(TE_smp)))
 
     # MAE
     MAE_w = np.mean(tf.abs(w_aux-wn_aux), axis=(0,1))
@@ -327,22 +316,23 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     MAE_r2 = np.mean(tf.abs(r2_aux-r2n_aux), axis=(0,1))
     MAE_fm = np.mean(tf.abs(field_aux-fieldn_aux), axis=(0,1))
 
-    MAE_w_2 = np.mean(tf.abs(w_aux_2-wn_aux), axis=(0,1))
-    MAE_f_2 = np.mean(tf.abs(f_aux_2-fn_aux), axis=(0,1))
-    MAE_pdff_2 = np.mean(tf.abs(PDFF_aux_2-PDFFn_aux), axis=(0,1))
-    MAE_r2_2 = np.mean(tf.abs(r2_aux_2-r2n_aux), axis=(0,1))
-    MAE_fm_2 = np.mean(tf.abs(field_aux_2-fieldn_aux), axis=(0,1))
+    # MAE_w_2 = np.mean(tf.abs(w_aux_2-wn_aux), axis=(0,1))
+    # MAE_f_2 = np.mean(tf.abs(f_aux_2-fn_aux), axis=(0,1))
+    # MAE_pdff_2 = np.mean(tf.abs(PDFF_aux_2-PDFFn_aux), axis=(0,1))
+    # MAE_r2_2 = np.mean(tf.abs(r2_aux_2-r2n_aux), axis=(0,1))
+    # MAE_fm_2 = np.mean(tf.abs(field_aux_2-fieldn_aux), axis=(0,1))
 
     ws_MAE.write(i+1,0,MAE_w)
     ws_MAE.write(i+1,1,MAE_f)
     ws_MAE.write(i+1,2,MAE_pdff)
     ws_MAE.write(i+1,3,MAE_r2)
     ws_MAE.write(i+1,4,MAE_fm)
-    ws_MAE.write(i+1,5,MAE_w_2)
-    ws_MAE.write(i+1,6,MAE_f_2)
-    ws_MAE.write(i+1,7,MAE_pdff_2)
-    ws_MAE.write(i+1,8,MAE_r2_2)
-    ws_MAE.write(i+1,9,MAE_fm_2)
+    
+    # ws_MAE.write(i+1,5,MAE_w_2)
+    # ws_MAE.write(i+1,6,MAE_f_2)
+    # ws_MAE.write(i+1,7,MAE_pdff_2)
+    # ws_MAE.write(i+1,8,MAE_r2_2)
+    # ws_MAE.write(i+1,9,MAE_fm_2)
 
     # SSIM
     w_ssim = structural_similarity(w_aux,wn_aux,multichannel=False)
@@ -351,22 +341,23 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     r2_ssim = structural_similarity(r2_aux,r2n_aux,multichannel=False)
     fm_ssim = structural_similarity(field_aux,fieldn_aux,multichannel=False)
 
-    w_ssim_2 = structural_similarity(w_aux_2,wn_aux,multichannel=False)
-    f_ssim_2 = structural_similarity(f_aux_2,fn_aux,multichannel=False)
-    pdff_ssim_2 = structural_similarity(PDFF_aux_2,PDFFn_aux,multichannel=False)
-    r2_ssim_2 = structural_similarity(r2_aux_2,r2n_aux,multichannel=False)
-    fm_ssim_2 = structural_similarity(field_aux_2,fieldn_aux,multichannel=False)
+    # w_ssim_2 = structural_similarity(w_aux_2,wn_aux,multichannel=False)
+    # f_ssim_2 = structural_similarity(f_aux_2,fn_aux,multichannel=False)
+    # pdff_ssim_2 = structural_similarity(PDFF_aux_2,PDFFn_aux,multichannel=False)
+    # r2_ssim_2 = structural_similarity(r2_aux_2,r2n_aux,multichannel=False)
+    # fm_ssim_2 = structural_similarity(field_aux_2,fieldn_aux,multichannel=False)
 
     ws_SSIM.write(i+1,0,w_ssim)
     ws_SSIM.write(i+1,1,f_ssim)
     ws_SSIM.write(i+1,2,pdff_ssim)
     ws_SSIM.write(i+1,3,r2_ssim)
     ws_SSIM.write(i+1,4,fm_ssim)
-    ws_SSIM.write(i+1,5,w_ssim_2)
-    ws_SSIM.write(i+1,6,f_ssim_2)
-    ws_SSIM.write(i+1,7,pdff_ssim_2)
-    ws_SSIM.write(i+1,8,r2_ssim_2)
-    ws_SSIM.write(i+1,9,fm_ssim_2)
+    
+    # ws_SSIM.write(i+1,5,w_ssim_2)
+    # ws_SSIM.write(i+1,6,f_ssim_2)
+    # ws_SSIM.write(i+1,7,pdff_ssim_2)
+    # ws_SSIM.write(i+1,8,r2_ssim_2)
+    # ws_SSIM.write(i+1,9,fm_ssim_2)
     
     i += 1
 
