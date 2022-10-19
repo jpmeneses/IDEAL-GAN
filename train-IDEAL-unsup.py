@@ -220,10 +220,10 @@ def train_G(A, B):
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
 
         ############ Cycle-Consistency Losses #############
-        if args.UQ:
-            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, args.std_log_weight)
-        else:
-            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        # if args.UQ:
+        #     A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, args.std_log_weight)
+        # else:
+        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
         WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -233,6 +233,11 @@ def train_G(A, B):
         FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
         reg_term = FM_TV + FM_L1
+        if args.UQ:
+            A2B_std_log = tf.math.log(A2B_std)
+            A2B_std_log = tf.where(tf.math.is_nan(A2B_std_log),0.0,A2B_std_log)
+            std_log = tf.reduce_sum(tf.reduce_mean(A2B_std_log,axis=(1,2,3))) * args.std_log_weight
+            reg_term += std_log
         
         G_loss = A2B2A_cycle_loss + reg_term
         
@@ -243,7 +248,8 @@ def train_G(A, B):
             'WF_loss': WF_abs_loss,
             'FM_loss': FM_loss,
             'TV_FM': FM_TV,
-            'L1_FM': FM_L1}
+            'L1_FM': FM_L1,
+            'STD_log': std_log}
 
 
 def train_step(A, B):
