@@ -71,6 +71,7 @@ def PatchGAN(input_shape,
 def UNet(
     input_shape,
     n_out=1,
+    bayesian=False,
     te_input=False,
     te_shape=(6,),
     filters=72,
@@ -166,9 +167,23 @@ def UNet(
         cont += 1
 
     output = keras.layers.Conv2D(n_out, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x)
+    if bayesian:
+        flat_mean = tf.keras.layers.Flatten()(output)
+        x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
+        out_std = keras.layers.Conv2D(1, (1,1), activation='sigmoid', kernel_initializer='zeros')(x_std)
+        flat_std = tf.keras.layers.Flatten()(out_std)
+        x_prob = tf.concat([flat_mean,flat_std],axis=-1)
+        # x_prob = tf.concat([output,out_std],axis=-1)
+        # x_prob = tf.transpose(x_prob,perm=[0,3,1,2])
+        # x_prob = tf.keras.layers.Flatten()(x_prob)
+        out_prob = tfp.layers.IndependentNormal([input_shape[0],input_shape[1],1])(x_prob)
 
-    if te_input:
+    if te_input and bayesian:
+        return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_std])
+    elif te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)
+    elif bayesian:
+        return keras.Model(inputs=inputs1, outputs=[out_prob,output,out_std])
     else:
         return keras.Model(inputs=inputs1, outputs=output)
 

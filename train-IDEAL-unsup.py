@@ -97,12 +97,16 @@ n1_div = 248
 n3_div = 0
 n4_div = 434
 
-trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
-valX    = acqs_2
-testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
+trainX = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+valX = acqs_1
+# trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
+# valX    = acqs_2
+# testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
 
-trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3,out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
-valY    = out_maps_2
+trainY = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+valY = out_maps_1
+# trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3,out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
+# valY    = out_maps_2
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(trainX)
@@ -138,6 +142,7 @@ if args.G_model == 'complex':
                             self_attention=args.SelfAttention)
 elif args.G_model == 'U-Net':
     G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+                    bayesian=args.UQ,
                     te_input=False,
                     te_shape=(args.n_echoes),
                     filters=args.n_G_filters,
@@ -192,18 +197,14 @@ def train_G(A, B):
 
         ##################### A Cycle #####################
         if args.UQ:
-            A2B_FM, A2B_prob = G_A2B(A, training=True)
-            # A2B & A2B_prob Masks
-            A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
-            A2B_prob = tf.where(A[:,:,:,:2]!=0.0,A2B_prob,0.0)
-            # Split mean and STD
-            A2B_mean,A2B_std = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=2)
-            A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:1].shape)
-            A2B_std = tf.reshape(A2B_std,A[:,:,:,:1].shape)
+            A2B_FM, A2B_std, A2B_mean = G_A2B(A, training=True)
         else:
             A2B_FM = G_A2B(A, training=True)
-            # A2B Mask
-            A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        
+        # A2B Masks
+        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        if args.UQ:
+            A2B_std = tf.where(A[:,:,:,:1]!=0.0,A2B_std,0.0)
         
         # Build A2B_PM array with zero-valued R2*
         A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM], axis=-1)
@@ -277,18 +278,14 @@ def sample(A, B):
     B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
 
     if args.UQ:
-        A2B_FM, A2B_prob = G_A2B(A, training=True)
-        # A2B & A2B_prob Masks
-        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
-        A2B_prob = tf.where(A[:,:,:,:2]!=0.0,A2B_prob,0.0)
-        # Split mean and STD
-        A2B_mean,A2B_std = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=2)
-        A2B_mean = tf.reshape(A2B_mean,A[:,:,:,:1].shape)
-        A2B_std = tf.reshape(A2B_std,A[:,:,:,:1].shape)
+        A2B_FM, A2B_std, A2B_mean = G_A2B(A, training=False)
     else:
-        A2B_FM = G_A2B(A, training=True)
-        # A2B Mask
-        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        A2B_FM = G_A2B(A, training=False)
+    
+    # A2B Masks
+    A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+    if args.UQ:
+        A2B_std = tf.where(A[:,:,:,:1]!=0.0,A2B_std,0.0)
 
     # Build A2B_PM array with zero-valued R2*
     A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM], axis=-1)
@@ -313,13 +310,13 @@ def sample(A, B):
     else:
         val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
 
-    return A2B, A2B2A, {'A2B2A_cycle_loss': val_A2B2A_loss,
-                        'WF_loss': WF_abs_loss,
-                        'FM_loss': FM_loss,}
+    return A2B, A2B2A, A2B_std,{'A2B2A_cycle_loss': val_A2B2A_loss,
+                                'WF_loss': WF_abs_loss,
+                                'FM_loss': FM_loss,}
 
 def validation_step(A, B):
-    A2B, A2B2A, val_A2B2A_dict = sample(A, B)
-    return A2B, A2B2A, val_A2B2A_dict
+    A2B, A2B2A, A2B_std, val_A2B2A_dict = sample(A, B)
+    return A2B, A2B2A, A2B_std, val_A2B2A_dict
 
 
 # ==============================================================================
@@ -393,7 +390,7 @@ for ep in range(args.epochs):
             A, B = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
-            A2B, A2B2A, val_A2B2A_dict = validation_step(A, B)
+            A2B, A2B2A, A2B_std, val_A2B2A_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
@@ -476,7 +473,10 @@ for ep in range(args.epochs):
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_aux = np.squeeze(A2B[:,:,:,4])
+            if not(args.UQ):
+                r2_aux = np.squeeze(A2B[:,:,:,4])
+            else:
+                r2_aux = np.squeeze(A2B_std)
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
