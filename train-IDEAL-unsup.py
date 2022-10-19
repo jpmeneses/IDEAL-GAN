@@ -233,10 +233,10 @@ def train_G(A, B):
         FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
         reg_term = FM_TV + FM_L1
-        if args.UQ:
-            A2B_std_log = tf.where(A2B_std!=0.0,tf.math.log(A2B_std),0.0)
-            std_log = tf.reduce_sum(tf.reduce_mean(A2B_std_log,axis=(1,2,3))) * args.std_log_weight
-            reg_term += std_log
+        # if args.UQ:
+        #     A2B_std_log = tf.where(A2B_std!=0.0,tf.math.log(A2B_std),0.0)
+        #     std_log = tf.reduce_sum(tf.reduce_mean(A2B_std_log,axis=(1,2,3))) * args.std_log_weight
+        #     reg_term += std_log
         
         G_loss = A2B2A_cycle_loss + reg_term
         
