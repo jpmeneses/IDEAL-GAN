@@ -247,8 +247,8 @@ def train_G(A, B):
             'WF_loss': WF_abs_loss,
             'FM_loss': FM_loss,
             'TV_FM': FM_TV,
-            'L1_FM': FM_L1,
-            'STD_log': std_log}
+            'L1_FM': FM_L1}
+            #'STD_log': std_log}
 
 
 def train_step(A, B):
