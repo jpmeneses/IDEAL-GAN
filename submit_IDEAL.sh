@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-unsup.py --dataset 'Unsup-009' --UQ True --epochs 20 --epoch_decay 20 --epoch_ckpt 4 --lr 0.0001 --beta_1 0.9 --beta_2 0.999
+python train-IDEAL-unsup.py --dataset 'Unsup-009' --UQ True --epochs 50 --epoch_decay 50 --epoch_ckpt 10 --lr 0.0001 --beta_1 0.9 --beta_2 0.999
