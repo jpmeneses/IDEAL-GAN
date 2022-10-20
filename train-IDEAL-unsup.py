@@ -196,14 +196,14 @@ def train_G(A, B):
 
         ##################### A Cycle #####################
         if args.UQ:
-            A2B_FM, A2B_mean, A2B_std = G_A2B(A, training=True)
+            A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=True)
         else:
             A2B_FM = G_A2B(A, training=True)
         
         # A2B Masks
         A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
         if args.UQ:
-            A2B_std = tf.where(A[:,:,:,:1]!=0.0,A2B_std,0.0)
+            A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
         
         # Build A2B_PM array with zero-valued R2*
         A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM], axis=-1)
@@ -219,10 +219,10 @@ def train_G(A, B):
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
 
         ############ Cycle-Consistency Losses #############
-        # if args.UQ:
-        #     A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, iter)
-        # else:
-        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        if args.UQ:
+            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_var, iter)
+        else:
+            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
         WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -233,8 +233,8 @@ def train_G(A, B):
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
         reg_term = FM_TV + FM_L1
         # if args.UQ:
-        #     A2B_std_log = tf.where(A2B_std!=0.0,tf.math.log(A2B_std),0.0)
-        #     std_log = tf.reduce_sum(tf.reduce_mean(A2B_std_log,axis=(1,2,3))) * args.std_log_weight
+        #     A2B_var_log = tf.where(A2B_var!=0.0,tf.math.log(A2B_var),0.0)
+        #     std_log = tf.reduce_sum(tf.reduce_mean(A2B_var_log,axis=(1,2,3))) * args.std_log_weight
         #     reg_term += std_log
         
         G_loss = A2B2A_cycle_loss + reg_term
@@ -282,14 +282,14 @@ def sample(A, B):
     B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
 
     if args.UQ:
-        A2B_FM, A2B_mean, A2B_std = G_A2B(A, training=False)
+        A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=False)
     else:
         A2B_FM = G_A2B(A, training=False)
     
     # A2B Masks
     A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
     if args.UQ:
-        A2B_std = tf.where(A[:,:,:,:1]!=0.0,A2B_std,0.0)
+        A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
 
     # Build A2B_PM array with zero-valued R2*
     A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM], axis=-1)
@@ -309,18 +309,18 @@ def sample(A, B):
     WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
-    # if args.UQ:
-    #     val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
-    # else:
-    val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
+    if args.UQ:
+        val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_var)
+    else:
+        val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
 
-    return A2B, A2B2A, A2B_std,{'A2B2A_cycle_loss': val_A2B2A_loss,
+    return A2B, A2B2A, A2B_var,{'A2B2A_cycle_loss': val_A2B2A_loss,
                                 'WF_loss': WF_abs_loss,
                                 'FM_loss': FM_loss,}
 
 def validation_step(A, B):
-    A2B, A2B2A, A2B_std, val_A2B2A_dict = sample(A, B)
-    return A2B, A2B2A, A2B_std, val_A2B2A_dict
+    A2B, A2B2A, A2B_var, val_A2B2A_dict = sample(A, B)
+    return A2B, A2B2A, A2B_var, val_A2B2A_dict
 
 
 # ==============================================================================
@@ -394,7 +394,7 @@ for ep in range(args.epochs):
             A, B = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
-            A2B, A2B2A, A2B_std, val_A2B2A_dict = validation_step(A, B)
+            A2B, A2B2A, A2B_var, val_A2B2A_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
@@ -482,7 +482,7 @@ for ep in range(args.epochs):
                 lmax = r2_sc
                 cmap = 'copper'
             else:
-                r2_aux = np.squeeze(A2B_std)*fm_sc
+                r2_aux = np.squeeze(A2B_var)*fm_sc
                 lmax = fm_sc/10
                 cmap = 'jet'
             r2_ok = axs[1,3].imshow(r2_aux, cmap=cmap,
