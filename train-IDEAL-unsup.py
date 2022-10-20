@@ -486,7 +486,7 @@ for ep in range(args.epochs):
                 lmax = fm_sc/10
                 cmap = 'jet'
             r2_ok = axs[1,3].imshow(r2_aux, cmap=cmap,
-                                    interpolation='none', vmin=0, vmax=lmax)
+                                    interpolation='none')#, vmin=0, vmax=lmax)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
