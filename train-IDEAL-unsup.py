@@ -224,7 +224,7 @@ def train_G(A, B):
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
-            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_var)
+            A2B2A_cycle_loss = gan.VarMeanSquaredError(A-A2B2A, A2B_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
@@ -314,7 +314,7 @@ def sample(A, B):
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
     if args.UQ:
-        val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_var)
+        val_A2B2A_loss = gan.VarMeanSquaredError(A-A2B2A, A2B_var)
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
 
