@@ -169,8 +169,8 @@ def UNet(
     output = keras.layers.Conv2D(n_out, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x)
     if bayesian:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
-        out_std = keras.layers.Conv2D(1, (1,1), kernel_initializer='glorot_normal')(x_std)
-        out_std = tf.keras.layers.Lambda(lambda x: 1e-3 + tf.math.softplus(0.05*x))(out_std)
+        out_std = keras.layers.Conv2D(1, (1,1), kernel_initializer='he_normal')(x_std)
+        out_std = tf.keras.layers.Lambda(lambda x: 1e-3 + tf.math.softplus(0.01*x))(out_std)
         x_prob = tf.concat([output,out_std],axis=-1)
         out_prob = tfp.layers.DistributionLambda(
                     lambda t: tfp.distributions.Normal(
