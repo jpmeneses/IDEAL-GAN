@@ -206,8 +206,8 @@ def train_G(A, B):
         if args.UQ:
             A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
             if tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32))>0:
-                aux = tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32)).numpy()
-                warnings.warn(str(aux)+' NaN values encountered in Variance map!')
+                aux = tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32))
+                warnings.warn('NaN values encountered in Variance map: '+str(aux))
         
         # Build A2B_PM array with zero-valued R2*
         A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM], axis=-1)
