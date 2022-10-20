@@ -1,4 +1,5 @@
 import functools
+import warnings
 
 import random
 import numpy as np
@@ -204,6 +205,9 @@ def train_G(A, B):
         A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
         if args.UQ:
             A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+            if tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32))>0:
+                aux = tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32)).numpy()
+                warnings.warn(str(aux)+' NaN values encountered in Variance map!')
         
         # Build A2B_PM array with zero-valued R2*
         A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM], axis=-1)
@@ -220,7 +224,7 @@ def train_G(A, B):
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
-            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_var, iter)
+            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 

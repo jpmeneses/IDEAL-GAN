@@ -125,7 +125,7 @@ def R1_regularization(f, real_sample):
     return reg_loss
 
 
-def STDw_MSE(x,y,std,log_weight=0.1):
+def STDw_MSE(x,y,std):
     if tf.reduce_sum(tf.cast(tf.math.is_nan(std),tf.int32)) > 0:
         raise ValueError("STD map with NaNs")
     msd = tf.reduce_mean(tf.math.squared_difference(x,y),axis=-1)
