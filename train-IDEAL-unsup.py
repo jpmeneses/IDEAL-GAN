@@ -204,7 +204,7 @@ def train_G(A, B):
         # A2B Masks
         A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
         if args.UQ:
-            A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+            # A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
             if tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32))>0:
                 aux = tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32))
                 warnings.warn('NaN values encountered in Variance map: '+str(aux))
