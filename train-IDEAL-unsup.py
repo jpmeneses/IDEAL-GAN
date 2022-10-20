@@ -219,10 +219,10 @@ def train_G(A, B):
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
 
         ############ Cycle-Consistency Losses #############
-        if args.UQ:
-            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
-        else:
-            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        # if args.UQ:
+        #     A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, iter)
+        # else:
+        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
         WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -309,10 +309,10 @@ def sample(A, B):
     WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
-    if args.UQ:
-        val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
-    else:
-        val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
+    # if args.UQ:
+    #     val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
+    # else:
+    val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
 
     return A2B, A2B2A, A2B_std,{'A2B2A_cycle_loss': val_A2B2A_loss,
                                 'WF_loss': WF_abs_loss,
