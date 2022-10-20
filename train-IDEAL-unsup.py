@@ -36,7 +36,6 @@ py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpo
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
-py.arg('--std_log_weight', type=float, default=1.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--SelfAttention',type=bool, default=True)
@@ -197,7 +196,7 @@ def train_G(A, B):
 
         ##################### A Cycle #####################
         if args.UQ:
-            A2B_FM, A2B_std, A2B_mean = G_A2B(A, training=True)
+            A2B_FM, A2B_mean, A2B_std = G_A2B(A, training=True)
         else:
             A2B_FM = G_A2B(A, training=True)
         
@@ -221,7 +220,7 @@ def train_G(A, B):
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
-            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, args.std_log_weight)
+            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
@@ -283,7 +282,7 @@ def sample(A, B):
     B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
 
     if args.UQ:
-        A2B_FM, A2B_std, A2B_mean = G_A2B(A, training=False)
+        A2B_FM, A2B_mean, A2B_std = G_A2B(A, training=False)
     else:
         A2B_FM = G_A2B(A, training=False)
     
