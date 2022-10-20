@@ -129,7 +129,6 @@ def STDw_MSE(x,y,std,log_weight=0.1):
     msd = tf.reduce_mean(tf.math.squared_difference(x,y),axis=-1)
     # std = tf.reduce_mean(std,axis=-1)
     std = tf.squeeze(std,axis=-1)
-    std = tf.where(std==0.0,1.0,std)
-    STDw_msd = msd/std
-    STDw_msd += tf.math.log(std)*log_weight
+    STDw_msd = tf.where(std!=0.0,msd/std,0.0)
+    STDw_msd += tf.where(std!=0.0,tf.math.log(std),0.0)*log_weight
     return tf.reduce_mean(STDw_msd)

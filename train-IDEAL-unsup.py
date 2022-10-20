@@ -220,10 +220,10 @@ def train_G(A, B):
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
 
         ############ Cycle-Consistency Losses #############
-        # if args.UQ:
-        #     A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, args.std_log_weight)
-        # else:
-        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        if args.UQ:
+            A2B2A_cycle_loss = gan.STDw_MSE(A, A2B2A, A2B_std, args.std_log_weight)
+        else:
+            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
         WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -310,10 +310,10 @@ def sample(A, B):
     WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
-    # if args.UQ:
-    #     val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
-    # else:
-    val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
+    if args.UQ:
+        val_A2B2A_loss = gan.STDw_MSE(A, A2B2A, A2B_std)
+    else:
+        val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
 
     return A2B, A2B2A, A2B_std,{'A2B2A_cycle_loss': val_A2B2A_loss,
                                 'WF_loss': WF_abs_loss,
@@ -479,11 +479,15 @@ for ep in range(args.epochs):
             axs[1,2].axis('off')
 
             if not(args.UQ):
-                r2_aux = np.squeeze(A2B[:,:,:,4])
+                r2_aux = np.squeeze(A2B[:,:,:,4])*r2_sc
+                lmax = r2_sc
+                cmap = 'copper'
             else:
-                r2_aux = np.squeeze(A2B_std)
-            r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
-                                    interpolation='none', vmin=0, vmax=r2_sc)
+                r2_aux = np.squeeze(A2B_std)*fm_sc
+                lmax = fm_sc/10
+                cmap = 'jet'
+            r2_ok = axs[1,3].imshow(r2_aux, cmap=cmap,
+                                    interpolation='none', vmin=0, vmax=lmax)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
