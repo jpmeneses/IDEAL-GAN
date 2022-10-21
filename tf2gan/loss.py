@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tf.keras.losses import Loss
+from tensorflow.keras.losses import Loss
 
 def get_gan_losses_fn():
     bce = tf.losses.BinaryCrossentropy(from_logits=True)
