@@ -177,7 +177,7 @@ def UNet(
                         loc=t[...,:1],
                         scale=tf.math.sqrt(t[...,1:])),
                     )(x_prob)
-        output = tf.concat([out_prob,output,out_var])
+        output = tf.concat([out_prob,output,out_var],axis=-1)
 
     if te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)
