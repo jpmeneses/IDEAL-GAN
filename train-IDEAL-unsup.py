@@ -176,14 +176,13 @@ def train_G(A, B):
 
     indx_mv =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
+                        2*tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     with tf.GradientTape() as t:
         # Split B outputs
         B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
         B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
+        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
 
         # Split B param maps
         B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
@@ -197,14 +196,19 @@ def train_G(A, B):
 
         ##################### A Cycle #####################
         if args.UQ:
-            A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=True)
+            A2B_prob = G_A2B(A, training=True)
+            # Split sample, mean, and variance maps
+            A2B_FM, A2B_mean, A2B_var = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=3)
+            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            A2B_mean = tf.reshape(A2B_mean,B[:,:,:,:1].shape)
+            A2B_var = tf.reshape(A2B_var,B[:,:,:,:1].shape)
         else:
             A2B_FM = G_A2B(A, training=True)
         
         # A2B Masks
         A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
         if args.UQ:
-            # A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+            A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
             if tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32))>0:
                 aux = tf.reduce_sum(tf.cast(tf.math.is_nan(A2B_var),tf.int32))
                 warnings.warn('NaN values encountered in Variance map: '+str(aux))

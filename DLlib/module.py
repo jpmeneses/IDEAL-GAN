@@ -177,13 +177,10 @@ def UNet(
                         loc=t[...,:1],
                         scale=tf.math.sqrt(t[...,1:])),
                     )(x_prob)
+        output = tf.concat([out_prob,output,out_var])
 
-    if te_input and bayesian:
-        return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_var])
-    elif te_input:
+    if te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)
-    elif bayesian:
-        return keras.Model(inputs=inputs1, outputs=[out_prob,output,out_var])
     else:
         return keras.Model(inputs=inputs1, outputs=output)
 
