@@ -169,18 +169,21 @@ def UNet(
     output = keras.layers.Conv2D(n_out, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x)
     if bayesian:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
-        out_var = keras.layers.Conv2D(1, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
+        out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
         # out_var = tf.keras.layers.Lambda(lambda x: 1e-3 + 0.1*x)(out_var)
         x_prob = tf.concat([output,out_var],axis=-1)
         out_prob = tfp.layers.DistributionLambda(
                     lambda t: tfp.distributions.Normal(
-                        loc=t[...,:1],
-                        scale=tf.math.sqrt(t[...,1:])),
+                        loc=t[...,:n_out],
+                        scale=tf.math.sqrt(t[...,n_out:])),
                     )(x_prob)
-        output = tf.concat([out_prob,output,out_var],axis=-1)
 
-    if te_input:
+    if te_input and bayesian:
+        return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_var])
+    elif te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)
+    elif bayesian:
+        return keras.Model(inputs=inputs1, outputs=[out_prob,output,out_var])
     else:
         return keras.Model(inputs=inputs1, outputs=output)
 

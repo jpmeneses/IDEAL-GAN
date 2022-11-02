@@ -176,7 +176,8 @@ def train_G(A, B):
 
     indx_mv =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
-                        2*tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
+                        tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     with tf.GradientTape() as t:
         # Split B outputs
@@ -271,7 +272,8 @@ def sample(A, B):
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     indx_mv =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
-                        2*tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
+                        tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     # Split B outputs
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
@@ -289,12 +291,7 @@ def sample(A, B):
     B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
 
     if args.UQ:
-        A2B_prob = G_A2B(A, training=True)
-        # Split sample, mean, and variance maps
-        A2B_FM, A2B_mean, A2B_var = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=3)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
-        A2B_mean = tf.reshape(A2B_mean,B[:,:,:,:1].shape)
-        A2B_var = tf.reshape(A2B_var,B[:,:,:,:1].shape)
+        A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=False)
     else:
         A2B_FM = G_A2B(A, training=False)
     
