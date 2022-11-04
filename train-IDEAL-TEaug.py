@@ -339,7 +339,7 @@ def sample(B, te=None):
         B2A2B_WF_abs = tf.where(B[:,:,:,:2]!=0.0,B2A2B_WF_abs,0.0)
         B2A2B_PM = tf.zeros_like(B_PM)
         # Split A2B param maps
-        B2A2B_R2, B2A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+        B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
         B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
         B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
         B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_PM],axis=-1)
