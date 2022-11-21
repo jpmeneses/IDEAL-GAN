@@ -58,11 +58,12 @@ pdff_Data %>%
 q = ggplot(pdff_Data, aes(refs, mean)) +
        geom_point(aes(color = Site_Protocol))+
        geom_smooth(method="lm") +
+	 ylim(0.0,1.0) +
   stat_regline_equation(
     aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"))
     )
 fn1 = "LS-corr.png"
-ggsave(plot=q, width=6, height=4, dpi=1200, filename=fn1)
+ggsave(plot=q, width=5, height=3, dpi=400, filename=fn1)
 
 
 ############################################################################
@@ -80,4 +81,4 @@ q2= ggplot(pdff_Data, aes(refs, bias)) +
   xlab("Ground-Truth") + 
   ylim(-0.8,0.8)
 fn2 = "Bias-BlandAltman.png"
-ggsave(plot=q2, width=6, height=4, dpi=1200, filename=fn2)
+ggsave(plot=q2, width=5, height=3, dpi=400, filename=fn2)

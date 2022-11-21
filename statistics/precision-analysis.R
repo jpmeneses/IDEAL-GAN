@@ -11,7 +11,7 @@ library(emmeans)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/Sup-007/"
+model = "/TEaug-004/"
 epoch = "200"
 
 dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
@@ -28,11 +28,13 @@ for (i in c(1:length(TEs_suffix)))
     len_ij = length(t(roi_data[,2]))
     if (i==1 & j==1)
     {
-      meas = c(t(roi_data[,2]))
+      refs = c(t(roi_data[,1]))
+	meas = c(t(roi_data[,2]))
 	sample_id = c(1:len_ij)
       TEs = rep(c(TEs_suffix[i]),len_ij)
     } else
     {
+      refs = c(refs,t(roi_data[,1]))
       meas = c(meas,t(roi_data[,2]))
 	sample_id = c(sample_id,c(1:len_ij)+(j-1)*len_ij)
       TEs = c(TEs,rep(c(TEs_suffix[i]),len_ij))
@@ -43,6 +45,7 @@ n_data = length(meas)
 
 # Create a data frame
 pdff_Data <- data.frame(
+refs = c(refs),
 meas = c(meas),
 sample_id = factor(sample_id,
 			 labels=c(paste0(LETTERS[1:len_ij],sep='-',1),
@@ -62,8 +65,14 @@ pdff_Data %>%
 # Precision metrics for each sample
 wXs = with(pdff_Data, aggregate(meas ~ sample_id, FUN = mean))
 wSDs = with(pdff_Data, aggregate(meas ~ sample_id, FUN = sd))
+wXs_r = with(pdff_Data, aggregate(refs ~ sample_id, FUN = mean))
+wSDs_r = with(pdff_Data, aggregate(refs ~ sample_id, FUN = sd))
+
 res_id <- data.frame(
 id = wXs$sample_id,
+wXs_r = wXs_r$refs,
+wSDs_r = wSDs_r$refs,
+wCVs_r = wSDs_r$refs/wXs_r$refs,
 wXs = wXs$meas,
 wSDs = wSDs$meas,
 wCVs = wSDs$meas/wXs$meas
@@ -88,13 +97,16 @@ cat('Mean wSD:',mean_wSD,'+-',1.96*std_wSD,
 ############################## SCATTERPLOT #################################
 ############################################################################
 upper_sd <- mean_wSD + 1.65*std_wSD
-q2= ggplot(res_id, aes(wXs, wSDs)) +
-  geom_point(size=1)+
-  geom_hline(yintercept = mean_wSD) +
-  geom_hline(yintercept = mean_RDC, color = "green", linetype="dotdash") +
-  geom_hline(yintercept = upper_sd, color = "red", linetype="dashed") +
-  ylab("Within-Subject/ROI PDFF SD") +
-  xlab("Per-Subject/ROI Average PDFF") + 
-  ylim(0,0.04)
-fn2 = "Precision-ScatPlot.png"
-ggsave(plot=q2, width=3.75, height=3, dpi=600, filename=fn2)
+q2 = ggplot(res_id, aes(wXs_r, wXs)) +
+      geom_point()+
+	geom_errorbar(aes(xmin=wXs_r-wSDs_r, xmax=wXs_r+wSDs_r,
+				ymin=wXs-wSDs, ymax=wXs+wSDs),
+				width=0.005) +
+      geom_smooth(method="lm") +
+	labs(x='Ref. ROI mean', y='Meas. ROI mean') +
+	ylim(0.02,0.3) +
+  stat_regline_equation(
+    aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"))
+    )
+fn2 = "Precision-corr-std.png"
+ggsave(plot=q2, width=3.2, height=2.8, dpi=500, filename=fn2)

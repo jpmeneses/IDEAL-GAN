@@ -23,7 +23,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='encod-decod', choices=['encod-decod','U-Net','complex'])
+py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','complex'])
 py.arg('--out_vars', default='WF', choices=['WF','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--n_G_filters', type=int, default=72)
@@ -130,7 +130,7 @@ B_dataset_val.batch(1)
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
-if args.G_model == 'encod-decod':
+if args.G_model == 'multi-decod':
     G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                             filters=args.n_G_filters,
                             te_input=args.te_input,
