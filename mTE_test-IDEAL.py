@@ -20,7 +20,7 @@ from skimage.metrics import structural_similarity
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','phantom'])
-py.arg('--out_vars', default='PM', choices=['WF','PM','WF-PM'])
+py.arg('--out_vars', default='PM', choices=['WF','PM','WF-PM', 'FM'])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--n_filters', type=int, default=72)
 py.arg('--D1_SelfAttention',type=bool, default=False)
@@ -82,7 +82,7 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../MRI-Datasets/HDF5-DS/'
+dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
 dataset_hdf5 = args.dataset + '_GC_192_complex_2D.hdf5'
 testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
                                     acqs_data=True, te_data=True,
@@ -130,10 +130,13 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
 elif args.G_model == 'U-Net':
     if args.out_vars == 'WF-PM':
         n_out = 4
+    elif args.out_vars == 'FM':
+        n_out = 1
     else:
         n_out = 2
     G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
                     n_out=n_out,
+                    bayesian=args.UQ,
                     te_input=args.te_input,
                     te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
@@ -190,6 +193,7 @@ def sample(A, B, TE=None):
         A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
         A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+        A2B_var = None
     elif args.out_vars == 'PM':
         if args.te_input:
             A2B_PM = G_A2B([A,TE], training=True)
@@ -208,6 +212,7 @@ def sample(A, B, TE=None):
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+        A2B_var = None
     elif args.out_vars == 'WF-PM':
         B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
         if args.te_input:
@@ -225,8 +230,35 @@ def sample(A, B, TE=None):
             A2B_FM = (A2B_FM - 0.5) * 2
             A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,A2B_FM,0.0)
             A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
+        A2B_var = None
+    elif args.out_vars == 'FM':
+        if args.UQ:
+            _, A2B_FM, A2B_var = G_A2B(A, training=False)
+        else:
+            A2B_FM = G_A2B(A, training=False)
+            A2B_var = None
+        
+        # A2B Masks
+        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        if args.UQ:
+            A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
 
-    return A2B_abs
+        # Build A2B_PM array with zero-valued R2*
+        A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM], axis=-1)
+        if args.fat_char:
+            A2B_P, A2B2A = fa.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+            A2B_WF = A2B_P[:,:,:,0:4]
+        else:
+            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
+
+        # Magnitude of water/fat images
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+        A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+
+    return A2B_abs, A2B_var
 
 
 # run
@@ -238,11 +270,18 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     A = tf.expand_dims(A,axis=0)
     TE_smp = tf.expand_dims(TE_smp,axis=0)
     B = tf.expand_dims(B,axis=0)
-    A2B = sample(A,B,TE_smp)
+    A2B, A2B_var = sample(A,B,TE_smp)
 
     w_aux = np.squeeze(A2B[:,:,:,0])
     f_aux = np.squeeze(A2B[:,:,:,1])
-    r2_aux = np.squeeze(A2B[:,:,:,2])
+    if not(args.UQ):
+        r2_aux = np.squeeze(A2B[:,:,:,2])*r2_sc
+        lmax = r2_sc
+        cmap = 'copper'
+    else:
+        r2_aux = np.squeeze(A2B_var)*fm_sc
+        lmax = 30
+        cmap = 'gnuplot2'
     field_aux = np.squeeze(A2B[:,:,:,3])
     PDFF_aux = f_aux/(w_aux+f_aux)
     PDFF_aux[np.isnan(PDFF_aux)] = 0.0
@@ -263,8 +302,8 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
         fig.colorbar(F_ok, ax=axs[0,0])
         axs[0,0].axis('off')
 
-        r2_ok = axs[0,1].imshow(r2_aux*r2_sc, cmap='copper',
-                                interpolation='none', vmin=0, vmax=r2_sc)
+        r2_ok = axs[0,1].imshow(r2_aux, cmap=cmap,
+                                interpolation='none', vmin=0, vmax=lmax)
         fig.colorbar(r2_ok, ax=axs[0,1])
         axs[0,1].axis('off')
 

@@ -16,7 +16,6 @@ import falib as fa
 import wflib as wf
 
 import data
-from keras_unet.models import custom_unet
 
 from itertools import cycle
 
@@ -29,14 +28,15 @@ py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='U-Net', choices=['complex','U-Net','MEBCRN'])
 py.arg('--fat_char', type=bool, default=False)
 py.arg('--UQ', type=bool, default=False)
+py.arg('--k_fold', type=int, default=1)
 py.arg('--n_G_filters', type=int, default=32)
 py.arg('--batch_size', type=int, default=1)
-py.arg('--epochs', type=int, default=200)
-py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
-py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpoint
-py.arg('--lr', type=float, default=0.0002)
-py.arg('--beta_1', type=float, default=0.5)
-py.arg('--beta_2', type=float, default=0.9)
+py.arg('--epochs', type=int, default=60)
+py.arg('--epoch_decay', type=int, default=60)  # epoch to start decaying learning rate
+py.arg('--epoch_ckpt', type=int, default=5)  # num. of epochs to save a checkpoint
+py.arg('--lr', type=float, default=0.0001)
+py.arg('--beta_1', type=float, default=0.9)
+py.arg('--beta_2', type=float, default=0.999)
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--SelfAttention',type=bool, default=True)
@@ -93,20 +93,15 @@ acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-n1_div = 248
-n3_div = 0
-n4_div = 434
+trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+k_divs = [0,832,1694,2547,3409,len(trainX)]
 
-trainX = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-valX = acqs_1
-# trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
-# valX    = acqs_2
-# testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
+valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
+valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
 
-trainY = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
-valY = out_maps_1
-# trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3,out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
-# valY    = out_maps_2
+trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(trainX)
@@ -121,6 +116,7 @@ print('Echoes:',echoes)
 print('Output Maps:',n_out)
 
 # Input and output dimensions (validations data)
+print('Training output shape:',trainY.shape)
 print('Validation output shape:',valY.shape)
 
 A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
@@ -144,9 +140,8 @@ elif args.G_model == 'U-Net':
     G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
                     bayesian=args.UQ,
                     te_input=False,
-                    te_shape=(args.n_echoes),
+                    te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
-                    dropout=0.0,
                     self_attention=args.SelfAttention)
 elif args.G_model == 'MEBCRN':
     G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
@@ -197,12 +192,12 @@ def train_G(A, B):
 
         ##################### A Cycle #####################
         if args.UQ:
-            A2B_prob = G_A2B(A, training=True)
+            A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=True)
             # Split sample, mean, and variance maps
-            A2B_FM, A2B_mean, A2B_var = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=3)
-            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
-            A2B_mean = tf.reshape(A2B_mean,B[:,:,:,:1].shape)
-            A2B_var = tf.reshape(A2B_var,B[:,:,:,:1].shape)
+            # A2B_FM, A2B_mean, A2B_var = tf.dynamic_partition(A2B_prob,indx_mv,num_partitions=3)
+            # A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            # A2B_mean = tf.reshape(A2B_mean,B[:,:,:,:1].shape)
+            # A2B_var = tf.reshape(A2B_var,B[:,:,:,:1].shape)
         else:
             A2B_FM = G_A2B(A, training=True)
         
@@ -229,7 +224,7 @@ def train_G(A, B):
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
-            A2B2A_cycle_loss = gan.VarMeanSquaredError(A-A2B2A, A2B_var)
+            A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
@@ -294,6 +289,7 @@ def sample(A, B):
         A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=False)
     else:
         A2B_FM = G_A2B(A, training=False)
+        A2B_var = None
     
     # A2B Masks
     A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -319,7 +315,7 @@ def sample(A, B):
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
     if args.UQ:
-        val_A2B2A_loss = gan.VarMeanSquaredError(A-A2B2A, A2B_var)
+        val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
 
@@ -358,7 +354,7 @@ val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summarie
 val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(valY))
+n_div = 30*np.ceil(total_steps/len(valY))
 
 # main loop
 for ep in range(args.epochs):
@@ -493,7 +489,7 @@ for ep in range(args.epochs):
             else:
                 r2_aux = np.squeeze(A2B_var)*fm_sc
                 lmax = fm_sc/10
-                cmap = 'jet'
+                cmap = 'gnuplot2'
             r2_ok = axs[1,3].imshow(r2_aux, cmap=cmap,
                                     interpolation='none')#, vmin=0, vmax=lmax)
             fig.colorbar(r2_ok, ax=axs[1,3])
