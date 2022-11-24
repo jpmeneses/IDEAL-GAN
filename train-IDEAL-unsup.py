@@ -19,6 +19,9 @@ import data
 
 from itertools import cycle
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="2"
+
 # ==============================================================================
 # =                                   param                                    =
 # ==============================================================================
@@ -354,7 +357,7 @@ val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summarie
 val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = 30*np.ceil(total_steps/len(valY))
+n_div = np.ceil(total_steps/len(valY))
 
 # main loop
 for ep in range(args.epochs):
@@ -405,139 +408,140 @@ for ep in range(args.epochs):
             with val_summary_writer.as_default():
                 tl.summary(val_A2B2A_dict, step=G_optimizer.iterations, name='G_losses')
 
-            fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
+            if G_optimizer.iterations.numpy() % (30*n_div) == 0:
+                fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
-            # Magnitude of recon MR images at each echo
-            if args.G_model != 'complex':
-                im_ech1 = np.squeeze(np.abs(tf.complex(A[:,:,:,0],A[:,:,:,1])))
-                im_ech2 = np.squeeze(np.abs(tf.complex(A[:,:,:,2],A[:,:,:,3])))
+                # Magnitude of recon MR images at each echo
+                if args.G_model != 'complex':
+                    im_ech1 = np.squeeze(np.abs(tf.complex(A[:,:,:,0],A[:,:,:,1])))
+                    im_ech2 = np.squeeze(np.abs(tf.complex(A[:,:,:,2],A[:,:,:,3])))
+                    if args.n_echoes >= 3:
+                        im_ech3 = np.squeeze(np.abs(tf.complex(A[:,:,:,4],A[:,:,:,5])))
+                    if args.n_echoes >= 4:
+                        im_ech4 = np.squeeze(np.abs(tf.complex(A[:,:,:,6],A[:,:,:,7])))
+                    if args.n_echoes >= 5:
+                        im_ech5 = np.squeeze(np.abs(tf.complex(A[:,:,:,8],A[:,:,:,9])))
+                    if args.n_echoes >= 6:
+                        im_ech6 = np.squeeze(np.abs(tf.complex(A[:,:,:,10],A[:,:,:,11])))
+                else:
+                    im_ech1 = np.squeeze(np.abs(A[:,:,:,0]))
+                    im_ech2 = np.squeeze(np.abs(A[:,:,:,1]))
+                    if args.n_echoes >= 3:
+                        im_ech3 = np.squeeze(np.abs(A[:,:,:,2]))
+                    if args.n_echoes >= 4:
+                        im_ech4 = np.squeeze(np.abs(A[:,:,:,3]))
+                    if args.n_echoes >= 5:
+                        im_ech5 = np.squeeze(np.abs(A[:,:,:,4]))
+                    if args.n_echoes >= 6:
+                        im_ech6 = np.squeeze(np.abs(A[:,:,:,5]))
+                
+                # Acquisitions in the first row
+                acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
+                                      interpolation='none', vmin=0, vmax=1)
+                axs[0,0].set_title('1st Echo')
+                axs[0,0].axis('off')
+                acq_ech2 = axs[0,1].imshow(im_ech2, cmap='gist_earth',
+                                      interpolation='none', vmin=0, vmax=1)
+                axs[0,1].set_title('2nd Echo')
+                axs[0,1].axis('off')
                 if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(np.abs(tf.complex(A[:,:,:,4],A[:,:,:,5])))
+                    acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
+                                          interpolation='none', vmin=0, vmax=1)
+                    axs[0,2].set_title('3rd Echo')
+                    axs[0,2].axis('off')
+                else:
+                    fig.delaxes(axs[0,2])
                 if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(np.abs(tf.complex(A[:,:,:,6],A[:,:,:,7])))
+                    acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
+                                          interpolation='none', vmin=0, vmax=1)
+                    axs[0,3].set_title('4th Echo')
+                    axs[0,3].axis('off')
+                else:
+                    fig.delaxes(axs[0,3])
                 if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(np.abs(tf.complex(A[:,:,:,8],A[:,:,:,9])))
+                    acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
+                                          interpolation='none', vmin=0, vmax=1)
+                    axs[0,4].set_title('5th Echo')
+                    axs[0,4].axis('off')
+                else:
+                    fig.delaxes(axs[0,4])
                 if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(np.abs(tf.complex(A[:,:,:,10],A[:,:,:,11])))
-            else:
-                im_ech1 = np.squeeze(np.abs(A[:,:,:,0]))
-                im_ech2 = np.squeeze(np.abs(A[:,:,:,1]))
-                if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(np.abs(A[:,:,:,2]))
-                if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(np.abs(A[:,:,:,3]))
-                if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(np.abs(A[:,:,:,4]))
-                if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(np.abs(A[:,:,:,5]))
-            
-            # Acquisitions in the first row
-            acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
-                                  interpolation='none', vmin=0, vmax=1)
-            axs[0,0].set_title('1st Echo')
-            axs[0,0].axis('off')
-            acq_ech2 = axs[0,1].imshow(im_ech2, cmap='gist_earth',
-                                  interpolation='none', vmin=0, vmax=1)
-            axs[0,1].set_title('2nd Echo')
-            axs[0,1].axis('off')
-            if args.n_echoes >= 3:
-                acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
-                                      interpolation='none', vmin=0, vmax=1)
-                axs[0,2].set_title('3rd Echo')
-                axs[0,2].axis('off')
-            else:
-                fig.delaxes(axs[0,2])
-            if args.n_echoes >= 4:
-                acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
-                                      interpolation='none', vmin=0, vmax=1)
-                axs[0,3].set_title('4th Echo')
-                axs[0,3].axis('off')
-            else:
-                fig.delaxes(axs[0,3])
-            if args.n_echoes >= 5:
-                acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
-                                      interpolation='none', vmin=0, vmax=1)
-                axs[0,4].set_title('5th Echo')
-                axs[0,4].axis('off')
-            else:
-                fig.delaxes(axs[0,4])
-            if args.n_echoes >= 6:
-                acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
-                                      interpolation='none', vmin=0, vmax=1)
-                axs[0,5].set_title('6th Echo')
-                axs[0,5].axis('off')
-            else:
-                fig.delaxes(axs[0,5])
+                    acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
+                                          interpolation='none', vmin=0, vmax=1)
+                    axs[0,5].set_title('6th Echo')
+                    axs[0,5].axis('off')
+                else:
+                    fig.delaxes(axs[0,5])
 
-            # A2B maps in the second row
-            w_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,0],A2B[:,:,:,1])))
-            W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
+                # A2B maps in the second row
+                w_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,0],A2B[:,:,:,1])))
+                W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
+                                        interpolation='none', vmin=0, vmax=1)
+                fig.colorbar(W_ok, ax=axs[1,1])
+                axs[1,1].axis('off')
+
+                f_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,2],A2B[:,:,:,3])))
+                F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
+                                        interpolation='none', vmin=0, vmax=1)
+                fig.colorbar(F_ok, ax=axs[1,2])
+                axs[1,2].axis('off')
+
+                if not(args.UQ):
+                    r2_aux = np.squeeze(A2B[:,:,:,4])*r2_sc
+                    lmax = r2_sc
+                    cmap = 'copper'
+                else:
+                    r2_aux = np.squeeze(A2B_var)*(fm_sc**2)
+                    lmax = 10
+                    cmap = 'gnuplot2'
+                r2_ok = axs[1,3].imshow(r2_aux, cmap=cmap,
+                                        interpolation='none', vmin=0, vmax=lmax)
+                fig.colorbar(r2_ok, ax=axs[1,3])
+                axs[1,3].axis('off')
+
+                field_aux = np.squeeze(A2B[:,:,:,5])
+                field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
+                                            interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+                fig.colorbar(field_ok, ax=axs[1,4])
+                axs[1,4].axis('off')
+                fig.delaxes(axs[1,0])
+                fig.delaxes(axs[1,5])
+
+                # Ground-truth in the third row
+                wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
+                W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
-            fig.colorbar(W_ok, ax=axs[1,1])
-            axs[1,1].axis('off')
+                fig.colorbar(W_unet, ax=axs[2,1])
+                axs[2,1].axis('off')
 
-            f_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,2],A2B[:,:,:,3])))
-            F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
+                fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
+                F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
-            fig.colorbar(F_ok, ax=axs[1,2])
-            axs[1,2].axis('off')
+                fig.colorbar(F_unet, ax=axs[2,2])
+                axs[2,2].axis('off')
 
-            if not(args.UQ):
-                r2_aux = np.squeeze(A2B[:,:,:,4])*r2_sc
-                lmax = r2_sc
-                cmap = 'copper'
-            else:
-                r2_aux = np.squeeze(A2B_var)*fm_sc
-                lmax = fm_sc/10
-                cmap = 'gnuplot2'
-            r2_ok = axs[1,3].imshow(r2_aux, cmap=cmap,
-                                    interpolation='none')#, vmin=0, vmax=lmax)
-            fig.colorbar(r2_ok, ax=axs[1,3])
-            axs[1,3].axis('off')
+                r2n_aux = np.squeeze(B[:,:,:,4])
+                r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
+                                     interpolation='none', vmin=0, vmax=r2_sc)
+                fig.colorbar(r2_unet, ax=axs[2,3])
+                axs[2,3].axis('off')
 
-            field_aux = np.squeeze(A2B[:,:,:,5])
-            field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
+                fieldn_aux = np.squeeze(B[:,:,:,5])
+                field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-            fig.colorbar(field_ok, ax=axs[1,4])
-            axs[1,4].axis('off')
-            fig.delaxes(axs[1,0])
-            fig.delaxes(axs[1,5])
+                fig.colorbar(field_unet, ax=axs[2,4])
+                axs[2,4].axis('off')
+                fig.delaxes(axs[2,0])
+                fig.delaxes(axs[2,5])
 
-            # Ground-truth in the third row
-            wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
-            W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
-                                interpolation='none', vmin=0, vmax=1)
-            fig.colorbar(W_unet, ax=axs[2,1])
-            axs[2,1].axis('off')
+                fig.suptitle('A2B Error: '+str(val_A2B2A_dict['WF_loss']), fontsize=16)
 
-            fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
-            F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
-                                interpolation='none', vmin=0, vmax=1)
-            fig.colorbar(F_unet, ax=axs[2,2])
-            axs[2,2].axis('off')
-
-            r2n_aux = np.squeeze(B[:,:,:,4])
-            r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
-                                 interpolation='none', vmin=0, vmax=r2_sc)
-            fig.colorbar(r2_unet, ax=axs[2,3])
-            axs[2,3].axis('off')
-
-            fieldn_aux = np.squeeze(B[:,:,:,5])
-            field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-            fig.colorbar(field_unet, ax=axs[2,4])
-            axs[2,4].axis('off')
-            fig.delaxes(axs[2,0])
-            fig.delaxes(axs[2,5])
-
-            fig.suptitle('A2B Error: '+str(val_A2B2A_dict['A2B2A_cycle_loss']), fontsize=16)
-
-            # plt.show()
-            plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
-            tl.make_space_above(axs,topmargin=0.8)
-            plt.savefig(py.join(sample_dir, 'iter-%09d.png' % G_optimizer.iterations.numpy()),
-                        bbox_inches = 'tight', pad_inches = 0)
-            plt.close(fig)
+                # plt.show()
+                plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+                tl.make_space_above(axs,topmargin=0.8)
+                plt.savefig(py.join(sample_dir, 'iter-%09d.png' % G_optimizer.iterations.numpy()),
+                            bbox_inches = 'tight', pad_inches = 0)
+                plt.close(fig)
 
     # save checkpoint
     if (((ep+1) % args.epoch_ckpt) == 0) or ((ep+1)==args.epochs):

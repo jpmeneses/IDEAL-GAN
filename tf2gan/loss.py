@@ -126,8 +126,9 @@ def R1_regularization(f, real_sample):
 
 
 def VarMeanSquaredError(A, A2B2A, var_map):
+    std_map = tf.math.sqrt(var_map)
     msd = tf.reduce_mean(tf.math.square(A-A2B2A),axis=-1,keepdims=True)
-    STDw_msd = tf.math.divide_no_nan(msd,var_map)
-    log_std = tf.where(var_map!=0.0,tf.math.log(var_map),0.0)
+    STDw_msd = tf.math.divide_no_nan(msd,std_map)
+    log_std = tf.where(std_map!=0.0,tf.math.log(std_map),0.0)
     STDw_msd += log_std
     return STDw_msd
