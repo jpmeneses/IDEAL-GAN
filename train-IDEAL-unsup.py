@@ -19,9 +19,6 @@ import data
 
 from itertools import cycle
 
-import os
-os.environ["CUDA_VISIBLE_DEVICES"]="2"
-
 # ==============================================================================
 # =                                   param                                    =
 # ==============================================================================
@@ -29,6 +26,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="2"
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='U-Net', choices=['complex','U-Net','MEBCRN'])
+py.arg('--R2s', type=bool, default=False)
 py.arg('--fat_char', type=bool, default=False)
 py.arg('--UQ', type=bool, default=False)
 py.arg('--k_fold', type=int, default=1)
@@ -140,7 +138,12 @@ if args.G_model == 'complex':
                             te_shape=(args.n_echoes,),
                             self_attention=args.SelfAttention)
 elif args.G_model == 'U-Net':
+    if args.R2s:
+        n_out = 2
+    else:
+        n_out = 1
     G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+                    n_out=n_out,
                     bayesian=args.UQ,
                     te_input=False,
                     te_shape=(args.n_echoes,),

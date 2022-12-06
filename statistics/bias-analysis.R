@@ -10,7 +10,7 @@ library(rstatix)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-007/"
+model = "/TEaug-004/"
 epoch = "200"
 
 dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
