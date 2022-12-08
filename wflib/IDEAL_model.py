@@ -357,14 +357,14 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
 
     # Matrix operations
     WmZS = Wm_var * Z * (Smtx**2)
-    MWmZS = tf.linalg.matmul(M_pinv**2,WmS)
+    MWmZS = tf.linalg.matmul(M_pinv**2,WmZS)
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
     rho_var = tf.reshape(tf.transpose(MWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
 
-    Re_rho = tf.math.real(rho_hat)
-    Im_rho = tf.math.imag(rho_hat)
+    Re_rho = tf.math.real(rho_var)
+    Im_rho = tf.math.imag(rho_var)
     zero_fill = tf.zeros_like(Re_rho)
     re_stack = tf.stack([Re_rho,zero_fill],4)
     re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])

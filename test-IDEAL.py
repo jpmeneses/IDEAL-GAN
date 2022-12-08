@@ -297,10 +297,10 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     if args.UQ:
         # Get water/fat uncertainties
         WF_var = wf.PDFF_uncertainty(A,A2B[:,:,:,-1],A2B_var)
-        W_var = tf.abs(tf.complex(A2B_WF[:,:,:,0],A2B_WF[:,:,:,1]))
-        F_var = tf.abs(tf.complex(A2B_WF[:,:,:,2],A2B_WF[:,:,:,3]))
+        W_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,0],WF_var[:,:,:,1])))
+        F_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,2],WF_var[:,:,:,3])))
         field_var = np.squeeze(A2B_var)*(fm_sc**2)
-        hgt_plt, wdt_plt, nr, nc = 11, 16, 3, 4
+        hgt_plt, wdt_plt, nr, nc = 10, 16, 3, 4
     else:
         hgt_plt, wdt_plt, nr, nc = 9, 16, 2, 3
 
@@ -312,18 +312,18 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
     
     if i%args.n_plot == 0 or args.dataset == 'phantom':
-        fig,axs=plt.subplots(figsize=(wdt_plt, hgt_plt), nrows=nr, ncols=3)
+        fig,axs=plt.subplots(figsize=(wdt_plt, hgt_plt), nrows=nr, ncols=nc)
 
         # Ground-truth maps in the first row
         FF_ok = axs[0,0].imshow(PDFFn_aux, cmap='jet',
                                 interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_ok, ax=axs[0,0])
+        fig.colorbar(FF_ok, ax=axs[0,0])
         axs[0,0].axis('off')
 
         # Estimated maps in the second row
-        F_est = axs[1,0].imshow(PDFF_aux, cmap='jet',
+        FF_est =axs[1,0].imshow(PDFF_aux, cmap='jet',
                                 interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_est, ax=axs[1,0])
+        fig.colorbar(FF_est, ax=axs[1,0])
         axs[1,0].axis('off')
 
         if args.UQ:
@@ -362,17 +362,17 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             # Uncertainty maps in the 3rd row
             fig.delaxes(axs[2,0]) # No PDFF variance map
 
-            W_uq =  axs[2,1].imshow(W_var, cmap='gnuplot',
-                                    interpolation='none', vmin=0)#, vmax=10)
+            W_uq =  axs[2,1].imshow(W_var, cmap='gnuplot2',
+                                    interpolation='none', vmin=0, vmax=0.1)
             fig.colorbar(W_uq, ax=axs[2,1])
             axs[2,1].axis('off')
 
             F_uq =  axs[2,2].imshow(F_var, cmap='gnuplot2',
-                                    interpolation='none', vmin=0)#, vmax=10)
+                                    interpolation='none', vmin=0, vmax=0.1)
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            field_uq = axs[2,3].imshow(field_var, cmap='plasma',
+            field_uq = axs[2,3].imshow(field_var, cmap='gnuplot2',
                                         interpolation='none', vmin=0, vmax=10)
             fig.colorbar(field_uq, ax=axs[2,3])
             axs[2,3].axis('off')
