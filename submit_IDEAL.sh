@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-TEaug.py --dataset 'Unsup-006' --R2s True --UQ True
+python train-IDEAL-unsup.py --dataset 'Unsup-006' --R2s True --UQ True

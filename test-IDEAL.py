@@ -295,17 +295,14 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     PDFF_aux[np.isnan(PDFF_aux)] = 0.0
 
     if args.UQ:
-        # A2B_PM_std = tf.concat([tf.zeros_like(A2B_var),A2B_var*fm_sc],axis=-1)
-        # A2B_WF_std = wf.get_rho(A,A2B_PM_std)
-        # A2B_WF_abs_std = tf.abs(tf.complex(A2B_WF_std[:,:,:,0::2],A2B_WF_std[:,:,:,1::2]))
-        # w_std_aux = np.squeeze(A2B_WF_abs_std[:,:,:,0])
-        # f_std_aux = np.squeeze(A2B_WF_abs_std[:,:,:,1])
-        # PDFF_std = f_std_aux/(w_std_aux+f_std_aux)
-        # PDFF_std[np.isnan(PDFF_std)] = 0.0
+        # Get water/fat uncertainties
+        WF_var = wf.PDFF_uncertainty(A,A2B[:,:,:,-1],A2B_var)
+        W_var = tf.abs(tf.complex(A2B_WF[:,:,:,0],A2B_WF[:,:,:,1]))
+        F_var = tf.abs(tf.complex(A2B_WF[:,:,:,2],A2B_WF[:,:,:,3]))
         field_var = np.squeeze(A2B_var)*(fm_sc**2)
-        hgt_plt, wdt_plt, nr = 13.5, 16, 3
+        hgt_plt, wdt_plt, nr, nc = 11, 16, 3, 4
     else:
-        hgt_plt, wdt_plt, nr = 9, 16, 2
+        hgt_plt, wdt_plt, nr, nc = 9, 16, 2, 3
 
     wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
     fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
@@ -317,52 +314,90 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     if i%args.n_plot == 0 or args.dataset == 'phantom':
         fig,axs=plt.subplots(figsize=(wdt_plt, hgt_plt), nrows=nr, ncols=3)
 
-        # B maps in the first row
-        F_unet = axs[0,0].imshow(PDFFn_aux, cmap='jet',
+        # Ground-truth maps in the first row
+        FF_ok = axs[0,0].imshow(PDFFn_aux, cmap='jet',
                                 interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_unet, ax=axs[0,0])
+        fig.colorbar(F_ok, ax=axs[0,0])
         axs[0,0].axis('off')
 
-        r2_unet=axs[0,1].imshow(r2n_aux*r2_sc, cmap='copper',
-                                interpolation='none', vmin=0, vmax=r2_sc)
-        fig.colorbar(r2_unet, ax=axs[0,1])
-        axs[0,1].axis('off')
-
-        field_unet =axs[0,2].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_unet, ax=axs[0,2])
-        axs[0,2].axis('off')
-
-        # Ground-truth in the second row
-        F_ok = axs[1,0].imshow(PDFF_aux, cmap='jet',
-                          interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_ok, ax=axs[1,0])
+        # Estimated maps in the second row
+        F_est = axs[1,0].imshow(PDFF_aux, cmap='jet',
+                                interpolation='none', vmin=0, vmax=1)
+        fig.colorbar(F_est, ax=axs[1,0])
         axs[1,0].axis('off')
 
-        r2_ok = axs[1,1].imshow(r2_aux, cmap='copper',
-                                interpolation='none', vmin=0, vmax=r2_sc)
-        fig.colorbar(r2_ok, ax=axs[1,1])
-        axs[1,1].axis('off')
-
-        field_ok = axs[1,2].imshow(field_aux*fm_sc, cmap='twilight',
-                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_ok, ax=axs[1,2])
-        axs[1,2].axis('off')
-
-        # Uncertainty maps in the third row
         if args.UQ:
-            # F_uq = axs[2,0].imshow(PDFF_std, cmap='gnuplot',
-            #                   interpolation='none', vmin=0)#, vmax=0.1)
-            # fig.colorbar(F_uq, ax=axs[2,0])
-            # axs[2,0].axis('off')
-            fig.delaxes(axs[2,0])            
+            # Ground-truth maps
+            W_ok =  axs[0,1].imshow(wn_aux, cmap='bone',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(W_ok, ax=axs[0,1])
+            axs[0,1].axis('off')
 
-            field_uq = axs[2,2].imshow(field_var, cmap='gnuplot2',
-                                        interpolation='none', vmin=0, vmax=10)
-            fig.colorbar(field_uq, ax=axs[2,2])
+            F_ok =  axs[0,2].imshow(fn_aux, cmap='pink',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(F_ok, ax=axs[0,2])
+            axs[0,2].axis('off')
+
+            field_ok =  axs[0,3].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_ok, ax=axs[0,3])
+            axs[0,3].axis('off')
+
+            # Estimated images/maps
+            W_est = axs[1,1].imshow(w_aux, cmap='bone',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(W_est, ax=axs[1,1])
+            axs[1,1].axis('off')
+
+            F_est = axs[1,2].imshow(f_aux, cmap='pink',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(F_est, ax=axs[1,2])
+            axs[1,2].axis('off')
+
+            field_est = axs[1,3].imshow(field_aux*fm_sc, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_ok, ax=axs[1,3])
+            axs[1,3].axis('off')
+
+            # Uncertainty maps in the 3rd row
+            fig.delaxes(axs[2,0]) # No PDFF variance map
+
+            W_uq =  axs[2,1].imshow(W_var, cmap='gnuplot',
+                                    interpolation='none', vmin=0)#, vmax=10)
+            fig.colorbar(W_uq, ax=axs[2,1])
+            axs[2,1].axis('off')
+
+            F_uq =  axs[2,2].imshow(F_var, cmap='gnuplot2',
+                                    interpolation='none', vmin=0)#, vmax=10)
+            fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            fig.delaxes(axs[2,1])
+            field_uq = axs[2,3].imshow(field_var, cmap='plasma',
+                                        interpolation='none', vmin=0, vmax=10)
+            fig.colorbar(field_uq, ax=axs[2,3])
+            axs[2,3].axis('off')
+        else:
+            # Ground truth
+            r2_ok = axs[0,1].imshow(r2n_aux, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
+            fig.colorbar(r2_ok, ax=axs[0,1])
+            axs[0,1].axis('off')
+
+            field_ok =  axs[0,2].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_ok, ax=axs[0,2])
+            axs[0,2].axis('off')
+
+            # Ground truth
+            r2_est =axs[1,1].imshow(r2_aux, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
+            fig.colorbar(r2_est, ax=axs[1,1])
+            axs[1,1].axis('off')
+
+            field_est = axs[1,2].imshow(field_aux*fm_sc, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_est, ax=axs[1,2])
+            axs[1,2].axis('off')
         
         plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
         tl.make_space_above(axs,topmargin=0.6)

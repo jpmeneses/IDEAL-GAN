@@ -297,3 +297,79 @@ def get_rho(acqs,param_maps,te=None,complex_data=False):
     
     return res_rho
 
+
+def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
+    n_batch,hgt,wdt,d_ech = acqs.shape
+    if complex_data:
+        n_ech = d_ech
+    else:
+        n_ech = d_ech//2
+
+    if te is None:
+        stop_te = (n_ech*12/6)*1e-3
+        te = np.arange(start=1.3e-3,stop=stop_te,step=2.1e-3)
+        te = tf.convert_to_tensor(te,dtype=tf.float32)
+        te = tf.expand_dims(te,0)
+        te = tf.tile(te,[n_batch,1])
+
+    ne = te.shape[1]
+    M, M_pinv = gen_M(te)
+
+    te_complex = tf.complex(0.0,te)
+    te_complex = tf.expand_dims(te_complex,-1)
+    te_real = tf.complex(te,0.0)
+    te_real = tf.expand_dims(te_real, -1)
+
+    # Generate complex signal
+    if not(complex_data):
+        real_S = acqs[:,:,:,0::2]
+        imag_S = acqs[:,:,:,1::2]
+        S = tf.complex(real_S,imag_S)
+    else:
+        S = acqs
+
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
+    Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1])
+
+    # r2s = mean_maps[:,:,:,0] * r2_sc
+    phi = mean_maps * fm_sc
+    # r2s_unc = param_maps[:,:,:,0] * r2_sc
+    phi_unc = var_maps * (fm_sc**2)
+
+    # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
+    xi = tf.complex(phi,0.0)
+    xi_rav = tf.reshape(xi,[n_batch,-1])
+    xi_rav = tf.expand_dims(xi_rav,1)
+    xi_unc = tf.complex(phi_unc,0.0)
+    xi_unc_rav = tf.reshape(xi_unc,[n_batch,-1])
+    xi_unc_rav = tf.expand_dims(xi_unc_rav,1)
+
+    # Diagonal matrix with the exponential of fieldmap variance
+    Wm_var = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, xi_unc_rav))
+
+    # (New) Diagonal matrix with sine and cosine terms
+    # (derived from variance of complex exponential)
+    # https://nbviewer.org/gist/dougalsutherland/8513749
+    Z_sin = tf.math.sin(tf.linalg.matmul(2*np.pi * te_real, xi_rav))
+    Z_cos = tf.math.cos(tf.linalg.matmul(2*np.pi * te_real, xi_rav))
+    Z = Z_sin**2 - Z_cos**2
+
+    # Matrix operations
+    WmZS = Wm_var * Z * (Smtx**2)
+    MWmZS = tf.linalg.matmul(M_pinv**2,WmS)
+
+    # Extract corresponding Water/Fat signals
+    # Reshape to original images dimensions
+    rho_var = tf.reshape(tf.transpose(MWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
+
+    Re_rho = tf.math.real(rho_hat)
+    Im_rho = tf.math.imag(rho_hat)
+    zero_fill = tf.zeros_like(Re_rho)
+    re_stack = tf.stack([Re_rho,zero_fill],4)
+    re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
+    im_stack = tf.stack([zero_fill,Im_rho],4)
+    im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
+    res_rho = re_aux + im_aux
+    
+    return res_rho
