@@ -346,18 +346,18 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     xi_unc_rav = tf.expand_dims(xi_unc_rav,1)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wm_var = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, xi_unc_rav))
+    Wm_var = tf.math.exp(tf.linalg.matmul(-2*(2*np.pi * te_real)**2, xi_unc_rav))
 
     # (New) Diagonal matrix with sine and cosine terms
     # (derived from variance of complex exponential)
     # https://nbviewer.org/gist/dougalsutherland/8513749
-    Z_sin = tf.math.sin(tf.linalg.matmul(2*np.pi * te_real, xi_rav))
-    Z_cos = tf.math.cos(tf.linalg.matmul(2*np.pi * te_real, xi_rav))
-    Z = Z_sin**2 - Z_cos**2
+    # Z_sin = tf.math.sin(tf.linalg.matmul(2*np.pi * te_real, xi_rav))
+    Z_cos = tf.math.cos(tf.linalg.matmul(4*np.pi * te_real, xi_rav))
+    # Z = Z_sin**2 - Z_cos**2
 
     # Matrix operations
-    WmZS = Wm_var * Z * (Smtx**2)
-    MWmZS = tf.linalg.matmul(M_pinv**2,WmZS)
+    WmZS = (1 + Wm_var * Z_cos) * (Smtx * tf.math.conj(Smtx))
+    MWmZS = tf.linalg.matmul(M_pinv * tf.math.conj(M_pinv),WmZS)
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions

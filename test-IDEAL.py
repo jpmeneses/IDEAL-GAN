@@ -77,26 +77,39 @@ acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+if args.k_fold > 1:
+    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                                acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
 
-dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+if args.k_fold > 2:
+    dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
+    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                                acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
 
-dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+if args.k_fold > 3:
+    dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
+    acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+                                acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
 
 ############################################################
 ################# DATASET PARTITIONS #######################
 ############################################################
 
-trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+if args.k_fold < 2:
+    trainX = np.concatenate((acqs_1,acqs_2),axis=0)
+    trainY = np.concatenate((out_maps_1,out_maps_2),axis=0)
+elif args.k_fold < 3:
+    trainX = np.concatenate((acqs_1,acqs_2,acqs_3),axis=0)
+    trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3),axis=0)
+elif args.k_fold < 4:
+    trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4),axis=0)
+    trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4),axis=0)
+else:
+    trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+    trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
 k_divs = [0,832,1694,2547,3409,len(trainX)]
 print('Length dataset:',len(trainX))
 
@@ -297,8 +310,8 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     if args.UQ:
         # Get water/fat uncertainties
         WF_var = wf.PDFF_uncertainty(A,A2B[:,:,:,-1],A2B_var)
-        W_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,0],WF_var[:,:,:,1])))
-        F_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,2],WF_var[:,:,:,3])))
+        W_var = np.squeeze(tf.math.real(tf.complex(WF_var[:,:,:,0],WF_var[:,:,:,1])))
+        F_var = np.squeeze(tf.math.real(tf.complex(WF_var[:,:,:,2],WF_var[:,:,:,3])))
         field_var = np.squeeze(A2B_var)*(fm_sc**2)
         hgt_plt, wdt_plt, nr, nc = 10, 16, 3, 4
     else:

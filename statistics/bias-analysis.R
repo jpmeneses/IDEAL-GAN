@@ -10,7 +10,7 @@ library(rstatix)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-004/"
+model = "/Sup-007/"
 epoch = "200"
 
 dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
@@ -25,12 +25,14 @@ for (i in c(1:length(ls_sheets)))
 		refs = c(t(roi_data[,1]))
 		meas = c(t(roi_data[,3]))
 		im_id = rep(c(i),length(t(roi_data[,1])))
+		vial_id = c(t(1:length(t(roi_data[,1]))))
 	} else
 	{
 		# meas = meas + c(t(roi_data[,3]))
 		refs = c(refs,t(roi_data[,1]))
 		meas = c(meas,t(roi_data[,3]))
 		im_id = append(im_id,rep(c(i),length(t(roi_data[,1]))))
+		vial_id = c(vial_id,t(1:length(t(roi_data[,1]))))
 	}
 }
 # meas = meas/length(ls_sheets)
@@ -41,6 +43,7 @@ pdff_Data <- data.frame(
 mean = c(meas),
 refs = c(refs),
 bias = c(meas-refs),
+vial = factor(c(vial_id)),
 Site_Protocol = factor(c(im_id),labels=c("S1-P1","S1-P2",
 		   "S2-P1","S2-P2","S3-P1","S3-P2","S6-P1","S6-P2"))
 )
@@ -48,10 +51,16 @@ Site_Protocol = factor(c(im_id),labels=c("S1-P1","S1-P2",
 # 		   "S2-P1","S2-P2","S3-P1","S3-P2","S4-P2","S6-P1","S6-P2"))
 
 # Dataset summary stats
-pdff_Data %>%
-  group_by(Site_Protocol) %>%
-  get_summary_stats(mean, type="common")
- 
+pdff_Vials <- pdff_Data %>%
+  group_by(vial) %>%
+  summarise(meanY = mean(mean),
+		refsX = mean(refs),
+		bias = mean(mean)-mean(refs))
+overall_bias = mean(pdff_Vials$bias)
+std_bias = sd(pdff_Vials$bias)
+cat('Overall bias:',overall_bias,'+-',std_bias,'\n')
+
+
 ############################################################################
 ########################### REGRESSION LINES ###############################
 ############################################################################
