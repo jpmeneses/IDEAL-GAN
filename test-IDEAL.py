@@ -309,13 +309,19 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
 
     if args.UQ:
         # Get water/fat uncertainties
-        WF_var = wf.PDFF_uncertainty(A,A2B[:,:,:,-1],A2B_var)
-        W_var = np.squeeze(tf.math.real(tf.complex(WF_var[:,:,:,0],WF_var[:,:,:,1])))
-        F_var = np.squeeze(tf.math.real(tf.complex(WF_var[:,:,:,2],WF_var[:,:,:,3])))
+        WF, WF_var = wf.PDFF_uncertainty(A,A2B[:,:,:,-1],A2B_var)
+        w_aux = np.squeeze(tf.abs(tf.complex(WF[:,:,:,0],WF[:,:,:,1])))
+        f_aux = np.squeeze(tf.abs(tf.complex(WF[:,:,:,2],WF[:,:,:,3])))
+        W_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,0],WF_var[:,:,:,1])))
+        F_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,2],WF_var[:,:,:,3])))
         field_var = np.squeeze(A2B_var)*(fm_sc**2)
         hgt_plt, wdt_plt, nr, nc = 10, 16, 3, 4
     else:
+        w_aux = np.squeeze(A2B[:,:,:,0])
+        f_aux = np.squeeze(A2B[:,:,:,1])
         hgt_plt, wdt_plt, nr, nc = 9, 16, 2, 3
+    PDFF_aux = f_aux/(w_aux+f_aux)
+    PDFF_aux[np.isnan(PDFF_aux)] = 0.0
 
     wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
     fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
@@ -376,12 +382,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.delaxes(axs[2,0]) # No PDFF variance map
 
             W_uq =  axs[2,1].imshow(W_var, cmap='gnuplot2',
-                                    interpolation='none', vmin=0, vmax=0.1)
+                                    interpolation='none', vmin=0, vmax=0.0001)
             fig.colorbar(W_uq, ax=axs[2,1])
             axs[2,1].axis('off')
 
             F_uq =  axs[2,2].imshow(F_var, cmap='gnuplot2',
-                                    interpolation='none', vmin=0, vmax=0.1)
+                                    interpolation='none', vmin=0, vmax=0.0001)
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 

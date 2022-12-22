@@ -122,7 +122,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
         return (res_rho,S_hat)
 
 
-def IDEAL_model(out_maps,n_ech,te=None,complex_data=False):
+def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False):
     n_batch,hgt,wdt,_ = out_maps.shape
 
     if te is None:
@@ -139,12 +139,17 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False):
     te_complex = tf.expand_dims(te_complex,-1)
 
     # Split water/fat images (orig_rho) and param. maps
-    orig_rho = out_maps[:,:,:,:4]
-    param_maps = out_maps[:,:,:,4:]
-
-    # Generate complex water/fat signals
-    real_rho = orig_rho[:,:,:,0::2]
-    imag_rho = orig_rho[:,:,:,1::2]
+    if only_mag:
+        real_rho = out_maps[:,:,:,:2]
+        imag_rho = tf.zeros_like(real_rho)
+        param_maps = out_maps[:,:,:,2:]
+    else:
+        orig_rho = out_maps[:,:,:,:4]
+        param_maps = out_maps[:,:,:,4:]
+        # Generate complex water/fat signals
+        real_rho = orig_rho[:,:,:,0::2]
+        imag_rho = orig_rho[:,:,:,1::2]
+    
     rho = tf.complex(real_rho,imag_rho) * rho_sc
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
@@ -162,12 +167,17 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False):
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
 
     # Matrix operations
-    Smtx = Wp * tf.linalg.matmul(M,rho_mtx)
+    if only_mag:
+        Smtx = tf.abs(Wp) * tf.abs(tf.linalg.matmul(M,rho_mtx))
+    else:
+        Smtx = Wp * tf.linalg.matmul(M,rho_mtx)
 
     # Reshape to original acquisition dimensions
     S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
 
-    if not(complex_data):
+    if only_mag or complex_data:
+        return S_hat
+    else:
         # Split into real and imaginary channels
         Re_gt = tf.math.real(S_hat)
         Im_gt = tf.math.imag(S_hat)
@@ -178,8 +188,6 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False):
         im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ne])
         res_gt = re_aux + im_aux
         return res_gt
-    else:
-        return S_hat
 
 
 def get_Ps_norm(acqs,param_maps,te=None):
@@ -346,30 +354,45 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     xi_unc_rav = tf.expand_dims(xi_unc_rav,1)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wm_var = tf.math.exp(tf.linalg.matmul(-2*(2*np.pi * te_real)**2, xi_unc_rav))
+    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav))
+    Wm_var = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, xi_unc_rav))
 
     # (New) Diagonal matrix with sine and cosine terms
     # (derived from variance of complex exponential)
     # https://nbviewer.org/gist/dougalsutherland/8513749
-    # Z_sin = tf.math.sin(tf.linalg.matmul(2*np.pi * te_real, xi_rav))
-    Z_cos = tf.math.cos(tf.linalg.matmul(4*np.pi * te_real, xi_rav))
+    # Z_sin = tf.math.sin(tf.linalg.matmul(-2*np.pi * te_real, xi_rav))
+    # Z_cos = tf.math.cos(tf.linalg.matmul(-4*np.pi * te_real, xi_rav))
     # Z = Z_sin**2 - Z_cos**2
 
-    # Matrix operations
-    WmZS = (1 + Wm_var * Z_cos) * (Smtx * tf.math.conj(Smtx))
+    # Matrix operations (mean)
+    WmS = Wm * tf.math.sqrt(Wm_var) * Smtx
+    MWmS = tf.linalg.matmul(M_pinv,WmS)
+
+    # Matrix operations (variance)
+    WmZS = (1 - Wm_var) * (Smtx * tf.math.conj(Smtx))
     MWmZS = tf.linalg.matmul(M_pinv * tf.math.conj(M_pinv),WmZS)
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
-    rho_var = tf.reshape(tf.transpose(MWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
+    rho_hat = tf.reshape(tf.transpose(MWmS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
 
-    Re_rho = tf.math.real(rho_var)
-    Im_rho = tf.math.imag(rho_var)
+    Re_rho = tf.math.real(rho_hat)
+    Im_rho = tf.math.imag(rho_hat)
     zero_fill = tf.zeros_like(Re_rho)
     re_stack = tf.stack([Re_rho,zero_fill],4)
     re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
     im_stack = tf.stack([zero_fill,Im_rho],4)
     im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
     res_rho = re_aux + im_aux
+
+    rho_var = tf.reshape(tf.transpose(MWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
+
+    Re_rho_var = tf.math.real(rho_var)
+    Im_rho_var = tf.math.imag(rho_var)
+    re_stack_var = tf.stack([Re_rho_var,zero_fill],4)
+    re_aux_var = tf.reshape(re_stack_var,[n_batch,hgt,wdt,2*ns])
+    im_stack_var = tf.stack([zero_fill,Im_rho_var],4)
+    im_aux_var = tf.reshape(im_stack_var,[n_batch,hgt,wdt,2*ns])
+    res_rho_var = re_aux_var + im_aux_var
     
-    return res_rho
+    return [res_rho, res_rho_var]

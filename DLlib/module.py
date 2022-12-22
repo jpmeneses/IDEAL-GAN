@@ -77,6 +77,7 @@ def UNet(
     filters=72,
     num_layers=4,
     dropout=0.0,
+    output_activation='tanh',
     self_attention=False,
     norm='instance_norm'):
     
@@ -166,7 +167,7 @@ def UNet(
         # Update counter
         cont += 1
 
-    output = keras.layers.Conv2D(n_out, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x)
+    output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer='glorot_normal')(x)
     if bayesian:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
