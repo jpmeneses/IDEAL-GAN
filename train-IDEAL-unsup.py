@@ -26,7 +26,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='U-Net', choices=['complex','U-Net','MEBCRN'])
-py.arg('--out_vars', default='FM', choices=['R2s','FM'])
+py.arg('--out_vars', default='FM', choices=['R2s','FM','PM'])
 py.arg('--fat_char', type=bool, default=False)
 py.arg('--UQ', type=bool, default=False)
 py.arg('--k_fold', type=int, default=1)
@@ -106,8 +106,6 @@ trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(trainX)
-if args.out_vars == 'R2s':
-    d_ech //= 2
 _,_,_,n_out = np.shape(valY)
 if args.G_model == 'complex':
     echoes = d_ech
@@ -140,17 +138,21 @@ if args.G_model == 'complex':
                             te_shape=(args.n_echoes,),
                             self_attention=args.SelfAttention)
 elif args.G_model == 'U-Net':
-    if args.out_vars == 'FM':
-        output_activation = 'tanh'
-    elif args.out_vars == 'R2s':
-        output_activation = 'relu'
     G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
                     bayesian=args.UQ,
                     te_input=False,
                     te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
-                    output_activation=output_activation,
+                    output_activation='tanh',
                     self_attention=args.SelfAttention)
+    if args.out_vars == 'R2s' or args.out_vars == 'PM':
+        G_A2R2= dl.UNet(input_shape=(hgt,wdt,d_ech//2),
+                        bayesian=False,
+                        te_input=False,
+                        te_shape=(args.n_echoes,),
+                        filters=args.n_G_filters,
+                        output_activation='relu',
+                        self_attention=False)
 elif args.G_model == 'MEBCRN':
     G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
                     n_res_blocks=5,
@@ -180,9 +182,6 @@ def train_G(A, B):
     indx_mv =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
-
-    indx_WFR=tf.concat([tf.zeros_like(A[:,:,:,:2],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     with tf.GradientTape() as t:
@@ -225,37 +224,50 @@ def train_G(A, B):
             A2B_WF_imag = A2B_WF[:,:,:,1::2]
             A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
         
-        elif args.out_vars == 'R2s':
+        elif args.out_vars == 'R2s' or args.out_vars == 'PM':
             if not(args.G_model == 'complex'):
                 A_real = A[:,:,:,0::2]
                 A_imag = A[:,:,:,1::2]
                 A_abs = tf.abs(tf.complex(A_real,A_imag))
             
-            if args.UQ:
-                A2B_out, A2B_mean, A2B_var = G_A2B(A_abs, training=True)
-            else:
-                A2B_R2 = G_A2B(A_abs, training=True)
-
-            # A2B Masks
+            # Compute R2s map from only-mag images
+            A2B_R2 = G_A2R2(A_abs, training=True)
             A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
 
-            # Build A2B_PM array with zero-valued FM
-            A2B_WF_abs = B_WF_abs
-            A2B_FM = tf.zeros_like(A2B_R2)
-            A2B = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
-            A2B2A_abs = wf.IDEAL_model(A2B,args.n_echoes,complex_data=(args.G_model=='complex'),only_mag=True)
+            # Compute FM using complex-valued images and pre-trained model
+            if args.UQ:
+                if args.out_vars == 'R2s':
+                    _, A2B_FM, A2B_var = G_A2B(A, training=False) # Mean FM
+                elif args.out_vars == 'PM':
+                    A2B_FM, _, A2B_var = G_A2B(A, training=True) # Randomly sampled FM
+            else:
+                A2B_FM = G_A2B(A, training=(args.out_vars=='PM'))
+            A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+            A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
+
+            # Magnitude of water/fat images
+            if args.out_vars == 'R2s':
+                A2B_WF = wf.get_rho(A,A2B_PM,complex_data=(args.G_model=='complex'))
+            elif args.out_vars == 'PM':
+                A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+            A2B_WF_real = A2B_WF[:,:,:,0::2]
+            A2B_WF_imag = A2B_WF[:,:,:,1::2]
+            A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+
+            A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
+            A2B2A_abs = wf.IDEAL_model(A2B_abs,args.n_echoes,complex_data=(args.G_model=='complex'),only_mag=True)
         
         # Variance map mask
         if args.UQ:
             A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
 
         ############ Cycle-Consistency Losses #############
-        if args.UQ:
+        if args.UQ and args.out_vars == 'FM':
             A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
         elif args.out_vars == 'R2s':
-            print('A shape:',A_abs.shape)
-            print('A2B2A shape:',A2B2A_abs.shape)
             A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+        elif args.out_vars == 'PM':
+            A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var) + cycle_loss_fn(A_abs, A2B2A_abs)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
@@ -271,11 +283,16 @@ def train_G(A, B):
         
         G_loss = A2B2A_cycle_loss + reg_term
         
-    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
+    if args.out_vars == 'R2s':
+        G_grad = t.gradient(G_loss, G_A2B.trainable_variables + G_A2R2.trainable_variables)
+        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables + G_A2R2.trainable_variables))
+    else:
+        G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
+        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
             'WF_loss': WF_abs_loss,
+            'R2_loss': R2_loss,
             'FM_loss': FM_loss,
             'TV_FM': FM_TV,
             'L1_FM': FM_L1}
@@ -296,8 +313,6 @@ def sample(A, B):
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
-    indx_WFR=tf.concat([tf.zeros_like(A[:,:,:,:2],dtype=tf.int32),
-                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     # Split B outputs
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
@@ -316,9 +331,9 @@ def sample(A, B):
 
     if args.out_vars == 'FM':
         if args.UQ:
-            A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=True)
+            A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=False)
         else:
-            A2B_FM = G_A2B(A, training=True)
+            A2B_FM = G_A2B(A, training=False)
             A2B_var = None
         
         # A2B Masks
@@ -339,34 +354,37 @@ def sample(A, B):
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
 
-    elif args.out_vars == 'R2s':
+    elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         if not(args.G_model == 'complex'):
             A_real = A[:,:,:,0::2]
             A_imag = A[:,:,:,1::2]
             A_abs = tf.abs(tf.complex(A_real,A_imag))
         
-        if args.UQ:
-            A2B_R2, A2B_mean, A2B_var = G_A2B(A_abs, training=True)
-        else:
-            A2B_R2 = G_A2B(A_abs, training=True)
-            A2B_var = None
-
-        # A2B Masks
-        # A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+        # Compute R2s maps using only-mag images
+        A2B_R2 = G_A2R2(A_abs, training=False)
         A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
 
-        # Complex WF
-        # Re_WF = tf.math.real(A2B_WF_abs)
-        # zero_fill = tf.zeros_like(Re_WF)
-        # WF_stack = tf.stack([Re_WF,zero_fill],4)
-        # A2B_WF = tf.reshape(WF_stack,B_WF.shape)
+        # Compute FM from complex-valued images
+        if args.UQ:
+            _, A2B_FM, A2B_var = G_A2B(A, training=False) # Mean FM
+        else:
+            A2B_FM = G_A2B(A, training=False)
+            A2B_var = None
+        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
 
-        # Build A2B_PM array with zero-valued R2*
-        A2B_WF = B_WF
-        A2B_WF_abs = B_WF_abs
-        A2B_FM = tf.zeros_like(A2B_R2)
+        # Magnitude of water/fat images
+        if args.out_vars == 'R2s':
+            A2B_WF = wf.get_rho(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        elif args.out_vars == 'PM':
+            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+
         A2B = tf.concat([A2B_WF,A2B_R2,A2B_FM], axis=-1)
-        A2B2A_abs = wf.IDEAL_model(A2B,args.n_echoes,complex_data=(args.G_model=='complex'),only_mag=True)
+        A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
+        A2B2A_abs = wf.IDEAL_model(A2B_abs,args.n_echoes,complex_data=(args.G_model=='complex'),only_mag=True)
     
     # Variance map mask
     if args.UQ:
@@ -377,10 +395,12 @@ def sample(A, B):
     R2_loss = cycle_loss_fn(B_R2, A2B_R2)
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
-    if args.UQ:
+    if args.UQ and args.out_vars == 'FM':
         val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
     elif args.out_vars == 'R2s':
         val_A2B2A_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+    elif args.out_vars == 'PM':
+        val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var) + cycle_loss_fn(A_abs, A2B2A_abs)
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
 
@@ -407,8 +427,17 @@ checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
                                 ep_cnt=ep_cnt),
                            py.join(output_dir, 'checkpoints'),
                            max_to_keep=5)
+checkpoint_2=tl.Checkpoint(dict(G_A2B=G_A2B,
+                                G_A2R2=G_A2R2,
+                                G_optimizer=G_optimizer,
+                                ep_cnt=ep_cnt),
+                           py.join(output_dir, 'checkpoints'),
+                           max_to_keep=5)
 try:  # restore checkpoint including the epoch counter
-    checkpoint.restore().assert_existing_objects_matched()
+    if args.out_vars == 'PM':
+        checkpoint_2.restore().assert_existing_objects_matched()
+    else:
+        checkpoint.restore().assert_existing_objects_matched()
 except Exception as e:
     print(e)
 
@@ -420,7 +449,7 @@ val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summarie
 val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(valY))
+n_div = np.ceil(total_steps/len(valY))//10
 
 # main loop
 for ep in range(args.epochs):
@@ -471,7 +500,7 @@ for ep in range(args.epochs):
             with val_summary_writer.as_default():
                 tl.summary(val_A2B2A_dict, step=G_optimizer.iterations, name='G_losses')
 
-            if G_optimizer.iterations.numpy() % (30*n_div) == 0:
+            if (G_optimizer.iterations.numpy() % (n_div*30) == 0) or (G_optimizer.iterations.numpy() < 100):
                 fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
                 # Magnitude of recon MR images at each echo
@@ -549,16 +578,9 @@ for ep in range(args.epochs):
                 fig.colorbar(F_ok, ax=axs[1,2])
                 axs[1,2].axis('off')
 
-                if not(args.UQ):
-                    r2_aux = np.squeeze(A2B[:,:,:,4])*r2_sc
-                    lmax = r2_sc
-                    cmap = 'copper'
-                else:
-                    r2_aux = np.squeeze(A2B_var)*(fm_sc**2)
-                    lmax = 10
-                    cmap = 'gnuplot2'
-                r2_ok = axs[1,3].imshow(r2_aux, cmap=cmap,
-                                        interpolation='none', vmin=0, vmax=lmax)
+                r2_aux = np.squeeze(A2B[:,:,:,4])
+                r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
+                                        interpolation='none', vmin=0, vmax=r2_sc)
                 fig.colorbar(r2_ok, ax=axs[1,3])
                 axs[1,3].axis('off')
 
@@ -568,7 +590,14 @@ for ep in range(args.epochs):
                 fig.colorbar(field_ok, ax=axs[1,4])
                 axs[1,4].axis('off')
                 fig.delaxes(axs[1,0])
-                fig.delaxes(axs[1,5])
+                if args.UQ:
+                    var_aux = np.squeeze(A2B_var)*(fm_sc**2)
+                    var_ok= axs[1,5].imshow(var_aux, cmap='gnuplot2',
+                                            interpolation='none', vmin=0, vmax=5)
+                    fig.colorbar(var_ok, ax=axs[1,5])
+                    axs[1,5].axis('off')
+                else:
+                    fig.delaxes(axs[1,5])
 
                 # Ground-truth in the third row
                 wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
@@ -608,4 +637,7 @@ for ep in range(args.epochs):
 
     # save checkpoint
     if (((ep+1) % args.epoch_ckpt) == 0) or ((ep+1)==args.epochs):
-        checkpoint.save(ep)
+        if args.out_vars == 'FM':
+            checkpoint.save(ep)
+        else:
+            checkpoint_2.save(ep)

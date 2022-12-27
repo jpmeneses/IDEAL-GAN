@@ -19,7 +19,7 @@ from skimage.metrics import structural_similarity
 # ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
-py.arg('--out_vars', default='PM', choices=['WF','PM','WF-PM','FM'])
+py.arg('--out_vars', default='PM', choices=['WF','PM','WF-PM','FM','R2s'])
 py.arg('--te_input', type=bool, default=False)
 py.arg('--k_fold', type=int, default=1)
 py.arg('--D1_SelfAttention',type=bool, default=False)
@@ -156,7 +156,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
 elif args.G_model == 'U-Net':
     if args.out_vars == 'WF-PM':
         n_out = 4
-    elif args.out_vars == 'FM':
+    elif args.out_vars == 'FM' or args.out_vars == 'R2s':
         n_out = 1
     else:
         n_out = 2
@@ -167,6 +167,14 @@ elif args.G_model == 'U-Net':
                     te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
+    if args.out_vars == 'R2s':
+        G_A2R2= dl.UNet(input_shape=(hgt,wdt,d_ech//2),
+                        bayesian=False,
+                        te_input=False,
+                        te_shape=(args.n_echoes,),
+                        filters=args.n_G_filters,
+                        output_activation='relu',
+                        self_attention=False)
 
 elif args.G_model == 'MEBCRN':
     if args.out_vars == 'WF-PM':
@@ -184,7 +192,10 @@ else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 # restore
-tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+if args.out_vars == 'R2s':
+    tl.Checkpoint(dict(G_A2B=G_A2B,G_A2R2=G_A2R2), py.join(args.experiment_dir, 'checkpoints')).restore()
+else:
+    tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
 def sample(A, B, TE=None):
@@ -283,6 +294,33 @@ def sample(A, B, TE=None):
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+    elif args.out_vars == 'R2s':
+        if not(args.G_model == 'complex'):
+            A_real = A[:,:,:,0::2]
+            A_imag = A[:,:,:,1::2]
+            A_abs = tf.abs(tf.complex(A_real,A_imag))
+        
+        # Compute R2s maps using only-mag images
+        A2B_R2 = G_A2R2(A_abs, training=False)
+        A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
+
+        # Compute FM from complex-valued images
+        if args.UQ:
+            A2B_rand, A2B_FM, A2B_var = G_A2B(A, training=False)
+            A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+        else:
+            A2B_FM = G_A2B(A, training=False)
+            A2B_var = None
+        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
+
+        # Magnitude of water/fat images
+        A2B_WF = wf.get_rho(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+
+        A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
 
     return A2B_abs, A2B_var
 
@@ -300,12 +338,8 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     B = tf.expand_dims(B,axis=0)
     A2B, A2B_var = sample(A,B)
 
-    w_aux = np.squeeze(A2B[:,:,:,0])
-    f_aux = np.squeeze(A2B[:,:,:,1])
-    r2_aux = np.squeeze(A2B[:,:,:,2])*r2_sc
+    r2_aux = np.squeeze(A2B[:,:,:,2])
     field_aux = np.squeeze(A2B[:,:,:,3])
-    PDFF_aux = f_aux/(w_aux+f_aux)
-    PDFF_aux[np.isnan(PDFF_aux)] = 0.0
 
     if args.UQ:
         # Get water/fat uncertainties
@@ -315,11 +349,15 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
         W_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,0],WF_var[:,:,:,1])))
         F_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,2],WF_var[:,:,:,3])))
         field_var = np.squeeze(A2B_var)*(fm_sc**2)
-        hgt_plt, wdt_plt, nr, nc = 10, 16, 3, 4
+        hgt_plt, wdt_plt, nr, nc = 10, 20, 3, 5
     else:
         w_aux = np.squeeze(A2B[:,:,:,0])
         f_aux = np.squeeze(A2B[:,:,:,1])
         hgt_plt, wdt_plt, nr, nc = 9, 16, 2, 3
+
+    # (Mean) PDFF estimation
+    PDFF_aux = f_aux/(w_aux+f_aux)
+    PDFF_aux[np.isnan(PDFF_aux)] = 0.0
     PDFF_aux = f_aux/(w_aux+f_aux)
     PDFF_aux[np.isnan(PDFF_aux)] = 0.0
 
@@ -357,10 +395,15 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.colorbar(F_ok, ax=axs[0,2])
             axs[0,2].axis('off')
 
-            field_ok =  axs[0,3].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-            fig.colorbar(field_ok, ax=axs[0,3])
+            r2_ok = axs[0,3].imshow(r2n_aux*r2_sc, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
+            fig.colorbar(r2_ok, ax=axs[0,3])
             axs[0,3].axis('off')
+
+            field_ok =  axs[0,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_ok, ax=axs[0,4])
+            axs[0,4].axis('off')
 
             # Estimated images/maps
             W_est = axs[1,1].imshow(w_aux, cmap='bone',
@@ -373,10 +416,15 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.colorbar(F_est, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            field_est = axs[1,3].imshow(field_aux*fm_sc, cmap='twilight',
-                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-            fig.colorbar(field_ok, ax=axs[1,3])
+            r2_est= axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
+            fig.colorbar(r2_est, ax=axs[1,3])
             axs[1,3].axis('off')
+
+            field_est = axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_est, ax=axs[1,4])
+            axs[1,4].axis('off')
 
             # Uncertainty maps in the 3rd row
             fig.delaxes(axs[2,0]) # No PDFF variance map
@@ -391,10 +439,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            field_uq = axs[2,3].imshow(field_var, cmap='gnuplot2',
-                                        interpolation='none', vmin=0, vmax=10)
-            fig.colorbar(field_uq, ax=axs[2,3])
-            axs[2,3].axis('off')
+            fig.delaxes(axs[2,3]) # No R2s variance map
+
+            field_uq =  axs[2,4].imshow(field_var, cmap='gnuplot2',
+                                        interpolation='none', vmin=0, vmax=5)
+            fig.colorbar(field_uq, ax=axs[2,4])
+            axs[2,4].axis('off')
         else:
             # Ground truth
             r2_ok = axs[0,1].imshow(r2n_aux, cmap='copper',
