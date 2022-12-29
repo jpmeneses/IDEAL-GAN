@@ -143,7 +143,6 @@ elif args.G_model == 'U-Net':
                     te_input=False,
                     te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
-                    output_activation='tanh',
                     self_attention=args.SelfAttention)
     if args.out_vars == 'R2s' or args.out_vars == 'PM':
         G_A2R2= dl.UNet(input_shape=(hgt,wdt,d_ech//2),
@@ -152,6 +151,7 @@ elif args.G_model == 'U-Net':
                         te_shape=(args.n_echoes,),
                         filters=args.n_G_filters,
                         output_activation='relu',
+                        output_initializer='he_uniform',
                         self_attention=False)
 elif args.G_model == 'MEBCRN':
     G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
@@ -166,6 +166,7 @@ cycle_loss_fn = tf.losses.MeanSquaredError()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+G_R2_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
 # ==============================================================================
 # =                                 train step                                 =
@@ -283,12 +284,15 @@ def train_G(A, B):
         
         G_loss = A2B2A_cycle_loss + reg_term
         
-    if args.out_vars == 'R2s':
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables + G_A2R2.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables + G_A2R2.trainable_variables))
-    else:
+    if args.out_vars == 'FM':
         G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
         G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
+    elif args.out_vars == 'R2s':
+        G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
+        G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
+    else:
+        G_grad = t.gradient(G_loss, G_A2B.trainable_variables + G_A2R2.trainable_variables)
+        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables + G_A2R2.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
             'WF_loss': WF_abs_loss,
@@ -430,6 +434,7 @@ checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
 checkpoint_2=tl.Checkpoint(dict(G_A2B=G_A2B,
                                 G_A2R2=G_A2R2,
                                 G_optimizer=G_optimizer,
+                                G_R2_optimizer=G_R2_optimizer,
                                 ep_cnt=ep_cnt),
                            py.join(output_dir, 'checkpoints'),
                            max_to_keep=5)
@@ -483,14 +488,19 @@ for ep in range(args.epochs):
         
         G_loss_dict = train_step(A, B)
 
+        if args.out_vars == 'R2s':
+            opt_aux = G_R2_optimizer.iterations
+        else:
+            opt_aux = G_optimizer.iterations
+
         # # summary
         with train_summary_writer.as_default():
-            tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
+            tl.summary(G_loss_dict, step=opt_aux, name='G_losses')
             tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
-                        step=G_optimizer.iterations, name='G learning rate')
+                        step=opt_aux, name='G learning rate')
 
         # sample
-        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
+        if (opt_aux.numpy() % n_div == 0) or (opt_aux.numpy() < 200):
             A, B = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
@@ -498,9 +508,9 @@ for ep in range(args.epochs):
 
             # # summary
             with val_summary_writer.as_default():
-                tl.summary(val_A2B2A_dict, step=G_optimizer.iterations, name='G_losses')
+                tl.summary(val_A2B2A_dict, step=opt_aux, name='G_losses')
 
-            if (G_optimizer.iterations.numpy() % (n_div*30) == 0) or (G_optimizer.iterations.numpy() < 100):
+            if (opt_aux.numpy() % (n_div*30) == 0) or (opt_aux.numpy() < 100):
                 fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
                 # Magnitude of recon MR images at each echo
@@ -631,7 +641,7 @@ for ep in range(args.epochs):
                 # plt.show()
                 plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
                 tl.make_space_above(axs,topmargin=0.8)
-                plt.savefig(py.join(sample_dir, 'iter-%09d.png' % G_optimizer.iterations.numpy()),
+                plt.savefig(py.join(sample_dir, 'iter-%09d.png' % opt_aux.numpy()),
                             bbox_inches = 'tight', pad_inches = 0)
                 plt.close(fig)
 
