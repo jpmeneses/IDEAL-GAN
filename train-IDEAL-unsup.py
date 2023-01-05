@@ -263,12 +263,12 @@ def train_G(A, B):
             A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
 
         ############ Cycle-Consistency Losses #############
-        if args.UQ and args.out_vars == 'FM':
-            A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
-        elif args.out_vars == 'R2s':
+        if args.out_vars == 'R2s':
             A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
-        elif args.out_vars == 'PM':
-            A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var) + cycle_loss_fn(A_abs, A2B2A_abs)
+        elif args.UQ:
+            A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
+        # elif args.out_vars == 'PM':
+        #     A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var) + cycle_loss_fn(A_abs, A2B2A_abs)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
@@ -399,12 +399,12 @@ def sample(A, B):
     R2_loss = cycle_loss_fn(B_R2, A2B_R2)
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
-    if args.UQ and args.out_vars == 'FM':
-        val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
-    elif args.out_vars == 'R2s':
+    if args.out_vars == 'R2s':
         val_A2B2A_loss = cycle_loss_fn(A_abs, A2B2A_abs)
-    elif args.out_vars == 'PM':
-        val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var) + cycle_loss_fn(A_abs, A2B2A_abs)
+    elif args.UQ:
+        val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
+    # elif args.out_vars == 'PM':
+    #     val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var) + cycle_loss_fn(A_abs, A2B2A_abs)
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
 
