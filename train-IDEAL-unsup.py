@@ -146,11 +146,11 @@ elif args.G_model == 'U-Net':
                     self_attention=args.SelfAttention)
     if args.out_vars == 'R2s' or args.out_vars == 'PM':
         G_A2R2= dl.UNet(input_shape=(hgt,wdt,d_ech//2),
-                        bayesian=False,
+                        bayesian=args.UQ,
                         te_input=False,
                         te_shape=(args.n_echoes,),
                         filters=args.n_G_filters,
-                        output_activation='relu',
+                        output_activation='sigmoid',
                         output_initializer='he_uniform',
                         self_attention=False)
 elif args.G_model == 'MEBCRN':
@@ -204,7 +204,8 @@ def train_G(A, B):
         ##################### A Cycle #####################
         if args.out_vars == 'FM':
             if args.UQ:
-                A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=True)
+                A2B_FM, A2B_mean, A2B_FM_var = G_A2B(A, training=True)
+                A2B_R2_var = tf.zeros_like(A2B_FM_var)
             else:
                 A2B_FM = G_A2B(A, training=True)
             
@@ -232,15 +233,19 @@ def train_G(A, B):
                 A_abs = tf.abs(tf.complex(A_real,A_imag))
             
             # Compute R2s map from only-mag images
-            A2B_R2 = G_A2R2(A_abs, training=True)
+            if args.UQ:
+                A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=True) # Mean FM
+            else:
+                A2B_R2 = G_A2R2(A_abs, training=True)
+                A2B_R2_var = None
             A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
 
             # Compute FM using complex-valued images and pre-trained model
             if args.UQ:
                 if args.out_vars == 'R2s':
-                    _, A2B_FM, A2B_var = G_A2B(A, training=False) # Mean FM
+                    _, A2B_FM, A2B_FM_var = G_A2B(A, training=False) # Mean FM
                 elif args.out_vars == 'PM':
-                    A2B_FM, _, A2B_var = G_A2B(A, training=True) # Randomly sampled FM
+                    A2B_FM, _, A2B_FM_var = G_A2B(A, training=True) # Randomly sampled FM
             else:
                 A2B_FM = G_A2B(A, training=(args.out_vars=='PM'))
             A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -260,17 +265,29 @@ def train_G(A, B):
         
         # Variance map mask
         if args.UQ:
-            A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+            A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
+            A2B_R2_var = tf.where(A[:,:,:,:1]!=0.0,A2B_R2_var,0.0)
+            A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
 
         ############ Cycle-Consistency Losses #############
-        if args.out_vars == 'R2s':
-            A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
-        elif args.UQ:
-            A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
+        # if args.out_vars == 'R2s':
+        #     A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+        if args.UQ:
+            if args.out_vars == 'FM':
+                A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
+            elif args.out_vars == 'R2s':
+                A2B2A_cycle_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
+            elif args.out_vars == 'PM':
+                A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
+        # elif args.UQ:
+        #     A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
         # elif args.out_vars == 'PM':
-        #     A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var) + cycle_loss_fn(A_abs, A2B2A_abs)
+        #     A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var) + cycle_loss_fn(A_abs, A2B2A_abs)
         else:
-            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+            if args.out_vars == 'R2s':
+                A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+            elif args.out_vars == 'FM':
+                A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
         WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -335,10 +352,11 @@ def sample(A, B):
 
     if args.out_vars == 'FM':
         if args.UQ:
-            A2B_FM, A2B_mean, A2B_var = G_A2B(A, training=False)
+            A2B_FM, A2B_mean, A2B_FM_var = G_A2B(A, training=False)
+            A2B_R2_var = tf.zeros_like(A2B_FM_var)
         else:
             A2B_FM = G_A2B(A, training=False)
-            A2B_var = None
+            A2B_FM_var = None
         
         # A2B Masks
         A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -365,15 +383,19 @@ def sample(A, B):
             A_abs = tf.abs(tf.complex(A_real,A_imag))
         
         # Compute R2s maps using only-mag images
-        A2B_R2 = G_A2R2(A_abs, training=False)
+        if args.UQ:
+            A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=False) # Mean FM
+        else:
+            A2B_R2 = G_A2R2(A_abs, training=False)
+            A2B_R2_var = None
         A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
 
         # Compute FM from complex-valued images
         if args.UQ:
-            _, A2B_FM, A2B_var = G_A2B(A, training=False) # Mean FM
+            _, A2B_FM, A2B_FM_var = G_A2B(A, training=False) # Mean FM
         else:
             A2B_FM = G_A2B(A, training=False)
-            A2B_var = None
+            A2B_FM_var = None
         A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
         A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
 
@@ -392,21 +414,31 @@ def sample(A, B):
     
     # Variance map mask
     if args.UQ:
-        A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+        A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
+        A2B_R2_var = tf.where(A[:,:,:,:1]!=0.0,A2B_R2_var,0.0)
+        A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
 
     ########### Splitted R2s and FM Losses ############
     WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
     R2_loss = cycle_loss_fn(B_R2, A2B_R2)
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
-    if args.out_vars == 'R2s':
-        val_A2B2A_loss = cycle_loss_fn(A_abs, A2B2A_abs)
-    elif args.UQ:
-        val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
+    # if args.out_vars == 'R2s':
+        # val_A2B2A_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+    if args.UQ:
+        if args.out_vars == 'FM':
+            val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
+        elif args.out_vars == 'R2s':
+            val_A2B2A_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
+        elif args.out_vars == 'PM':
+            val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
     # elif args.out_vars == 'PM':
-    #     val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var) + cycle_loss_fn(A_abs, A2B2A_abs)
+    #     val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var) + cycle_loss_fn(A_abs, A2B2A_abs)
     else:
-        val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
+        if args.out_vars == 'R2s':
+            val_A2B2A_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+        elif args.out_vars == 'FM':
+            val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
 
     return A2B,A2B_var,{'A2B2A_cycle_loss': val_A2B2A_loss,
                         'WF_loss': WF_abs_loss,
@@ -522,7 +554,7 @@ for ep in range(args.epochs):
                     if args.n_echoes >= 4:
                         im_ech4 = np.squeeze(np.abs(tf.complex(A[:,:,:,6],A[:,:,:,7])))
                     if args.n_echoes >= 5:
-                        im_ech5 = np.squeeze(np.abs(tf.complex(A[:,:,:,8],A[:,:,:,9])))
+                        im_ech5 = np.   squeeze(np.abs(tf.complex(A[:,:,:,8],A[:,:,:,9])))
                     if args.n_echoes >= 6:
                         im_ech6 = np.squeeze(np.abs(tf.complex(A[:,:,:,10],A[:,:,:,11])))
                 else:
@@ -577,63 +609,70 @@ for ep in range(args.epochs):
 
                 # A2B maps in the second row
                 w_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,0],A2B[:,:,:,1])))
-                W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
+                W_ok =  axs[1,0].imshow(w_aux, cmap='bone',
                                         interpolation='none', vmin=0, vmax=1)
-                fig.colorbar(W_ok, ax=axs[1,1])
-                axs[1,1].axis('off')
+                fig.colorbar(W_ok, ax=axs[1,0])
+                axs[1,0].axis('off')
 
                 f_aux = np.squeeze(np.abs(tf.complex(A2B[:,:,:,2],A2B[:,:,:,3])))
-                F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
+                F_ok =  axs[1,1].imshow(f_aux, cmap='pink',
                                         interpolation='none', vmin=0, vmax=1)
-                fig.colorbar(F_ok, ax=axs[1,2])
-                axs[1,2].axis('off')
+                fig.colorbar(F_ok, ax=axs[1,1])
+                axs[1,1].axis('off')
 
                 r2_aux = np.squeeze(A2B[:,:,:,4])
-                r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
+                r2_ok = axs[1,2].imshow(r2_aux*r2_sc, cmap='copper',
                                         interpolation='none', vmin=0, vmax=r2_sc)
-                fig.colorbar(r2_ok, ax=axs[1,3])
-                axs[1,3].axis('off')
+                fig.colorbar(r2_ok, ax=axs[1,2])
+                axs[1,2].axis('off')
 
                 field_aux = np.squeeze(A2B[:,:,:,5])
                 field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                             interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
                 fig.colorbar(field_ok, ax=axs[1,4])
                 axs[1,4].axis('off')
-                fig.delaxes(axs[1,0])
+                
                 if args.UQ:
-                    var_aux = np.squeeze(A2B_var)*(fm_sc**2)
-                    var_ok= axs[1,5].imshow(var_aux, cmap='gnuplot2',
+                    R2_var_aux = np.squeeze(A2B_var[:,:,:,0])*(r2_sc**2)
+                    R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
+                                            interpolation='none', vmin=0, vmax=10)
+                    fig.colorbar(R2_var_ok, ax=axs[1,3])
+                    axs[1,3].axis('off')
+
+                    FM_var_aux = np.squeeze(A2B_var[:,:,:,1])*(fm_sc**2)
+                    FM_var_ok= axs[1,5].imshow(FM_var_aux, cmap='gnuplot2',
                                             interpolation='none', vmin=0, vmax=5)
-                    fig.colorbar(var_ok, ax=axs[1,5])
+                    fig.colorbar(FM_var_ok, ax=axs[1,5])
                     axs[1,5].axis('off')
                 else:
+                    fig.delaxes(axs[1,3])
                     fig.delaxes(axs[1,5])
 
                 # Ground-truth in the third row
                 wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
-                W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
+                W_unet = axs[2,0].imshow(wn_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
-                fig.colorbar(W_unet, ax=axs[2,1])
-                axs[2,1].axis('off')
+                fig.colorbar(W_unet, ax=axs[2,0])
+                axs[2,0].axis('off')
 
                 fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
-                F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
+                F_unet = axs[2,1].imshow(fn_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
-                fig.colorbar(F_unet, ax=axs[2,2])
-                axs[2,2].axis('off')
+                fig.colorbar(F_unet, ax=axs[2,1])
+                axs[2,1].axis('off')
 
                 r2n_aux = np.squeeze(B[:,:,:,4])
-                r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
+                r2_unet = axs[2,2].imshow(r2n_aux*r2_sc, cmap='copper',
                                      interpolation='none', vmin=0, vmax=r2_sc)
-                fig.colorbar(r2_unet, ax=axs[2,3])
-                axs[2,3].axis('off')
+                fig.colorbar(r2_unet, ax=axs[2,2])
+                axs[2,2].axis('off')
 
                 fieldn_aux = np.squeeze(B[:,:,:,5])
                 field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
                 fig.colorbar(field_unet, ax=axs[2,4])
                 axs[2,4].axis('off')
-                fig.delaxes(axs[2,0])
+                fig.delaxes(axs[2,3])
                 fig.delaxes(axs[2,5])
 
                 fig.suptitle('A2B Error: '+str(val_A2B2A_dict['WF_loss']), fontsize=16)

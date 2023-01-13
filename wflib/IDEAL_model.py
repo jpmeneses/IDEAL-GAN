@@ -18,6 +18,7 @@ r2_sc = 200.0   # HR:150 / GC:200
 fm_sc = 300.0   # HR:300 / GC:400
 rho_sc = 1.4
 
+@tf.function
 def gen_M(te,get_Mpinv=True,get_P0=False):
     ne = te.shape[1] # len(te)
     te = tf.cast(te,tf.complex64)
@@ -41,7 +42,7 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
     elif not(get_Mpinv) and not(get_P0):
         return M
 
-
+@tf.function
 def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
     if complex_data:
@@ -121,7 +122,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     else:
         return (res_rho,S_hat)
 
-
+@tf.function
 def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False):
     n_batch,hgt,wdt,_ = out_maps.shape
 
@@ -189,7 +190,7 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False):
         res_gt = re_aux + im_aux
         return res_gt
 
-
+@tf.function
 def get_Ps_norm(acqs,param_maps,te=None):
     n_batch,hgt,wdt,d_ech = acqs.shape
     n_ech = d_ech//2
@@ -243,7 +244,7 @@ def get_Ps_norm(acqs,param_maps,te=None):
 
     return L2_norm
 
-
+@tf.function
 def get_rho(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
     if complex_data:
@@ -305,7 +306,7 @@ def get_rho(acqs,param_maps,te=None,complex_data=False):
     
     return res_rho
 
-
+@tf.function
 def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
     if complex_data:
