@@ -152,7 +152,7 @@ elif args.G_model == 'U-Net':
                         filters=args.n_G_filters,
                         output_activation='sigmoid',
                         output_initializer='he_uniform',
-                        self_attention=False)
+                        self_attention=args.D2_SelfAttention)
 elif args.G_model == 'MEBCRN':
     G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
                     n_res_blocks=5,

@@ -173,8 +173,8 @@ elif args.G_model == 'U-Net':
                         te_input=False,
                         te_shape=(args.n_echoes,),
                         filters=args.n_G_filters,
-                        output_activation='relu',
-                        self_attention=False)
+                        output_activation='sigmoid',
+                        self_attention=args.D2_SelfAttention)
 
 elif args.G_model == 'MEBCRN':
     if args.out_vars == 'WF-PM':
