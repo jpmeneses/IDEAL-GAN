@@ -10,7 +10,6 @@ import data
 
 import matplotlib.pyplot as plt
 import tqdm
-import h5py
 import xlsxwriter
 from skimage.metrics import structural_similarity
 
@@ -22,8 +21,8 @@ py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--out_vars', default='PM', choices=['WF','PM','WF-PM','FM','R2s'])
 py.arg('--te_input', type=bool, default=False)
 py.arg('--k_fold', type=int, default=1)
-py.arg('--D1_SelfAttention',type=bool, default=False)
-py.arg('--D2_SelfAttention',type=bool, default=True)
+py.arg('--D1_SelfAttention',type=bool, default=True)
+py.arg('--D2_SelfAttention',type=bool, default=False)
 py.arg('--n_plot', type=int, default=30)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
@@ -65,7 +64,7 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../datasets/'
+dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
                             acqs_data=True, te_data=False,
@@ -169,8 +168,8 @@ elif args.G_model == 'U-Net':
                     self_attention=args.D1_SelfAttention)
     if args.out_vars == 'R2s':
         G_A2R2= dl.UNet(input_shape=(hgt,wdt,d_ech//2),
-                        bayesian=False,
-                        te_input=False,
+                        bayesian=args.UQ,
+                        te_input=args.te_input,
                         te_shape=(args.n_echoes,),
                         filters=args.n_G_filters,
                         output_activation='sigmoid',
@@ -301,16 +300,20 @@ def sample(A, B, TE=None):
             A_abs = tf.abs(tf.complex(A_real,A_imag))
         
         # Compute R2s maps using only-mag images
-        A2B_R2 = G_A2R2(A_abs, training=False)
+        if args.UQ:
+            _, A2B_R2, A2B_R2_var = G_A2R2(A_abs, training=False) # Mean R2s
+        else:
+            A2B_R2 = G_A2R2(A_abs, training=False)
+            A2B_R2_var = None
         A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
 
         # Compute FM from complex-valued images
         if args.UQ:
-            A2B_rand, A2B_FM, A2B_var = G_A2B(A, training=False)
-            A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+            _, A2B_FM, A2B_var = G_A2B(A, training=False)
+            A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
         else:
             A2B_FM = G_A2B(A, training=False)
-            A2B_var = None
+            A2B_FM_var = None
         A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
         A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
 
@@ -321,6 +324,14 @@ def sample(A, B, TE=None):
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
 
         A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
+
+        # Variance map mask
+        if args.UQ:
+            A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
+            A2B_R2_var = tf.where(A[:,:,:,:1]!=0.0,A2B_R2_var,0.0)
+            A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
+        else:
+            A2B_var = None
 
     return A2B_abs, A2B_var
 
@@ -343,12 +354,15 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
 
     if args.UQ:
         # Get water/fat uncertainties
-        WF, WF_var = wf.PDFF_uncertainty(A,A2B[:,:,:,-1],A2B_var)
-        w_aux = np.squeeze(tf.abs(tf.complex(WF[:,:,:,0],WF[:,:,:,1])))
-        f_aux = np.squeeze(tf.abs(tf.complex(WF[:,:,:,2],WF[:,:,:,3])))
+        WF, WF_var = wf.PDFF_uncertainty(A,A2B,A2B_var)
+        # w_aux = np.squeeze(tf.abs(tf.complex(WF[:,:,:,0],WF[:,:,:,1])))
+        # f_aux = np.squeeze(tf.abs(tf.complex(WF[:,:,:,2],WF[:,:,:,3])))
+        w_aux = np.squeeze(A2B[:,:,:,0])
+        f_aux = np.squeeze(A2B[:,:,:,1])
         W_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,0],WF_var[:,:,:,1])))
         F_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,2],WF_var[:,:,:,3])))
-        field_var = np.squeeze(A2B_var)*(fm_sc**2)
+        r2s_var = np.squeeze(A2B_var[:,:,:,:1])*(r2_sc**2)
+        field_var = np.squeeze(A2B_var[:,:,:,-1:])*(fm_sc**2)
         hgt_plt, wdt_plt, nr, nc = 10, 20, 3, 5
     else:
         w_aux = np.squeeze(A2B[:,:,:,0])
@@ -439,7 +453,10 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            fig.delaxes(axs[2,3]) # No R2s variance map
+            r2s_uq =axs[2,3].imshow(r2s_var, cmap='gnuplot',
+                                    interpolation='none', vmin=0, vmax=5)
+            fig.colorbar(r2s_uq, ax=axs[2,3])
+            axs[2,3].axis('off')
 
             field_uq =  axs[2,4].imshow(field_var, cmap='gnuplot2',
                                         interpolation='none', vmin=0, vmax=5)

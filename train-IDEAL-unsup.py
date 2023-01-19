@@ -38,9 +38,12 @@ py.arg('--epoch_ckpt', type=int, default=5)  # num. of epochs to save a checkpoi
 py.arg('--lr', type=float, default=0.0001)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
+py.arg('--R2_TV_weight', type=float, default=0.0)
+py.arg('--R2_L1_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
-py.arg('--SelfAttention',type=bool, default=True)
+py.arg('--D1_SelfAttention',type=bool, default=True)
+py.arg('--D2_SelfAttention',type=bool, default=False)
 args = py.args()
 
 # output_dir
@@ -50,6 +53,7 @@ py.mkdir(output_dir)
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
+# mirrored_strategy = tf.distribute.Mirrored_Strategy(devices=["/gpu:0", "/gpu:1"])
 
 # ==============================================================================
 # =                                    data                                    =
@@ -125,25 +129,29 @@ A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
 A_B_dataset_val.batch(1)
 
+# dist_A_B_dataset = mirrored_strategy.experimental_distribute_dataset(A_B_dataset)
+# dist_A_B_dataset_val = mirrored_strategy.experimental_distribute_dataset(A_B_dataset_val)
+
 # ==============================================================================
 # =                                   models                                   =
 # ==============================================================================
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
+# with mirrored_strategy.scope():
 if args.G_model == 'complex':
     G_A2B = dl.complex_unet(input_shape=(hgt,wdt,d_ech),
                             filters=args.n_G_filters,
                             te_input=False,
                             te_shape=(args.n_echoes,),
-                            self_attention=args.SelfAttention)
+                            self_attention=args.D1_SelfAttention)
 elif args.G_model == 'U-Net':
     G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
                     bayesian=args.UQ,
                     te_input=False,
                     te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
-                    self_attention=args.SelfAttention)
+                    self_attention=args.D1_SelfAttention)
     if args.out_vars == 'R2s' or args.out_vars == 'PM':
         G_A2R2= dl.UNet(input_shape=(hgt,wdt,d_ech//2),
                         bayesian=args.UQ,
@@ -158,15 +166,17 @@ elif args.G_model == 'MEBCRN':
                     n_res_blocks=5,
                     n_downsamplings=2,
                     filters=args.n_G_filters,
-                    self_attention=args.SelfAttention)
+                    self_attention=args.D1_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 cycle_loss_fn = tf.losses.MeanSquaredError()
 
+# with mirrored_strategy.scope():
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
-G_R2_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+if not(args.out_vars == 'FM'):
+    G_R2_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
 # ==============================================================================
 # =                                 train step                                 =
@@ -178,11 +188,6 @@ def train_G(A, B):
                         tf.ones_like(A[:,:,:,:2],dtype=tf.int32)],axis=-1)
 
     indx_PM =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
-
-    indx_mv =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     with tf.GradientTape() as t:
@@ -202,67 +207,39 @@ def train_G(A, B):
         B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
 
         ##################### A Cycle #####################
-        if args.out_vars == 'FM':
-            if args.UQ:
-                A2B_FM, A2B_mean, A2B_FM_var = G_A2B(A, training=True)
-                A2B_R2_var = tf.zeros_like(A2B_FM_var)
-            else:
-                A2B_FM = G_A2B(A, training=True)
-            
-            # A2B Masks
-            A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        if args.UQ:
+            A2B_FM, _, A2B_FM_var = G_A2B(A, training=True) # Randomly sampled FM
+        else:
+            A2B_FM = G_A2B(A, training=True)
+        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
 
-            # Build A2B_PM array with zero-valued R2*
-            A2B_R2 = tf.zeros_like(A2B_FM)
-            A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
-            if args.fat_char:
-                A2B_P, A2B2A = fa.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-                A2B_WF = A2B_P[:,:,:,0:4]
-            else:
-                A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-
-            # Magnitude of water/fat images
-            A2B_WF_real = A2B_WF[:,:,:,0::2]
-            A2B_WF_imag = A2B_WF[:,:,:,1::2]
-            A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
-        
-        elif args.out_vars == 'R2s' or args.out_vars == 'PM':
+        if args.out_vars == 'PM':
             if not(args.G_model == 'complex'):
                 A_real = A[:,:,:,0::2]
                 A_imag = A[:,:,:,1::2]
                 A_abs = tf.abs(tf.complex(A_real,A_imag))
-            
+        
             # Compute R2s map from only-mag images
             if args.UQ:
-                A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=True) # Mean FM
+                _, A2B_R2, A2B_R2_var = G_A2R2(A_abs, training=True) # Mean R2
             else:
                 A2B_R2 = G_A2R2(A_abs, training=True)
                 A2B_R2_var = None
             A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
 
-            # Compute FM using complex-valued images and pre-trained model
+        else:
+            A2B_R2 = tf.zeros_like(A2B_FM)
             if args.UQ:
-                if args.out_vars == 'R2s':
-                    _, A2B_FM, A2B_FM_var = G_A2B(A, training=False) # Mean FM
-                elif args.out_vars == 'PM':
-                    A2B_FM, _, A2B_FM_var = G_A2B(A, training=True) # Randomly sampled FM
-            else:
-                A2B_FM = G_A2B(A, training=(args.out_vars=='PM'))
-            A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
-            A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
+                A2B_R2_var = tf.zeros_like(A2B_FM_var)
 
-            # Magnitude of water/fat images
-            if args.out_vars == 'R2s':
-                A2B_WF = wf.get_rho(A,A2B_PM,complex_data=(args.G_model=='complex'))
-            elif args.out_vars == 'PM':
-                A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-            A2B_WF_real = A2B_WF[:,:,:,0::2]
-            A2B_WF_imag = A2B_WF[:,:,:,1::2]
-            A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+        A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
 
-            A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
-            A2B2A_abs = wf.IDEAL_model(A2B_abs,args.n_echoes,complex_data=(args.G_model=='complex'),only_mag=True)
-        
+        # Magnitude of water/fat images
+        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+
         # Variance map mask
         if args.UQ:
             A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
@@ -270,24 +247,13 @@ def train_G(A, B):
             A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
 
         ############ Cycle-Consistency Losses #############
-        # if args.out_vars == 'R2s':
-        #     A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
         if args.UQ:
             if args.out_vars == 'FM':
                 A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
-            elif args.out_vars == 'R2s':
-                A2B2A_cycle_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
-            elif args.out_vars == 'PM':
+            else:
                 A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
-        # elif args.UQ:
-        #     A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
-        # elif args.out_vars == 'PM':
-        #     A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var) + cycle_loss_fn(A_abs, A2B2A_abs)
         else:
-            if args.out_vars == 'R2s':
-                A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
-            elif args.out_vars == 'FM':
-                A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
         WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -301,16 +267,9 @@ def train_G(A, B):
         
         G_loss = A2B2A_cycle_loss + reg_term
         
-    if args.out_vars == 'FM':
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
-    elif args.out_vars == 'R2s':
-        G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
-        G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
-    else:
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables + G_A2R2.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables + G_A2R2.trainable_variables))
-
+    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
+    
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
             'WF_loss': WF_abs_loss,
             'R2_loss': R2_loss,
@@ -319,9 +278,131 @@ def train_G(A, B):
             'L1_FM': FM_L1}
 
 
+@tf.function
+def train_G_R2(A, B):
+    indx_B = tf.concat([tf.zeros_like(A[:,:,:,:4],dtype=tf.int32),
+                        tf.ones_like(A[:,:,:,:2],dtype=tf.int32)],axis=-1)
+
+    indx_PM =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
+                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
+
+    with tf.GradientTape() as t:
+        # Split B outputs
+        B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
+        B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
+        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
+
+        # Split B param maps
+        B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
+        B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
+        B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+
+        # Magnitude of water/fat images
+        B_WF_real = B_WF[:,:,:,0::2]
+        B_WF_imag = B_WF[:,:,:,1::2]
+        B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
+
+        ##################### A Cycle #####################
+        if not(args.G_model == 'complex'):
+            A_real = A[:,:,:,0::2]
+            A_imag = A[:,:,:,1::2]
+            A_abs = tf.abs(tf.complex(A_real,A_imag))
+        
+        # Compute R2s map from only-mag images
+        if args.UQ:
+            A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=True) # Mean FM
+        else:
+            A2B_R2 = G_A2R2(A_abs, training=True)
+            A2B_R2_var = None
+        A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
+
+        # Compute FM using complex-valued images and pre-trained model
+        if args.UQ:
+            if args.out_vars == 'R2s':
+                _, A2B_FM, A2B_FM_var = G_A2B(A, training=False) # Mean FM
+            elif args.out_vars == 'PM':
+                A2B_FM, _, A2B_FM_var = G_A2B(A, training=False) # Randomly sampled FM
+        else:
+            A2B_FM = G_A2B(A, training=False)
+        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+        A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
+
+        # Magnitude of water/fat images
+        if args.out_vars == 'R2s':
+            A2B_WF = wf.get_rho(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        elif args.out_vars == 'PM':
+            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+
+        A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
+        A2B2A_abs = wf.IDEAL_model(A2B_abs,args.n_echoes,complex_data=(args.G_model=='complex'),only_mag=True)
+        
+        # Variance map mask
+        if args.UQ:
+            A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
+            A2B_R2_var = tf.where(A[:,:,:,:1]!=0.0,A2B_R2_var,0.0)
+            A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
+
+        ############ Cycle-Consistency Losses #############
+        # CHECK
+        if args.UQ:
+            A2B2A_cycle_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
+        else:
+            A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+
+        ########### Splitted R2s and FM Losses ############
+        WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
+        R2_loss = cycle_loss_fn(B_R2, A2B_R2)
+        FM_loss = cycle_loss_fn(B_FM, A2B_FM)
+
+        ################ Regularizers #####################
+        R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
+        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
+        reg_term = R2_TV + R2_L1
+        
+        G_loss = A2B2A_cycle_loss + reg_term
+        
+    G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
+    G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
+
+    return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
+            'WF_loss': WF_abs_loss,
+            'R2_loss': R2_loss,
+            'FM_loss': FM_loss,
+            'TV_R2': R2_TV,
+            'L1_R2': R2_L1}
+
+
 def train_step(A, B):
-    G_loss_dict = train_G(A, B)
-    return G_loss_dict
+    if args.out_vars == 'FM':
+        G_loss_dict = train_G(A, B)
+        G_R2_loss_dict={'A2B2A_cycle_loss': tf.constant(0.0),
+                        'WF_loss': tf.constant(0.0),
+                        'R2_loss': tf.constant(0.0),
+                        'FM_loss': tf.constant(0.0),
+                        'TV_R2': tf.constant(0.0),
+                        'L1_R2': tf.constant(0.0)}
+    elif args.out_vars == 'R2s':
+        G_loss_dict  = {'A2B2A_cycle_loss': tf.constant(0.0),
+                        'WF_loss': tf.constant(0.0),
+                        'R2_loss': tf.constant(0.0),
+                        'FM_loss': tf.constant(0.0),
+                        'TV_FM': tf.constant(0.0),
+                        'L1_FM': tf.constant(0.0)}
+        G_R2_loss_dict = train_G_R2(A, B)
+    else:
+        G_loss_dict = train_G(A, B)
+        G_R2_loss_dict = train_G_R2(A, B)
+    return G_loss_dict, G_R2_loss_dict
+
+
+# @tf.function
+# def distributed_train_step(dist_inputs):
+#   per_replica_losses = mirrored_strategy.run(train_step, args=(dist_inputs,))
+#   return mirrored_strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses,
+#                          axis=None)
 
 
 @tf.function
@@ -330,10 +411,6 @@ def sample(A, B):
                         tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
     indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-    indx_mv =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
 
     # Split B outputs
     B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
@@ -423,31 +500,41 @@ def sample(A, B):
     R2_loss = cycle_loss_fn(B_R2, A2B_R2)
     FM_loss = cycle_loss_fn(B_FM, A2B_FM)
 
-    # if args.out_vars == 'R2s':
-        # val_A2B2A_loss = cycle_loss_fn(A_abs, A2B2A_abs)
     if args.UQ:
         if args.out_vars == 'FM':
-            val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
+            val_A2B2A_R2_loss = 0
+            val_A2B2A_FM_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
         elif args.out_vars == 'R2s':
-            val_A2B2A_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
-        elif args.out_vars == 'PM':
-            val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
-    # elif args.out_vars == 'PM':
-    #     val_A2B2A_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var) + cycle_loss_fn(A_abs, A2B2A_abs)
+            val_A2B2A_R2_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
+            val_A2B2A_FM_loss = 0
+        else:
+            val_A2B2A_R2_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
+            val_A2B2A_FM_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
     else:
+        if args.out_vars == 'FM':
+            val_A2B2A_R2_loss = 0
+            val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
         if args.out_vars == 'R2s':
-            val_A2B2A_loss = cycle_loss_fn(A_abs, A2B2A_abs)
-        elif args.out_vars == 'FM':
-            val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
+            val_A2B2A_R2_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+            val_A2B2A_FM_loss = 0
+        else:
+            val_A2B2A_R2_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+            val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
+    
+    val_FM_dict =  {'A2B2A_cycle_loss': val_A2B2A_FM_loss,
+                    'WF_loss': WF_abs_loss,
+                    'R2_loss': R2_loss,
+                    'FM_loss': FM_loss}
+    val_R2_dict =  {'A2B2A_cycle_loss': val_A2B2A_R2_loss,
+                    'WF_loss': WF_abs_loss,
+                    'R2_loss': R2_loss,
+                    'FM_loss': FM_loss}
 
-    return A2B,A2B_var,{'A2B2A_cycle_loss': val_A2B2A_loss,
-                        'WF_loss': WF_abs_loss,
-                        'R2_loss': R2_loss,
-                        'FM_loss': FM_loss,}
+    return A2B, A2B_var, val_FM_dict, val_R2_dict
 
 def validation_step(A, B):
-    A2B, A2B_var, val_A2B2A_dict = sample(A, B)
-    return A2B, A2B_var, val_A2B2A_dict
+    A2B, A2B_var, val_FM_dict, val_R2_dict = sample(A, B)
+    return A2B, A2B_var, val_FM_dict, val_R2_dict
 
 
 # ==============================================================================
@@ -463,13 +550,14 @@ checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
                                 ep_cnt=ep_cnt),
                            py.join(output_dir, 'checkpoints'),
                            max_to_keep=5)
-checkpoint_2=tl.Checkpoint(dict(G_A2B=G_A2B,
-                                G_A2R2=G_A2R2,
-                                G_optimizer=G_optimizer,
-                                G_R2_optimizer=G_R2_optimizer,
-                                ep_cnt=ep_cnt),
-                           py.join(output_dir, 'checkpoints'),
-                           max_to_keep=5)
+if not(args.out_vars == 'FM'):
+    checkpoint_2=tl.Checkpoint(dict(G_A2B=G_A2B,
+                                    G_A2R2=G_A2R2,
+                                    G_optimizer=G_optimizer,
+                                    G_R2_optimizer=G_R2_optimizer,
+                                    ep_cnt=ep_cnt),
+                               py.join(output_dir, 'checkpoints'),
+                               max_to_keep=5)
 try:  # restore checkpoint including the epoch counter
     if args.out_vars == 'PM':
         checkpoint_2.restore().assert_existing_objects_matched()
@@ -506,19 +594,22 @@ for ep in range(args.epochs):
             # Random 90 deg rotations
             for _ in range(np.random.randint(3)):
                 A = tf.image.rot90(A)
+                B = tf.image.rot90(B)
 
             # Random horizontal reflections
-            A = tf.image.random_flip_left_right(A)
+            A = tf.image.random_flip_left_right(A, seed=1)
+            B = tf.image.random_flip_left_right(B, seed=1)
 
             # Random vertical reflections
-            A = tf.image.random_flip_up_down(A)
+            A = tf.image.random_flip_up_down(A, seed=2)
+            B = tf.image.random_flip_up_down(B, seed=2)
         # ==============================================================================
 
         # ==============================================================================
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        G_loss_dict = train_step(A, B)
+        G_loss_dict, G_R2_loss_dict = train_step(A, B)
 
         if args.out_vars == 'R2s':
             opt_aux = G_R2_optimizer.iterations
@@ -528,6 +619,7 @@ for ep in range(args.epochs):
         # # summary
         with train_summary_writer.as_default():
             tl.summary(G_loss_dict, step=opt_aux, name='G_losses')
+            tl.summary(G_R2_loss_dict, step=opt_aux, name='G_R2_losses')
             tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
                         step=opt_aux, name='G learning rate')
 
@@ -536,13 +628,14 @@ for ep in range(args.epochs):
             A, B = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
-            A2B, A2B_var, val_A2B2A_dict = validation_step(A, B)
+            A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
-                tl.summary(val_A2B2A_dict, step=opt_aux, name='G_losses')
+                tl.summary(val_FM_dict, step=opt_aux, name='G_losses')
+                tl.summary(val_R2_dict, step=opt_aux, name='G_R2_losses')
 
-            if (opt_aux.numpy() % (n_div*30) == 0) or (opt_aux.numpy() < 100):
+            if (opt_aux.numpy() % (n_div*100) == 0) or (opt_aux.numpy() < 100):
                 fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
                 # Magnitude of recon MR images at each echo
@@ -635,7 +728,7 @@ for ep in range(args.epochs):
                 if args.UQ:
                     R2_var_aux = np.squeeze(A2B_var[:,:,:,0])*(r2_sc**2)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
-                                            interpolation='none', vmin=0, vmax=10)
+                                            interpolation='none', vmin=0, vmax=2)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
                     axs[1,3].axis('off')
 
@@ -675,7 +768,10 @@ for ep in range(args.epochs):
                 fig.delaxes(axs[2,3])
                 fig.delaxes(axs[2,5])
 
-                fig.suptitle('A2B Error: '+str(val_A2B2A_dict['WF_loss']), fontsize=16)
+                if args.out_vars == 'R2s':
+                    fig.suptitle('A2B Error: '+str(val_R2_dict['WF_loss']), fontsize=16)
+                else:
+                    fig.suptitle('A2B Error: '+str(val_FM_dict['WF_loss']), fontsize=16)
 
                 # plt.show()
                 plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)

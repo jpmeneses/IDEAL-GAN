@@ -341,36 +341,30 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1])
 
-    # r2s = mean_maps[:,:,:,0] * r2_sc
-    phi = mean_maps * fm_sc
-    # r2s_unc = param_maps[:,:,:,0] * r2_sc
-    phi_unc = var_maps * (fm_sc**2)
+    r2s = mean_maps[:,:,:,0] * r2_sc
+    phi = mean_maps[:,:,:,1] * fm_sc
+    r2s_unc = var_maps[:,:,:,0] * (r2_sc**2)
+    phi_unc = var_maps[:,:,:,1] * (fm_sc**2)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi,0.0)
+    xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1)
-    xi_unc = tf.complex(phi_unc,0.0)
+
+    xi_unc = tf.complex(phi_unc+r2s_unc/((2*np.pi)**2),0.0)
     xi_unc_rav = tf.reshape(xi_unc,[n_batch,-1])
     xi_unc_rav = tf.expand_dims(xi_unc_rav,1)
 
     # Diagonal matrix with the exponential of fieldmap variance
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav))
-    Wm_var = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, xi_unc_rav))
-
-    # (New) Diagonal matrix with sine and cosine terms
-    # (derived from variance of complex exponential)
-    # https://nbviewer.org/gist/dougalsutherland/8513749
-    # Z_sin = tf.math.sin(tf.linalg.matmul(-2*np.pi * te_real, xi_rav))
-    # Z_cos = tf.math.cos(tf.linalg.matmul(-4*np.pi * te_real, xi_rav))
-    # Z = Z_sin**2 - Z_cos**2
+    Wm_unc_var = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, xi_unc_rav))
 
     # Matrix operations (mean)
-    WmS = Wm * tf.math.sqrt(Wm_var) * Smtx
+    WmS = Wm * tf.math.sqrt(Wm_unc_var) * Smtx
     MWmS = tf.linalg.matmul(M_pinv,WmS)
 
     # Matrix operations (variance)
-    WmZS = (1 - Wm_var) * (Smtx * tf.math.conj(Smtx))
+    WmZS = (1 - Wm_unc_var) * (Smtx * tf.math.conj(Smtx)) #  * (Wm_r2s_var - 1) * (Wm_r2s**2 * Wm_r2s_var)
     MWmZS = tf.linalg.matmul(M_pinv * tf.math.conj(M_pinv),WmZS)
 
     # Extract corresponding Water/Fat signals

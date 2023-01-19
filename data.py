@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import h5py
+h5py._errors.unsilence_errors()
 
 class ItemPool:
 
@@ -27,6 +28,7 @@ class ItemPool:
                 else:
                     out_items.append(in_item)
         return tf.stack(out_items, axis=0)
+
 
 def load_hdf5(ds_dir,hdf5_file,ech_idx,acqs_data=True,te_data=False,complex_data=False,remove_zeros=True):
     f = h5py.File(ds_dir + hdf5_file, 'r')
