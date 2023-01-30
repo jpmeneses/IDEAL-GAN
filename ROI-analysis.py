@@ -8,13 +8,16 @@ import wflib as wf
 import data
 from utils import *
 
-import statsmodels.api as sm
+# import statsmodels.api as sm
 import tqdm
 import xlsxwriter
 
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import PercentFormatter
+
+import os
+os.environ['TF_ENABLE_GPU_GARBAGE_COLLECTION'] = 'false'
 
 py.arg('--experiment_dir',default='output/WF-sep')
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
@@ -44,14 +47,14 @@ ws_ROI_2.write(0,1,'Model res.')
 # data
 ech_idx = args.n_echoes * 2
 
-# dataset_dir = '../../OneDrive/Documents/datasets/'
-dataset_dir = '../MRI-Datasets/'
+dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
+# dataset_dir = '../MRI-Datasets/'
 if args.n_echoes == 6 and not(args.multi_TE):
-  dataset_hdf5 = 'UNet-multiTE/6ech_GC_192_origTEs_complex_2D.hdf5'
+  dataset_hdf5 = '6ech_GC_192_origTEs_complex_2D.hdf5'
 elif args.n_echoes == 6 and args.multi_TE:
-  dataset_hdf5 = 'HDF5-DS/multiTE_GC_192_complex_2D.hdf5'
+  dataset_hdf5 = 'multiTE_GC_192_complex_2D.hdf5'
 elif args.n_echoes == 3:
-  dataset_hdf5 = 'UNet-multiTE/3ech_GC_192_complex_2D.hdf5'
+  dataset_hdf5 = '3ech_GC_192_complex_2D.hdf5'
 testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
                                   te_data=True,complex_data=(args.G_model=='complex'),remove_zeros=False)
 if args.multi_TE:
@@ -335,22 +338,22 @@ if args.map != 'Water':
   # plt.savefig('out_images/ROI_histogram_R2.eps',format='eps')
   plt.show()
   # Bland-Altman
-  f,(ax1,ax2) = plt.subplots(figsize=(8,7),nrows=2,ncols=1)
-  sm.graphics.mean_diff_plot(np.array(XA_res_all),np.array(XA_gt_all),ax=ax1)
-  if args.map == 'PDFF':
-    ax1.set_xlim([0,0.45])
-    ax1.set_ylim([-0.035,0.035])
-  elif args.map == 'R2s':
-    ax1.set_xlim([20,70])
-    ax1.set_ylim([-20,20])
-  sm.graphics.mean_diff_plot(np.array(XB_res_all),np.array(XB_gt_all),ax=ax2)
-  if args.map == 'PDFF':
-    ax2.set_xlim([0,0.45])
-    ax2.set_ylim([-0.035,0.035])
-  elif args.map == 'R2s':
-    ax2.set_xlim([20,70])
-    ax2.set_ylim([-20,20])
-  plt.show()
+  # f,(ax1,ax2) = plt.subplots(figsize=(8,7),nrows=2,ncols=1)
+  # sm.graphics.mean_diff_plot(np.array(XA_res_all),np.array(XA_gt_all),ax=ax1)
+  # if args.map == 'PDFF':
+  #   ax1.set_xlim([0,0.45])
+  #   ax1.set_ylim([-0.035,0.035])
+  # elif args.map == 'R2s':
+  #   ax1.set_xlim([20,70])
+  #   ax1.set_ylim([-20,20])
+  # sm.graphics.mean_diff_plot(np.array(XB_res_all),np.array(XB_gt_all),ax=ax2)
+  # if args.map == 'PDFF':
+  #   ax2.set_xlim([0,0.45])
+  #   ax2.set_ylim([-0.035,0.035])
+  # elif args.map == 'R2s':
+  #   ax2.set_xlim([20,70])
+  #   ax2.set_ylim([-20,20])
+  # plt.show()
   # Export to Excel file
   for idx1 in range(len(XA_gt_all)):
     ws_ROI_1.write(idx1+1,0,XA_gt_all[idx1])

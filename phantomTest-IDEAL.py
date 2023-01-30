@@ -1,15 +1,13 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-from keras_unet.models import custom_unet
 
+import DLlib as dl
 import pylib as py
 import tf2lib as tl
 import wflib as wf
 
 import data
-import module
-import mebcrn
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -70,7 +68,8 @@ ech_idx = args.n_echoes * 2
 ############################################################
 ############### DIRECTORIES AND FILENAMES ##################
 ############################################################
-dataset_dir = '../MATLAB/waterFatSignalPhantom/data_out/'
+# dataset_dir = '../MATLAB/waterFatSignalPhantom/data_out/'
+dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/MATLAB/waterFatSignalPhantom/data_out/'
 dataset_hdf5_1 = 'phantom.hdf5'
 
 ############################################################
@@ -118,23 +117,23 @@ A_B_dataset_test.batch(1)
 
 # model
 if args.G_model == 'encod-decod':
-    G_A2B = module.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                                filters=args.n_filters,
-                                te_input=args.te_input,
-                                te_shape=(args.n_echoes,),
-                                R2_self_attention=args.R2_SelfAttention,
-                                FM_self_attention=args.FM_SelfAttention)
-elif args.G_model == 'U-Net':
-    G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
-                        num_classes=2,
-                        use_attention=args.FM_SelfAttention,
-                        filters=args.n_filters)
-elif args.G_model == 'MEBCRN':
-    G_A2B  =  mebcrn.MEBCRN(input_shape=(hgt,wdt,d_ech),
-                            n_res_blocks=5,
-                            n_downsamplings=2,
+    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                             filters=args.n_filters,
-                            self_attention=args.FM_SelfAttention)
+                            te_input=args.te_input,
+                            te_shape=(args.n_echoes,),
+                            R2_self_attention=args.R2_SelfAttention,
+                            FM_self_attention=args.FM_SelfAttention)
+elif args.G_model == 'U-Net':
+    G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+                    num_classes=2,
+                    use_attention=args.FM_SelfAttention,
+                    filters=args.n_filters)
+elif args.G_model == 'MEBCRN':
+    G_A2B  =  dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
+                        n_res_blocks=5,
+                        n_downsamplings=2,
+                        filters=args.n_filters,
+                        self_attention=args.FM_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 

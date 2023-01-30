@@ -5,16 +5,16 @@ library(pwr)
 library(tidyverse)
 library(ggpubr)
 library(rstatix)
-library(emmeans)
+#library(emmeans)
 
 ############################################################################
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-004/"
+model = "/Sup-007/"
 epoch = "200"
 
-dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
+dir = paste("C:/Users/jpmen/Documents/IDEAL-GAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
 
 TEs_suffix = c('13_21','13_22','13_23','13_24','14_21','14_22')
@@ -75,7 +75,9 @@ wSDs_r = wSDs_r$refs,
 wCVs_r = wSDs_r$refs/wXs_r$refs,
 wXs = wXs$meas,
 wSDs = wSDs$meas,
-wCVs = wSDs$meas/wXs$meas
+wCVs = wSDs$meas/wXs$meas,
+bias = wXs$meas - wXs_r$refs,
+mean = (wXs$meas + wXs_r$refs)/2
 )
 
 # Summarized precision metrics
@@ -110,3 +112,24 @@ q2 = ggplot(res_id, aes(wXs_r, wXs)) +
     )
 fn2 = "Precision-corr-std.png"
 ggsave(plot=q2, width=3.2, height=2.8, dpi=500, filename=fn2)
+
+############################################################################
+########################## BLAND ALTMAN PLOT ###############################
+############################################################################
+mean_diff <- mean(res_id$bias)
+lower <- mean_diff - 1.96*sd(res_id$bias)
+upper <- mean_diff + 1.96*sd(res_id$bias)
+q2= ggplot(res_id, aes(mean, bias)) +
+  geom_errorbar(aes(xmin=mean, xmax=mean,
+			ymin=bias-wSDs, ymax=bias+wSDs),
+			width=0.003, color="#3399FF") +
+  geom_point(size=0.9) +
+  geom_hline(yintercept = mean_diff) +
+  geom_hline(yintercept = lower, color = "red", linetype="dashed") +
+  geom_hline(yintercept = upper, color = "red", linetype="dashed") +
+  ylab("Difference Between Measurements") +
+  xlab("Mean Between Measurements") + 
+  ylim(-0.04,0.04)
+  # + xlim(0.035,0.08)
+fn2 = "Precision-BlandAltman.png"
+ggsave(plot=q2, width=4, height=3, dpi=400, filename=fn2)
