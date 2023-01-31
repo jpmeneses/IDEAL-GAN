@@ -133,14 +133,9 @@ def UNet(
         
         if te_input and l==1:
             # Fully-connected network for processing the vector with echo-times
-            hgt_dim = input_shape[0] // (2**(l+1))
-            wdt_dim = input_shape[1] // (2**(l+1))
             y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
-            y = keras.layers.RepeatVector(hgt_dim*wdt_dim)(y)
-            y = keras.layers.Reshape((hgt_dim,wdt_dim,filters))(y)
-
-            # Add fully-connected output with latent space
-            x = keras.layers.add([x,y])
+            # Adaptive Instance Normalization for Style-Trasnfer
+            x = AdaIN(x, y)
 
         filters = filters * 2  # double the number of filters with each layer
 
