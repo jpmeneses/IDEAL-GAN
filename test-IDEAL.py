@@ -66,54 +66,59 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
-
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
-
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-if args.k_fold > 1:
+dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
+dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
+
+if args.k_fold == 1:
+    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+                                acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                end=320, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    testX = np.concatenate((acqs_1,acqs_2),axis=0)
+    testY = np.concatenate((out_maps_1,out_maps_2),axis=0)
+
+elif args.k_fold == 2:
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                start=320, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
     acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                                acqs_data=True, te_data=False,
+                                end=798, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
+    testX = np.concatenate((acqs_2,acqs_3),axis=0)
+    testY = np.concatenate((out_maps_2,out_maps_3),axis=0)
 
-if args.k_fold > 2:
-    dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
+elif args.k_fold == 3:
+    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                                start=798, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
     acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                                acqs_data=True, te_data=False,
+                                end=310, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    testX = np.concatenate((acqs_3,acqs_4),axis=0)
+    testY = np.concatenate((out_maps_3,out_maps_4),axis=0)
+
+elif args.k_fold == 4:
+    testX, testY = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                                start=310, end=1172, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
 
-if args.k_fold > 3:
-    dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
+elif args.k_fold == 5:
+    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                                start=1172, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
     acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
                                 acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
+    testX = np.concatenate((acqs_4,acqs_5),axis=0)
+    testY = np.concatenate((out_maps_4,out_maps_5),axis=0)
 
 ############################################################
 ################# DATASET PARTITIONS #######################
 ############################################################
-
-if args.k_fold < 2:
-    trainX = np.concatenate((acqs_1,acqs_2),axis=0)
-    trainY = np.concatenate((out_maps_1,out_maps_2),axis=0)
-elif args.k_fold < 3:
-    trainX = np.concatenate((acqs_1,acqs_2,acqs_3),axis=0)
-    trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3),axis=0)
-elif args.k_fold < 4:
-    trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4),axis=0)
-    trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4),axis=0)
-else:
-    trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-    trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
-k_divs = [0,832,1694,2547,3409,len(trainX)]
-print('Length dataset:',len(trainX))
-
-testX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
-testY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,d_ech = np.shape(testX)
@@ -121,6 +126,7 @@ _,_,_,n_out = np.shape(testY)
 echoes = int(d_ech/2)
 r2_sc,fm_sc = 200,300
 
+print('Length dataset:', len_dataset)
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
 print('Output Maps:',n_out)
@@ -444,22 +450,22 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.delaxes(axs[2,0]) # No PDFF variance map
 
             W_uq =  axs[2,1].imshow(W_var, cmap='gnuplot2',
-                                    interpolation='none', vmin=0, vmax=0.0001)
+                                    interpolation='none', vmin=0, vmax=0.00005)
             fig.colorbar(W_uq, ax=axs[2,1])
             axs[2,1].axis('off')
 
             F_uq =  axs[2,2].imshow(F_var, cmap='gnuplot2',
-                                    interpolation='none', vmin=0, vmax=0.0001)
+                                    interpolation='none', vmin=0, vmax=0.00005)
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
             r2s_uq =axs[2,3].imshow(r2s_var, cmap='gnuplot',
-                                    interpolation='none', vmin=0, vmax=5)
+                                    interpolation='none', vmin=0, vmax=2)
             fig.colorbar(r2s_uq, ax=axs[2,3])
             axs[2,3].axis('off')
 
             field_uq =  axs[2,4].imshow(field_var, cmap='gnuplot2',
-                                        interpolation='none', vmin=0, vmax=5)
+                                        interpolation='none', vmin=0, vmax=3)
             fig.colorbar(field_uq, ax=axs[2,4])
             axs[2,4].axis('off')
         else:

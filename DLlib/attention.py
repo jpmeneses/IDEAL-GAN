@@ -70,6 +70,7 @@ class SelfAttention(Layer):
     def compute_output_shape(self, input_shape):
         return input_shape
 
+
 def AdaIN(content_features, style_features, alpha=1.0, epsilon=1e-5):
     '''
     Normalizes the `content_features` with scaling and offset from `style_features`.

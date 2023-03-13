@@ -14,6 +14,7 @@ import xlsxwriter
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import PercentFormatter
+from time import process_time
 
 py.arg('--experiment_dir',default='output/WF-sep')
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
@@ -159,6 +160,7 @@ def sample(A, B, TE=None):
 all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
 i = 0
 
+t1 = process_time()
 for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
   A = tf.expand_dims(A,axis=0)
   B = tf.expand_dims(B,axis=0)
@@ -168,6 +170,10 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
 
   all_test_ans[i,:,:,:] = A2B
   i += 1
+
+t2 = process_time()
+print("Elapsed time during the whole program in seconds:",t2-t1) 
+print("Time per slice:",(t2-t1)/len_dataset)
 
 w_all_ans = all_test_ans[:,:,:,0]
 f_all_ans = all_test_ans[:,:,:,1]

@@ -10,26 +10,29 @@ library(rstatix)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/Sup-007/"
+model = "/TEaug-007/"
+map = "PDFF"
 epoch = "200"
 
-dir = paste("C:/Users/jpmen/Documents/OT-CycleGAN/output",model,"Ep-",epoch,sep="")
+dir = paste("C:/Users/jpmen/Documents/IDEAL-GAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
 
-ls_sheets = excel_sheets('PDFF_phantom_ROIs.xlsx')
+ls_sheets = excel_sheets(paste(map,'_phantom_ROIs.xlsx',sep=""))
 for (i in c(1:length(ls_sheets)))
 {
-	roi_data=read_excel('PDFF_phantom_ROIs.xlsx',sheet=ls_sheets[i])
+	roi_data=read_excel(paste(map,'_phantom_ROIs.xlsx',sep=""),sheet=ls_sheets[i])
 	if (i==1)
 	{
-		refs = c(t(roi_data[,1]))
+		if (map=="PDFF") {refs = c(t(roi_data[,1]))}
+		else {refs = c(t(roi_data[,2]))}
 		meas = c(t(roi_data[,3]))
 		im_id = rep(c(i),length(t(roi_data[,1])))
 		vial_id = c(t(1:length(t(roi_data[,1]))))
 	} else
 	{
 		# meas = meas + c(t(roi_data[,3]))
-		refs = c(refs,t(roi_data[,1]))
+		if (map=="PDFF") {refs = c(refs,t(roi_data[,1]))}
+		else {refs = c(refs,t(roi_data[,2]))}
 		meas = c(meas,t(roi_data[,3]))
 		im_id = append(im_id,rep(c(i),length(t(roi_data[,1]))))
 		vial_id = c(vial_id,t(1:length(t(roi_data[,1]))))
@@ -64,14 +67,15 @@ cat('Overall bias:',overall_bias,'+-',std_bias,'\n')
 ############################################################################
 ########################### REGRESSION LINES ###############################
 ############################################################################
+if (map=="PDFF") {yl=1.0} else {yl=40.0}
 q = ggplot(pdff_Data, aes(refs, mean)) +
        geom_point(aes(color = Site_Protocol))+
        geom_smooth(method="lm") +
-	 ylim(0.0,1.0) +
+	 ylim(0.0,yl) +
   stat_regline_equation(
     aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"))
     )
-fn1 = "LS-corr.png"
+fn1 = paste(map,"LS-corr.png",sep="-")
 ggsave(plot=q, width=5, height=3, dpi=400, filename=fn1)
 
 
@@ -81,13 +85,14 @@ ggsave(plot=q, width=5, height=3, dpi=400, filename=fn1)
 mean_diff <- mean(pdff_Data$bias)
 lower <- mean_diff - 1.96*sd(pdff_Data$bias)
 upper <- mean_diff + 1.96*sd(pdff_Data$bias)
+if (map=="PDFF") {yl_ba=0.8} else {yl_ba=40.0}
 q2= ggplot(pdff_Data, aes(refs, bias)) +
   geom_point(aes(color = Site_Protocol))+
   geom_hline(yintercept = mean_diff) +
   geom_hline(yintercept = lower, color = "red", linetype="dashed") +
   geom_hline(yintercept = upper, color = "red", linetype="dashed") +
+  ylim(-yl_ba,yl_ba) +
   ylab("Difference Between Measurements") +
-  xlab("Ground-Truth") + 
-  ylim(-0.8,0.8)
-fn2 = "Bias-BlandAltman.png"
+  xlab("Ground-Truth")
+fn2 = paste(map,"Bias-BlandAltman.png",sep="-")
 ggsave(plot=q2, width=5, height=3, dpi=400, filename=fn2)
