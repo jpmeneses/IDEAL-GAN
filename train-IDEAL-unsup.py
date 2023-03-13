@@ -1,5 +1,6 @@
 import functools
 import warnings
+import os
 
 import random
 import numpy as np
@@ -54,6 +55,7 @@ py.mkdir(output_dir)
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 # mirrored_strategy = tf.distribute.Mirrored_Strategy(devices=["/gpu:0", "/gpu:1"])
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # ==============================================================================
 # =                                    data                                    =
