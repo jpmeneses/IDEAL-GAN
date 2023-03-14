@@ -137,7 +137,7 @@ filepath = [dataset_dir+dataset_hdf5_1,
 # A_B_dataset_val.batch(1)
 
 A_B_dataset = tf.data.Dataset.from_tensor_slices(filepath)
-A_B_dataset = A_B_dataset.
+A_B_dataset = A_B_dataset
                 .shuffle(32)
                 .map(data.load_hdf5, num_parallel_calls=AUTOTUNE)
                 .cache()
@@ -146,7 +146,7 @@ A_B_dataset = A_B_dataset.
                 .prefetch(AUTOTUNE)
 
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices([dataset_dir+dataset_hdf5_2])
-A_B_dataset_val = A_B_dataset_val.
+A_B_dataset_val = A_B_dataset_val
                 .map(data.load_hdf5, num_parallel_calls=AUTOTUNE)
                 .cache()
                 .repeat()
