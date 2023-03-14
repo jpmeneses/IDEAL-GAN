@@ -72,64 +72,86 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+# acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+#                             acqs_data=True, te_data=False,
+#                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+# acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+#                             acqs_data=True, te_data=False,
+#                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+# acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+#                             acqs_data=True, te_data=False,
+#                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+# acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+#                             acqs_data=True, te_data=False,
+#                             complex_data=(args.G_model=='complex'))
 
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+# acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+#                             acqs_data=True, te_data=False,
+#                             complex_data=(args.G_model=='complex'))
+
+filepath = [dataset_dir+dataset_hdf5_1,
+            dataset_dir+dataset_hdf5_3,
+            dataset_dir+dataset_hdf5_4,
+            dataset_dir+dataset_hdf5_5]
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
-k_divs = [0,832,1694,2547,3409,len(trainX)]
+# trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+# trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+# k_divs = [0,832,1694,2547,3409,len(trainX)]
 
-valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
-valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
+# valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
+# valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
 
-trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
-trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+# trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+# trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
-# Overall dataset statistics
-len_dataset,hgt,wdt,d_ech = np.shape(trainX)
-_,_,_,n_out = np.shape(valY)
-if args.G_model == 'complex':
-    echoes = d_ech
-else:
-    echoes = int(d_ech/2)
+# # Overall dataset statistics
+# len_dataset,hgt,wdt,d_ech = np.shape(trainX)
+# _,_,_,n_out = np.shape(valY)
+# if args.G_model == 'complex':
+#     echoes = d_ech
+# else:
+#     echoes = int(d_ech/2)
 
-print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',echoes)
-print('Output Maps:',n_out)
+# print('Acquisition Dimensions:', hgt,wdt)
+# print('Echoes:',echoes)
+# print('Output Maps:',n_out)
 
-# Input and output dimensions (validations data)
-print('Training output shape:',trainY.shape)
-print('Validation output shape:',valY.shape)
+# # Input and output dimensions (validations data)
+# print('Training output shape:',trainY.shape)
+# print('Validation output shape:',valY.shape)
 
-A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
-A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
-A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
-A_B_dataset_val.batch(1)
+# A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
+# A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
+# A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
+# A_B_dataset_val.batch(1)
+
+A_B_dataset = tf.data.Dataset.from_tensor_slices(filepath)
+A_B_dataset = A_B_dataset.
+                .shuffle(32)
+                .map(data.load_hdf5, num_parallel_calls=AUTOTUNE)
+                .cache()
+                .repeat()
+                .batch(args.batch_size)
+                .prefetch(AUTOTUNE)
+
+A_B_dataset_val = tf.data.Dataset.from_tensor_slices([dataset_dir+dataset_hdf5_2])
+A_B_dataset_val = A_B_dataset_val.
+                .map(data.load_hdf5, num_parallel_calls=AUTOTUNE)
+                .cache()
+                .repeat()
+                .batch(1)
+                .prefetch(AUTOTUNE)
 
 # dist_A_B_dataset = mirrored_strategy.experimental_distribute_dataset(A_B_dataset)
 # dist_A_B_dataset_val = mirrored_strategy.experimental_distribute_dataset(A_B_dataset_val)

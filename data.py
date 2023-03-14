@@ -30,9 +30,10 @@ class ItemPool:
         return tf.stack(out_items, axis=0)
 
 
-def load_hdf5(ds_dir,hdf5_file,ech_idx,start=0,end=2000,
+@tf.function
+def load_hdf5(hdf5_file,ech_idx=12,start=0,end=2000,
             acqs_data=True,te_data=False,complex_data=False,remove_zeros=True):
-    f = h5py.File(ds_dir + hdf5_file, 'r')
+    f = h5py.File(hdf5_file, 'r')
     if acqs_data:
         acqs = f['Acquisitions'][start:end]
     out_maps = f['OutMaps'][start:end]
