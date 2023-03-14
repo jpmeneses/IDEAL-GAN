@@ -137,9 +137,9 @@ filepath = [dataset_dir+dataset_hdf5_1,
 # A_B_dataset_val.batch(1)
 
 A_B_dataset = tf.data.Dataset.from_tensor_slices(filepath)
-A_B_dataset = A_B_dataset.shuffle(32).map(data.load_hdf5, num_parallel_calls=AUTOTUNE).cache().repeat().batch(args.batch_size).prefetch(AUTOTUNE)
+A_B_dataset = A_B_dataset.shuffle(32).map(data.load_hdf5, num_parallel_calls=tf.data.AUTOTUNE).cache().repeat().batch(args.batch_size).prefetch(AUTOTUNE)
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices([dataset_dir+dataset_hdf5_2])
-A_B_dataset_val = A_B_dataset_val.map(data.load_hdf5, num_parallel_calls=AUTOTUNE).cache().repeat().batch(1).prefetch(AUTOTUNE)
+A_B_dataset_val = A_B_dataset_val.map(data.load_hdf5, num_parallel_calls=tf.data.AUTOTUNE).cache().repeat().batch(1).prefetch(AUTOTUNE)
 
 # dist_A_B_dataset = mirrored_strategy.experimental_distribute_dataset(A_B_dataset)
 # dist_A_B_dataset_val = mirrored_strategy.experimental_distribute_dataset(A_B_dataset_val)
