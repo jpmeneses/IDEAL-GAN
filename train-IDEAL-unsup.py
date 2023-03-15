@@ -247,7 +247,7 @@ def train_G(A, B):
         else:
             A2B_R2 = tf.zeros_like(A2B_FM)
             if args.UQ:
-                A2B_R2_var = tf.zeros_like(A2B_FM_var)
+                A2B_R2_var = tf.zeros_like(A2B_FM_var, dtype=tf.float32)
 
         A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
 
@@ -282,7 +282,7 @@ def train_G(A, B):
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
         reg_term = FM_TV + FM_L1
         
-        G_loss = A2B2A_cycle_loss + reg_term
+        G_loss = A2B2A_cycle_loss #+ reg_term
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
