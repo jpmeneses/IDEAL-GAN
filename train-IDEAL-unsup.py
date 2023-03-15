@@ -256,14 +256,12 @@ def train_G(A, B):
         A2B_WF_real = A2B_WF[:,:,:,0::2]
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
-        print(A2B2A)
 
         # Variance map mask
         if args.UQ:
             A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
             A2B_R2_var = tf.where(A[:,:,:,:1]!=0.0,A2B_R2_var,0.0)
             A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
-            print(A2B_var)
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
