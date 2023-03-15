@@ -4,5 +4,6 @@ __pycache__/
 /deprecated/
 /output/
 DiscTest.py
+test_h5py.py
 TE-idx.ipynb
 out_*

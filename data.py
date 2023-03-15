@@ -73,6 +73,29 @@ def load_hdf5(hdf5_file,ech_idx=12,start=0,end=2000,
         return out_maps, TEs
     else:
         return out_maps
+
+
+def gen_hdf5(filepaths,ech_idx,lims_list,acqs_data=True,te_data=False,remove_zeros=True):
+    for k in range(len(filepaths)):
+        file = filepaths[k]
+        lims = lims_list[k]
+        with h5py.File(file, 'r') as f:
+            if lims[1] >= lims[0]:
+                idx_list = np.arange(lims[0],lims[1])
+            else:
+                idx_list = np.concatenate([np.arange(0,lims[1]),np.arange(lims[0],len(f['OutMaps']))])
+            for i in idx_list:
+                out = f['OutMaps'][i]
+                if tf.reduce_sum(out)!=0.0 or not(remove_zeros):
+                    if acqs_data:
+                        im = f['Acquisitions'][i,:,:,:ech_idx]
+                        yield im, out
+                    elif te_data:
+                        TEs = f['TEs'][i]
+                        yield im, out, TEs
+                    else:
+                        yield out
+            f.close()
         
 
 def group_TEs(A,B,TEs,TE1,dTE):
