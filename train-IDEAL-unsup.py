@@ -72,75 +72,62 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+                            acqs_data=True, te_data=False,
+                            complex_data=(args.G_model=='complex'))
+
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                            acqs_data=True, te_data=False,
+                            complex_data=(args.G_model=='complex'))
+
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                            acqs_data=True, te_data=False,
+                            complex_data=(args.G_model=='complex'))
+
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                            acqs_data=True, te_data=False,
+                            complex_data=(args.G_model=='complex'))
+
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-
-filepath = [dataset_dir+dataset_hdf5_1,
-            dataset_dir+dataset_hdf5_2,
-            dataset_dir+dataset_hdf5_3,
-            dataset_dir+dataset_hdf5_4,
-            dataset_dir+dataset_hdf5_5]
-
-total_data = 4226
-
-if args.k_fold == 1:
-    lims = [(0,0),(320,384),(0,1341),(0,1308),(0,681)]
-    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir+dataset_hdf5_1, ech_idx,
-                                acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir+dataset_hdf5_2, ech_idx,
-                                end=320, acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-    valX = np.concatenate((acqs_1,acqs_2),axis=0)
-    valY = np.concatenate((out_maps_1,out_maps_2),axis=0)
-elif args.k_fold == 2:
-    lims = [(0,512),(0,320),(798,1341),(0,1308),(0,681)]
-    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir+dataset_hdf5_2, ech_idx,
-                                start=320, acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir+dataset_hdf5_3, ech_idx,
-                                end=798, acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-    valX = np.concatenate((acqs_2,acqs_3),axis=0)
-    valY = np.concatenate((out_maps_2,out_maps_3),axis=0)
-elif args.k_fold == 3:
-    lims = [(0,512),(0,384),(0,798),(310,1308),(0,681)]
-    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir+dataset_hdf5_3, ech_idx,
-                                start=798, acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir+dataset_hdf5_4, ech_idx,
-                                end=310, acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-    valX = np.concatenate((acqs_3,acqs_4),axis=0)
-    valY = np.concatenate((out_maps_3,out_maps_4),axis=0)
-elif args.k_fold == 4:
-    lims = [(0,512),(0,384),(0,1341),(1172,310),(0,681)]
-    valX, valY = data.load_hdf5(dataset_dir+dataset_hdf5_4, ech_idx,
-                                start=310, end=1172, acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-elif args.k_fold == 5:
-    lims = [(0,512),(0,384),(0,798),(0,1172),(0,0)]
-    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir+dataset_hdf5_4, ech_idx,
-                                start=1172, acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-    acqs_5, out_maps_5 = data.load_hdf5(dataset_dir+dataset_hdf5_5, ech_idx,
-                                acqs_data=True, te_data=False,
-                                complex_data=(args.G_model=='complex'))
-    valX = np.concatenate((acqs_4,acqs_5),axis=0)
-    valY = np.concatenate((out_maps_4,out_maps_5),axis=0)
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+                            acqs_data=True, te_data=False,
+                            complex_data=(args.G_model=='complex'))
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-A_B_dataset= tf.data.Dataset.from_generator(data.gen_hdf5,
-                                            output_types=(tf.float32,tf.float32),
-                                            args=[filepath,ech_idx,lims])
+trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+k_divs = [0,832,1694,2547,3409,len(trainX)]
 
-# A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
-# A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
+valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
+valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:]
+
+trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+
+# Overall dataset statistics
+len_dataset,hgt,wdt,d_ech = np.shape(trainX)
+_,_,_,n_out = np.shape(valY)
+if args.G_model == 'complex':
+    echoes = d_ech
+else:
+    echoes = int(d_ech/2)
+
+print('Acquisition Dimensions:', hgt,wdt)
+print('Echoes:',echoes)
+print('Output Maps:',n_out)
+
+# Input and output dimensions (validations data)
+print('Training output shape:',trainY.shape)
+print('Validation output shape:',valY.shape)
+
+A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
+A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
 A_B_dataset_val.batch(1)
 
