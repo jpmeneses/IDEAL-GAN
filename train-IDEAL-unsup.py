@@ -135,7 +135,7 @@ elif args.k_fold == 5:
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-A_B_dataset= tf.data.Dataset.from_generator(data.load_hdf5,
+A_B_dataset= tf.data.Dataset.from_generator(data.gen_hdf5,
                                             output_types=(tf.float32,tf.float32),
                                             args=[filepath,ech_idx,lims])
 

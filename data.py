@@ -31,7 +31,6 @@ class ItemPool:
 
 
 def load_hdf5(hdf5_file,ech_idx=12,start=0,end=2000,acqs_data=True,te_data=False,complex_data=False,remove_zeros=True):
-    print(hdf5_file)
     f = h5py.File(hdf5_file, 'r')
     if acqs_data:
         acqs = f['Acquisitions'][start:end]
