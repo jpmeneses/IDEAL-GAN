@@ -72,45 +72,45 @@ dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
 
 if args.k_fold == 1:
-    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir+dataset_hdf5_1, ech_idx,
                                 acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
-    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir+dataset_hdf5_2, ech_idx,
                                 end=320, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
     testX = np.concatenate((acqs_1,acqs_2),axis=0)
     testY = np.concatenate((out_maps_1,out_maps_2),axis=0)
 
 elif args.k_fold == 2:
-    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir+dataset_hdf5_2, ech_idx,
                                 start=320, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
-    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir+dataset_hdf5_3, ech_idx,
                                 end=798, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
     testX = np.concatenate((acqs_2,acqs_3),axis=0)
     testY = np.concatenate((out_maps_2,out_maps_3),axis=0)
 
 elif args.k_fold == 3:
-    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir+dataset_hdf5_3, ech_idx,
                                 start=798, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
-    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir+dataset_hdf5_4, ech_idx,
                                 end=310, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
     testX = np.concatenate((acqs_3,acqs_4),axis=0)
     testY = np.concatenate((out_maps_3,out_maps_4),axis=0)
 
 elif args.k_fold == 4:
-    testX, testY = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+    testX, testY = data.load_hdf5(dataset_dir+dataset_hdf5_4, ech_idx,
                                 start=310, end=1172, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
 
 elif args.k_fold == 5:
-    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir+dataset_hdf5_4, ech_idx,
                                 start=1172, acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
-    acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+    acqs_5, out_maps_5 = data.load_hdf5(dataset_dir+dataset_hdf5_5, ech_idx,
                                 acqs_data=True, te_data=False,
                                 complex_data=(args.G_model=='complex'))
     testX = np.concatenate((acqs_4,acqs_5),axis=0)
