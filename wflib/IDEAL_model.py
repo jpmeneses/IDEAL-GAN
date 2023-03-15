@@ -112,7 +112,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     if not(complex_data):
         Re_gt = tf.math.real(S_hat)
         Im_gt = tf.math.imag(S_hat)
-        zero_fill = tf.zeros_like(Re_gt)
+        zero_fill = tf.zeros_like(Re_gt,dtype=tf.float32)
         re_stack = tf.stack([Re_gt,zero_fill],4)
         re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*n_ech])
         im_stack = tf.stack([zero_fill,Im_gt],4)
