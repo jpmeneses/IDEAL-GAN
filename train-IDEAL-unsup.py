@@ -151,7 +151,8 @@ A_B_dataset_val.batch(1)
 # =                                   models                                   =
 # ==============================================================================
 
-len_dataset = total_data - len(valX)
+len_val,hgt,wdt,d_ech = np.shape(valX)
+len_dataset = total_data - len_val
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 # with mirrored_strategy.scope():
