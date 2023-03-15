@@ -30,7 +30,6 @@ class ItemPool:
         return tf.stack(out_items, axis=0)
 
 
-@tf.function
 def load_hdf5(hdf5_file,ech_idx=12,start=0,end=2000,
             acqs_data=True,te_data=False,complex_data=False,remove_zeros=True):
     f = h5py.File(hdf5_file, 'r')
