@@ -636,11 +636,11 @@ for ep in range(args.epochs):
             opt_aux = G_optimizer.iterations
 
         # # summary
-        with train_summary_writer.as_default():
-            tl.summary(G_loss_dict, step=opt_aux, name='G_losses')
-            tl.summary(G_R2_loss_dict, step=opt_aux, name='G_R2_losses')
-            tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
-                        step=opt_aux, name='G learning rate')
+        # with train_summary_writer.as_default():
+        #     tl.summary(G_loss_dict, step=opt_aux, name='G_losses')
+        #     tl.summary(G_R2_loss_dict, step=opt_aux, name='G_R2_losses')
+        #     tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
+        #                 step=opt_aux, name='G learning rate')
 
         # sample
         if (opt_aux.numpy() % n_div == 0) or (opt_aux.numpy() < 200):
@@ -650,9 +650,9 @@ for ep in range(args.epochs):
             A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A, B)
 
             # # summary
-            with val_summary_writer.as_default():
-                tl.summary(val_FM_dict, step=opt_aux, name='G_losses')
-                tl.summary(val_R2_dict, step=opt_aux, name='G_R2_losses')
+            # with val_summary_writer.as_default():
+            #     tl.summary(val_FM_dict, step=opt_aux, name='G_losses')
+            #     tl.summary(val_R2_dict, step=opt_aux, name='G_R2_losses')
 
             if (opt_aux.numpy() % (n_div*100) == 0) or (opt_aux.numpy() < 100):
                 fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
