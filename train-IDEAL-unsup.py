@@ -83,6 +83,8 @@ filepath = [dataset_dir+dataset_hdf5_1,
             dataset_dir+dataset_hdf5_4,
             dataset_dir+dataset_hdf5_5]
 
+total_data = 4226
+
 if args.k_fold == 1:
     lims = [(0,0),(320,384),(0,1341),(0,1308),(0,681)]
     acqs_1, out_maps_1 = data.load_hdf5(dataset_dir+dataset_hdf5_1, ech_idx,
@@ -149,6 +151,7 @@ A_B_dataset_val.batch(1)
 # =                                   models                                   =
 # ==============================================================================
 
+len_dataset = total_data - len(valX)
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 # with mirrored_strategy.scope():
