@@ -628,7 +628,8 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        # G_loss_dict, G_R2_loss_dict = train_step(A, B)
+        print(A)
+        G_loss_dict, G_R2_loss_dict = train_step(A, B)
 
         if args.out_vars == 'R2s':
             opt_aux = G_R2_optimizer.iterations
