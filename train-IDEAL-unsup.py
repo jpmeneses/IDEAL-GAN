@@ -256,6 +256,7 @@ def train_G(A, B):
         A2B_WF_real = A2B_WF[:,:,:,0::2]
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+        A2B2A = tf.cast(A2B2A,dtype=tf.float32)
 
         # Variance map mask
         if args.UQ:
@@ -603,7 +604,6 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
-        print(B)
         A = tf.expand_dims(A,axis=0)
         B = tf.expand_dims(B,axis=0)
         # ==============================================================================
