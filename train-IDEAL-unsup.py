@@ -256,12 +256,14 @@ def train_G(A, B):
         A2B_WF_real = A2B_WF[:,:,:,0::2]
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+        print(A2B2A)
 
         # Variance map mask
         if args.UQ:
             A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
             A2B_R2_var = tf.where(A[:,:,:,:1]!=0.0,A2B_R2_var,0.0)
             A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
+            print(A2B_var)
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
@@ -602,7 +604,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for A, B in A_B_dataset_val:
+    for A, B in A_B_dataset:
         A = tf.expand_dims(A,axis=0)
         B = tf.expand_dims(B,axis=0)
         # ==============================================================================
@@ -628,7 +630,6 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        print(A)
         G_loss_dict, G_R2_loss_dict = train_step(A, B)
 
         if args.out_vars == 'R2s':
