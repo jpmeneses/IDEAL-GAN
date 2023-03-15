@@ -85,10 +85,34 @@ filepath = [dataset_dir+dataset_hdf5_1,
 
 if args.k_fold == 1:
     lims = [(0,0),(320,384),(0,1341),(0,1308),(0,681)]
+    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+                                acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                end=320, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    valX = np.concatenate((acqs_1,acqs_2),axis=0)
+    valY = np.concatenate((out_maps_1,out_maps_2),axis=0)
 elif args.k_fold == 2:
     lims = [(0,512),(0,320),(798,1341),(0,1308),(0,681)]
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                start=320, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                                end=798, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    valX = np.concatenate((acqs_2,acqs_3),axis=0)
+    valY = np.concatenate((out_maps_2,out_maps_3),axis=0)
 elif args.k_fold == 3:
     lims = [(0,512),(0,384),(0,798),(310,1308),(0,681)]
+    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                                start=798, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                                end=310, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    valX = np.concatenate((acqs_3,acqs_4),axis=0)
+    valY = np.concatenate((out_maps_3,out_maps_4),axis=0)
 elif args.k_fold == 4:
     lims = [(0,512),(0,384),(0,1341),(1172,310),(0,681)]
     valX, valY = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
@@ -96,6 +120,14 @@ elif args.k_fold == 4:
                                 complex_data=(args.G_model=='complex'))
 elif args.k_fold == 5:
     lims = [(0,512),(0,384),(0,798),(0,1172),(0,0)]
+    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                                start=1172, acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+                                acqs_data=True, te_data=False,
+                                complex_data=(args.G_model=='complex'))
+    valX = np.concatenate((acqs_4,acqs_5),axis=0)
+    valY = np.concatenate((out_maps_4,out_maps_5),axis=0)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
