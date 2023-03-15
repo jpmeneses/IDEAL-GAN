@@ -602,7 +602,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for A, B in A_B_dataset_val:
+    for A, B in A_B_dataset:
         A = tf.expand_dims(A,axis=0)
         B = tf.expand_dims(B,axis=0)
         # ==============================================================================
