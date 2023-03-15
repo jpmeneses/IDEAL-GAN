@@ -136,9 +136,6 @@ elif args.k_fold == 5:
 A_B_dataset= tf.data.Dataset.from_generator(data.load_hdf5,
                                             output_types=(tf.float32,tf.float32),
                                             args=[filepath,ech_idx,lims])
-A_B_dataset_val = tf.data.Dataset.from_generator(data.load_hdf5,
-                                            output_types=(tf.float32,tf.float32),
-                                            args=[filepath,ech_idx,val_lims])
 
 # A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
 # A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
