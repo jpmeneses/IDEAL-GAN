@@ -12,7 +12,7 @@ library(gridExtra)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-009/"
+model = "/Sup-007/"
 map = "PDFF"
 epoch = "200"
 
@@ -111,7 +111,8 @@ q2 = ggplot(res_id, aes(wXs_r, wXs)) +
 	# 			ymin=wXs-wSDs, ymax=wXs+wSDs),
 	# 			width=0.005) +
       geom_smooth(method="lm") +
-	labs(x='Ref. ROI mean', y='Meas. ROI mean') +
+	labs(x='Reference', y='Measurement') +
+	theme(text = element_text(size = 12)) +
 	xlim(0.0,0.3) +
 	ylim(0.0,0.3) +
   stat_regline_equation(
@@ -127,22 +128,22 @@ mean_diff <- mean(res_id$bias)
 lower <- mean_diff - 1.96*sd(res_id$bias)
 upper <- mean_diff + 1.96*sd(res_id$bias)
 if (map=="PDFF"){
-  yl = 0.04
+  yl = 0.03
+  xl = 0.33
 } else {
   yl = 35.0
+  xl = 115.0
 }
 q2= ggplot(res_id, aes(mean, bias)) +
-  geom_errorbar(aes(xmin=mean, xmax=mean,
-			ymin=bias-wSDs, ymax=bias+wSDs),
-			width=0.003, color="#3399FF") +
-  geom_point(size=0.9) +
+  geom_point(size=1.1) +
   geom_hline(yintercept = mean_diff) +
   geom_hline(yintercept = lower, color = "red", linetype="dashed") +
   geom_hline(yintercept = upper, color = "red", linetype="dashed") +
+  theme(text = element_text(size = 17)) +
   ylim(-yl,yl) +
-  # xlim(0.035,0.08) +
-  ylab("Difference Between Measurements") +
-  xlab("Mean Between Measurements")
+  xlim(0.0,xl) +
+  ylab("Difference") +
+  xlab("Mean")
 fn2 = paste(map,"Precision-BlandAltman.png",sep="-")
 ggsave(plot=q2, width=4, height=3, dpi=400, filename=fn2)
 

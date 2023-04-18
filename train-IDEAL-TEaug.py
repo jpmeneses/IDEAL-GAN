@@ -23,7 +23,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','complex'])
+py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
 py.arg('--out_vars', default='WF', choices=['WF','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--n_G_filters', type=int, default=72)
@@ -131,12 +131,21 @@ B_dataset_val.batch(1)
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 if args.G_model == 'multi-decod':
-    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                            filters=args.n_G_filters,
-                            te_input=args.te_input,
-                            te_shape=(args.n_echoes,),
-                            R2_self_attention=args.D1_SelfAttention,
-                            FM_self_attention=args.D2_SelfAttention)
+    if args.out_vars == 'WF-PM':
+        G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
+                                te_input=args.te_input,
+                                te_shape=(args.n_echoes,),
+                                filters=args.n_G_filters,
+                                WF_self_attention=args.D1_SelfAttention,
+                                R2_self_attention=args.D2_SelfAttention,
+                                FM_self_attention=args.D3_SelfAttention)
+    else:
+        G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+                                filters=args.n_G_filters,
+                                te_input=args.te_input,
+                                te_shape=(args.n_echoes,),
+                                R2_self_attention=args.D1_SelfAttention,
+                                FM_self_attention=args.D2_SelfAttention)
 elif args.G_model == 'U-Net':
     if args.out_vars == 'WF-PM':
         n_out = 4
@@ -148,12 +157,12 @@ elif args.G_model == 'U-Net':
                     te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
-elif args.G_model == 'complex':
-    G_A2B=dl.PM_complex(input_shape=(hgt,wdt,d_ech),
-                        filters=args.n_G_filters,
-                        te_input=args.te_input,
-                        te_shape=(args.n_echoes,),
-                        self_attention=(args.D1_SelfAttention and args.D2_SelfAttention))
+elif args.G_model == 'MEBCRN':
+    G_A2B=dl.MEBCRN(input_shape=(2,hgt,wdt,args.n_echoes),
+                    n_res_blocks=9,
+                    n_downsamplings=0,
+                    filters=args.n_G_filters,
+                    self_attention=args.FM_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 

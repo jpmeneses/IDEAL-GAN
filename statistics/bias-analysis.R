@@ -10,7 +10,7 @@ library(rstatix)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-007/"
+model = "/Sup-007/"
 map = "PDFF"
 epoch = "200"
 
@@ -47,7 +47,7 @@ mean = c(meas),
 refs = c(refs),
 bias = c(meas-refs),
 vial = factor(c(vial_id)),
-Site_Protocol = factor(c(im_id),labels=c("S1-P1","S1-P2",
+Site_Prot = factor(c(im_id),labels=c("S1-P1","S1-P2",
 		   "S2-P1","S2-P2","S3-P1","S3-P2","S6-P1","S6-P2"))
 )
 # factor(c(im_id),labels=c("S1-P1(V1)","S1-P2(V1)","S1-P1(V2)","S1-P2(V2)",
@@ -69,9 +69,12 @@ cat('Overall bias:',overall_bias,'+-',std_bias,'\n')
 ############################################################################
 if (map=="PDFF") {yl=1.0} else {yl=40.0}
 q = ggplot(pdff_Data, aes(refs, mean)) +
-       geom_point(aes(color = Site_Protocol))+
+       geom_point(aes(color = Site_Prot))+
        geom_smooth(method="lm") +
+	 theme(text = element_text(size = 14)) +
 	 ylim(0.0,yl) +
+	 ylab("Measurements") +
+	 xlab("References")
   stat_regline_equation(
     aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"))
     )
@@ -87,12 +90,13 @@ lower <- mean_diff - 1.96*sd(pdff_Data$bias)
 upper <- mean_diff + 1.96*sd(pdff_Data$bias)
 if (map=="PDFF") {yl_ba=0.8} else {yl_ba=40.0}
 q2= ggplot(pdff_Data, aes(refs, bias)) +
-  geom_point(aes(color = Site_Protocol))+
+  geom_point(aes(color = Site_Prot))+
   geom_hline(yintercept = mean_diff) +
   geom_hline(yintercept = lower, color = "red", linetype="dashed") +
   geom_hline(yintercept = upper, color = "red", linetype="dashed") +
+  theme(text = element_text(size = 13)) +
   ylim(-yl_ba,yl_ba) +
-  ylab("Difference Between Measurements") +
+  ylab("Difference") +
   xlab("Ground-Truth")
 fn2 = paste(map,"Bias-BlandAltman.png",sep="-")
 ggsave(plot=q2, width=5, height=3, dpi=400, filename=fn2)

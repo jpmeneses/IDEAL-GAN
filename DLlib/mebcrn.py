@@ -25,7 +25,7 @@ def MEBCRN(input_shape=(192, 192, 12),
            self_attention=False,
 		   norm='instance_norm'):
     Norm = _get_norm_layer(norm)
-    n_ech = input_shape[-1]//2
+    n_ech = input_shape[-1]
     nf = filters
     nr = (2+nf)*n_ech # 2 corresponds to [real+imag] channels
 
@@ -65,27 +65,25 @@ def MEBCRN(input_shape=(192, 192, 12),
 
         # Forward
         def _mid_echo_frw(xi,F_frw_im,F_prev_i=None):
-            Fi_frw_A = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(xi)
-            Fi_frw_B = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(F_frw_im)
+            Fi_frw_A = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(xi)
+            Fi_frw_B = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(F_frw_im)
             if F_prev_i is not None:
-                Fi_frw_C = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(F_prev_i)
+                Fi_frw_C = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(F_prev_i)
                 Fi_frw = keras.layers.add([Fi_frw_A,Fi_frw_B,Fi_frw_C])
             else:
                 Fi_frw = keras.layers.add([Fi_frw_A,Fi_frw_B])
-            Fi_frw = Norm()(Fi_frw)
-            Fi_frw = tf.nn.relu(Fi_frw)
+            # Fi_frw = Norm()(Fi_frw)
             return Fi_frw
 
         x1 = x_vec[0]
         if F_prev is not None:
             F_prev_1 = F_prev_vec[0]
-            F1_frw_A = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(x1)
-            F1_frw_C = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(F_prev_1)
+            F1_frw_A = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(x1)
+            F1_frw_C = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(F_prev_1)
             F1_frw = keras.layers.add([F1_frw_A,F1_frw_C])
         else:
-            F1_frw = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(x1)
-        F1_frw = Norm()(F1_frw)
-        F1_frw = tf.nn.relu(F1_frw)
+            F1_frw = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(x1)
+        # F1_frw = Norm()(F1_frw)
 
         F_frw = [F1_frw]
         for k in range(n_ech-1):
@@ -99,15 +97,14 @@ def MEBCRN(input_shape=(192, 192, 12),
 
         # Reverse
         def _mid_echo_rev(xi,F_rev_ip,F_prev_i=None):
-            Fi_rev_A = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(xi)
-            Fi_rev_B = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(F_rev_ip)
+            Fi_rev_A = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(xi)
+            Fi_rev_B = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(F_rev_ip)
             if F_prev_i is not None:
-                Fi_rev_C = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',use_bias=True)(F_prev_i)
+                Fi_rev_C = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal',activation='relu',use_bias=True)(F_prev_i)
                 Fi_rev = keras.layers.add([Fi_rev_A,Fi_rev_B,Fi_rev_C])
             else:
                 Fi_rev = keras.layers.add([Fi_rev_A,Fi_rev_B])
-            Fi_rev = Norm()(Fi_rev)
-            Fi_rev = tf.nn.relu(Fi_rev)
+            # Fi_rev = Norm()(Fi_rev)
             return Fi_rev
 
         x6 = x_vec[-1]
