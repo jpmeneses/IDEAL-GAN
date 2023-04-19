@@ -179,7 +179,7 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
     if only_mag or complex_data:
         return S_hat
     elif MEBCRN:
-        S_hat = tf.expand_dims(tf.transpose(Smtx, perm=[0,3,1,2]),-1)
+        S_hat = tf.expand_dims(tf.transpose(S_hat, perm=[0,3,1,2]),-1)
         # Split into real and imaginary channels
         Re_gt = tf.math.real(S_hat)
         Im_gt = tf.math.imag(S_hat)
