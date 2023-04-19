@@ -123,7 +123,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
         return (res_rho,S_hat)
 
 @tf.function
-def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False):
+def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=False):
     n_batch,hgt,wdt,_ = out_maps.shape
 
     if te is None:
@@ -178,6 +178,13 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False):
 
     if only_mag or complex_data:
         return S_hat
+    elif MEBCRN:
+        S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,ne,hgt,wdt,1])
+        # Split into real and imaginary channels
+        Re_gt = tf.math.real(S_hat)
+        Im_gt = tf.math.imag(S_hat)
+        res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+        return res_gt
     else:
         # Split into real and imaginary channels
         Re_gt = tf.math.real(S_hat)

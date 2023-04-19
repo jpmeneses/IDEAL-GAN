@@ -68,27 +68,32 @@ dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
 out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
                             acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model==MEBCRN))
 
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
 out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
                             acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model==MEBCRN))
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
 out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
                             acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model==MEBCRN))
 
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
 out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
                             acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model==MEBCRN))
 
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
 out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
                             acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'))
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model==MEBCRN))
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -162,7 +167,7 @@ elif args.G_model == 'MEBCRN':
                     n_res_blocks=9,
                     n_downsamplings=0,
                     filters=args.n_G_filters,
-                    self_attention=args.FM_SelfAttention)
+                    self_attention=args.D1_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
@@ -203,8 +208,9 @@ def train_G(B, te=None):
         B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
         B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
 
-        B2A = wf.IDEAL_model(B,echoes,te=te)
+        B2A = wf.IDEAL_model(B,echoes,te=te,MEBCRN=(args.G_model=='MEBCRN'))
         B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
+
         if args.out_vars == 'WF':
             # Compute model's output
             if args.te_input:

@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-TEaug.py --dataset 'TEaug-010' --G_model 'multi-decod' --out_vars 'WF-PM' --te_input False --epoch_decay 200 --epoch_ckpt 50 --beta_1 0.9 --beta_2 0.999 --D2_SelfAttention False
+python train-IDEAL-TEaug.py --dataset 'TEaug-011' --G_model 'MEBCRN' --out_vars 'WFc' --te_input False --epoch_decay 200 --epoch_ckpt 50 --beta_1 0.9 --beta_2 0.999

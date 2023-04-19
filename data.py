@@ -31,7 +31,8 @@ class ItemPool:
 
 
 def load_hdf5(ds_dir,hdf5_file,ech_idx,start=0,end=2000,
-            acqs_data=True,te_data=False,complex_data=False,remove_zeros=True):
+            acqs_data=True,te_data=False,complex_data=False,
+            remove_zeros=True, MEBCRN=False):
     f = h5py.File(ds_dir + hdf5_file, 'r')
     if acqs_data:
         acqs = f['Acquisitions'][...]
@@ -49,13 +50,19 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx,start=0,end=2000,
         idxs_list = [i for i in range(len(out_maps))]
 
     out_maps = out_maps[idxs_list,:,:,:]
+    ns,hgt,wdt,_ = out_maps.shape
 
     if acqs_data:
-        if complex_data:
+        acqs = acqs[idxs_list,:,:,:ech_idx]
+        if complex_data or MEBCRN:
             acqs_real = acqs[:,:,:,0::2]
             acqs_imag = acqs[:,:,:,1::2]
-            acqs = acqs_real + 1j*acqs_imag
-        acqs = acqs[idxs_list,:,:,:ech_idx]
+            if complex_data:
+                acqs = acqs_real + 1j*acqs_imag
+            elif MEBCRN:
+                acqs = np.zeros([len(out_maps),acqs_real.shape[-1],hgt,wdt,2])
+                acqs[:,:,:,:,0] = acqs_real
+                acqs[:,:,:,:,1] = acqs_imag
         if te_data:
             if complex_data:
                 TEs = TEs[idxs_list,:ech_idx]
