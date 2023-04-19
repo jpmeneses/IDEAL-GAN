@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --job-name=v010-TEaug
-#SBATCH --output=out_TEaug_010.txt
+#SBATCH --job-name=v011-TEaug
+#SBATCH --output=out_TEaug_011.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
