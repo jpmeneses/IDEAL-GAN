@@ -24,7 +24,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
-py.arg('--out_vars', default='WF', choices=['WF','PM','WF-PM'])
+py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--n_G_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=1)
@@ -224,6 +224,30 @@ def train_G(B, te=None):
             # Compute loss
             sup_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
 
+        elif args.out_vars == 'WFc':
+            # Compute model's output
+            if args.te_input:
+                B2A2B_WF = G_A2B([B2A,te], training=True)
+            else:
+                B2A2B_WF = G_A2B(B2A, training=True)
+            B2A2B_WF = tf.where(B[:,:,:,:4]!=0.0,B2A2B_WF,0.0)
+
+            # Magnitude of water/fat images
+            B2A2B_WF_real = B2A2B_WF[:,:,:,0::2]
+            B2A2B_WF_imag = B2A2B_WF[:,:,:,1::2]
+            B2A2B_WF_abs = tf.abs(tf.complex(B2A2B_WF_real,B2A2B_WF_imag))
+
+            # Compute zero-valued param maps
+            B2A2B_PM = tf.zeros_like(B2A2B_WF_abs)
+
+            # Split A2B param maps
+            B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
+            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+
+            # Compute loss
+            sup_loss = sup_loss_fn(B_WF, B2A2B_WF)
+
         elif args.out_vars == 'PM':
             # Compute model's output
             if args.te_input:
@@ -353,6 +377,22 @@ def sample(B, te=None):
         B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
         B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_PM],axis=-1)
         val_sup_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
+    elif args.out_vars == 'WFc':
+        if args.te_input:
+            B2A2B_WF = G_A2B([B2A,te], training=True)
+        else:
+            B2A2B_WF = G_A2B(B2A, training=True)
+        B2A2B_WF = tf.where(B[:,:,:,:4]!=0.0,B2A2B_WF,0.0)
+        B2A2B_WF_real = B2A2B_WF[:,:,:,0::2]
+        B2A2B_WF_imag = B2A2B_WF[:,:,:,1::2]
+        B2A2B_WF_abs = tf.abs(tf.complex(B2A2B_WF_real,B2A2B_WF_imag))
+        B2A2B_PM = tf.zeros_like(B_PM)
+        # Split A2B param maps
+        B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+        B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
+        B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+        B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_PM],axis=-1)
+        val_sup_loss = sup_loss_fn(B_WF, B2A2B_WF)
     elif args.out_vars == 'PM':
         if args.te_input:
             B2A2B_PM = G_A2B([B2A,te], training=True)
