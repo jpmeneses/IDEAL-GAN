@@ -169,7 +169,7 @@ elif args.G_model == 'MEBCRN':
     else:
         n_out = 2
         out_activ = 'sigmoid'
-    G_A2B=dl.MEBCRN(input_shape=(2,hgt,wdt,args.n_echoes),
+    G_A2B=dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
                     n_outputs=n_out,
                     output_activation=out_activ,
                     n_res_blocks=9,
