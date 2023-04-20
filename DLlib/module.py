@@ -430,8 +430,8 @@ def PM_Generator(
 
         if te_input:
             # Fully-connected network for processing the vector with echo-times
-            y1 = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
             y2 = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
+            y3 = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
             # Adaptive Instance Normalization for Style-Trasnfer
             x2 = AdaIN(x2, y2)
             x3 = AdaIN(x3, y3)

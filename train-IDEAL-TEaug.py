@@ -165,7 +165,7 @@ elif args.G_model == 'U-Net':
 elif args.G_model == 'MEBCRN':
     if args.out_vars=='WFc':
         n_out = 4
-        out_activ = 'tanh'
+        out_activ = None
     else:
         n_out = 2
         out_activ = 'sigmoid'

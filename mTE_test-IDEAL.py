@@ -22,6 +22,7 @@ py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','phantom'])
 py.arg('--out_vars', default='PM', choices=['WF','PM','WF-PM', 'FM'])
 py.arg('--te_input', type=bool, default=True)
+py.arg('--UQ', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=72)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 py.arg('--D2_SelfAttention',type=bool, default=True)
@@ -98,7 +99,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     if args.out_vars == 'WF-PM':
         G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
                                 te_input=args.te_input,
-                                filters=args.n_filters,
+                                filters=args.n_G_filters,
                                 dropout=0.0,
                                 WF_self_attention=args.D1_SelfAttention,
                                 R2_self_attention=args.D2_SelfAttention,
@@ -107,7 +108,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
         G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
-                                filters=args.n_filters,
+                                filters=args.n_G_filters,
                                 dropout=0.0,
                                 R2_self_attention=args.D1_SelfAttention,
                                 FM_self_attention=args.D2_SelfAttention)
