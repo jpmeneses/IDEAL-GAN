@@ -85,7 +85,16 @@ A_B_dataset_test.batch(1)
 
 # model
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
-  G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+  if args.out_vars == 'WF-PM':
+    G_A2B = dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
+                              te_input=args.te_input,
+                              te_shape=(args.n_echoes,),
+                              filters=args.n_G_filters,
+                              WF_self_attention=args.D1_SelfAttention,
+                              R2_self_attention=args.D2_SelfAttention,
+                              FM_self_attention=args.D3_SelfAttention)
+  else:
+    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                           filters=args.n_G_filters,
                           te_input=args.te_input,
                           te_shape=(args.n_echoes,),
