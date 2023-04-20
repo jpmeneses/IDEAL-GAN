@@ -374,7 +374,7 @@ def sample(B, te=None):
     B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
 
     # Compute B2A (+ noise) and estimate B2A2B
-    B2A = wf.IDEAL_model(B,echoes,te=te)
+    B2A = wf.IDEAL_model(B,echoes,te=te,MEBCRN=(args.G_model=='MEBCRN'))
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     
     # Estimate A2B
