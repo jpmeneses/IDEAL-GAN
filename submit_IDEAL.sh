@@ -5,4 +5,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-TEaug.py --dataset 'test-011' --G_model 'MEBCRN' --out_vars 'WFc' --te_input False --epoch_decay 200 --epoch_ckpt 50 --beta_1 0.9 --beta_2 0.999
+python train-IDEAL-TEaug.py --dataset 'test-011' --G_model 'MEBCRN' --out_vars 'WFc' --te_input False --n_G_filters 64 --epoch_decay 200 --epoch_ckpt 50 --beta_1 0.9 --beta_2 0.999

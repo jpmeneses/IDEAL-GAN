@@ -163,7 +163,15 @@ elif args.G_model == 'U-Net':
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
 elif args.G_model == 'MEBCRN':
+    if args.out_vars=='WFc':
+        n_out = 4
+        out_activ = 'tanh'
+    else:
+        n_out = 2
+        out_activ = 'sigmoid'
     G_A2B=dl.MEBCRN(input_shape=(2,hgt,wdt,args.n_echoes),
+                    n_outputs=n_out,
+                    output_activation=out_activ,
                     n_res_blocks=9,
                     n_downsamplings=0,
                     filters=args.n_G_filters,

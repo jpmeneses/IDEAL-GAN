@@ -16,6 +16,7 @@ def _get_norm_layer(norm):
 
 def MEBCRN(input_shape=(6, 192, 192, 2),
            n_outputs=4,
+           output_activation='tanh',
 		   n_mebc_blocks=4,
 		   n_res_blocks=9,
            n_downsamplings=0,
@@ -175,6 +176,6 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         h = tf.nn.relu(h)
 
     h = keras.layers.Conv2D(filters,3,padding='same',kernel_initializer='he_normal')(h)
-    output = keras.layers.Conv2D(n_outputs,3,padding='same',activation='sigmoid',kernel_initializer='glorot_normal')(h)
+    output = keras.layers.Conv2D(n_outputs,3,padding='same',activation=output_activation,kernel_initializer='glorot_normal')(h)
 
     return keras.Model(inputs=inputs, outputs=output)
