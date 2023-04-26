@@ -14,6 +14,7 @@ def _get_norm_layer(norm):
     elif norm == 'layer_norm':
         return keras.layers.LayerNormalization
 
+
 def MEBCRN(input_shape=(6, 192, 192, 2),
            n_outputs=4,
            output_activation='tanh',
@@ -36,6 +37,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         h = x
         h = keras.layers.Conv2D(dim,3,padding='same',kernel_initializer='he_normal',activation='relu')(h)
         h = keras.layers.Conv2D(dim,3,padding='same',kernel_initializer='he_normal',activation='relu')(h)
+        h = Norm()(h)
         h = keras.layers.add([x, h])
         return h
 
@@ -62,6 +64,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
             else:
                 Fi_frw = keras.layers.add([Fi_frw_A,Fi_frw_B])
             Fi_frw = tf.nn.relu(Fi_frw)
+            Fi_frw = Norm()(Fi_frw)
             return Fi_frw
 
         x1 = x_vec[0] # (nb,hgt,wdt,nch)
@@ -73,6 +76,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         else:
             F1_frw = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal')(x1)
         F1_frw = tf.nn.relu(F1_frw)
+        F1_frw = Norm()(F1_frw)
 
         F_frw = [F1_frw]
         for k in range(n_ech-1):
@@ -94,6 +98,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
             else:
                 Fi_rev = keras.layers.add([Fi_rev_A,Fi_rev_B])
             Fi_rev = tf.nn.relu(Fi_rev)
+            Fi_rev = Norm()(Fi_rev)
             return Fi_rev
 
         x6 = x_vec[-1]
@@ -105,6 +110,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         else:
             F6_rev = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal')(x6)
         F6_rev = tf.nn.relu(F6_rev)
+        F6_rev = Norm()(F6_rev)
 
         F_rev = [F6_rev]
         for k in range(n_ech-1):
@@ -148,7 +154,8 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         nfb = filters//8 + (2*i)
         h = _MEBC_block(inputs,n_ech,nfb,h)
 
-    h = keras.layers.Reshape((h.shape[-3],h.shape[-2],h.shape[-1]*n_ech))(h)
+    h = keras.layers.Permute((2,3,1,4))(h)
+    h = keras.layers.Reshape((h.shape[-4],h.shape[-3],h.shape[-2]*h.shape[-1]))(h)
 
     dim = h.shape[-1]
     nfb = filters
