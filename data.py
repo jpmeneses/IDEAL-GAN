@@ -61,8 +61,8 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx,start=0,end=2000,
                 acqs = acqs_real + 1j*acqs_imag
             elif MEBCRN:
                 acqs = np.zeros([len(out_maps),acqs_real.shape[-1],hgt,wdt,2])
-                acqs[:,:,:,:,0] = acqs_real
-                acqs[:,:,:,:,1] = acqs_imag
+                acqs[:,:,:,:,0] = np.reshape(acqs_real,(len(out_maps),acqs_real.shape[-1],hgt,wdt))
+                acqs[:,:,:,:,1] = np.reshape(acqs_imag,(len(out_maps),acqs_imag.shape[-1],hgt,wdt))
         if te_data:
             if complex_data:
                 TEs = TEs[idxs_list,:ech_idx]
