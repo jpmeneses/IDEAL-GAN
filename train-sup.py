@@ -23,9 +23,9 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-sup')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--out_vars', default='WF', choices=['WF','PM','WF-PM'])
+py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
-py.arg('--n_filters', type=int, default=72)
+py.arg('--n_G_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=32)
 py.arg('--epochs', type=int, default=100)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
@@ -62,54 +62,53 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                                    acqs_data=True, te_data=False,
-                                    complex_data=False)
+out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+                            acqs_data=False, te_data=False,
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                    acqs_data=True, te_data=False,
-                                    complex_data=False)
+out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                            acqs_data=False, te_data=False,
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                                    acqs_data=True, te_data=False,
-                                    complex_data=False)
+out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                            acqs_data=False, te_data=False,
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                                    acqs_data=True, te_data=False,
-                                    complex_data=False)
+out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                            acqs_data=False, te_data=False,
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                                    acqs_data=True, te_data=False,
-                                    complex_data=False)
+out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+                            acqs_data=False, te_data=False,
+                            complex_data=(args.G_model=='complex'),
+                            MEBCRN=(args.G_model=='MEBCRN'))
 
 ################################################################################
 ############################# DATASET PARTITIONS ###############################
 ################################################################################
 
-n1_div = 248
-n3_div = 0
-n4_div = 434
+# n1_div = 248
+# n3_div = 0
+# n4_div = 434
 
-# trainX = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-# valX = acqs_1
-trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
-valX    = acqs_2
-# testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
-
-# trainY = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
-# valY = out_maps_1
-trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
-valY    = out_maps_2
-# testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
+trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+valY    = out_maps_1
 
 # Overall dataset statistics
-len_dataset,hgt,wdt,d_ech = np.shape(trainX)
-_,_,_,n_out = np.shape(trainY)
-echoes = int(d_ech/2)
+len_dataset,hgt,wdt,n_out = np.shape(trainY)
+echoes = args.n_echoes
+if args.G_model == 'complex':
+    d_ech = echoes
+else:
+    d_ech = echoes*2
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
@@ -167,20 +166,19 @@ elif args.G_model == 'U-Net':
         testY[:,:,:,-1]     = 0.5*testY[:,:,:,-1] + 0.5
 
 elif args.G_model == 'MEBCRN':
-    if args.out_vars == 'WF-PM':
+    if args.out_vars=='WFc':
         n_out = 4
+        out_activ = None
     else:
         n_out = 2
-    G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
+        out_activ = 'sigmoid'
+    G_A2B=dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
                     n_outputs=n_out,
-                    n_res_blocks=5,
-                    n_downsamplings=2,
-                    filters=args.n_filters,
+                    output_activation=out_activ,
+                    n_res_blocks=9,
+                    n_downsamplings=0,
+                    filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
-    if not(args.out_vars == 'WF'):
-        trainY[:,:,:,-1]    = 0.5*trainY[:,:,:,-1] + 0.5
-        valY[:,:,:,-1]      = 0.5*valY[:,:,:,-1] + 0.5
-        testY[:,:,:,-1]     = 0.5*testY[:,:,:,-1] + 0.5
 
 else:
     raise(NameError('Unrecognized Generator Architecture'))
@@ -236,6 +234,27 @@ def train_G(A, B):
 
             # Compute loss
             sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
+
+        elif args.out_vars == 'WFc':
+            # Compute model's output
+            A2B_WF = G_A2B(A, training=True)
+            A2B_WF = tf.where(B[:,:,:,:4]!=0.0,B2A2B_WF,0.0)
+
+            # Magnitude of water/fat images
+            A2B_WF_real = A2B_WF[:,:,:,0::2]
+            A2B_WF_imag = A2B_WF[:,:,:,1::2]
+            A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+
+            # Compute zero-valued param maps
+            A2B_PM = tf.zeros_like(A2B_WF_abs)
+
+            # Split A2B param maps
+            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+
+            # Compute loss
+            sup_loss = sup_loss_fn(B_WF, A2B_WF)
 
         elif args.out_vars == 'PM':
             # Compute model's output
@@ -358,6 +377,19 @@ def sample(A, B):
         A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
         val_sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
+    elif args.out_vars == 'WFc':
+        A2B_WF = G_A2B(A, training=True)
+        A2B_WF = tf.where(B[:,:,:,:4]!=0.0,A2B_WF,0.0)
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+        A2B_PM = tf.zeros_like(B_PM)
+        # Split A2B param maps
+        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+        A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+        val_sup_loss = sup_loss_fn(B_WF, A2B_WF)
     elif args.out_vars == 'PM':
         A2B_PM = G_A2B(A, training=True)
         A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
