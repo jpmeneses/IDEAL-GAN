@@ -241,7 +241,7 @@ def train_G(A, B):
         elif args.out_vars == 'WFc':
             # Compute model's output
             A2B_WF = G_A2B(A, training=True)
-            A2B_WF = tf.where(B[:,:,:,:4]!=0.0,B2A2B_WF,0.0)
+            A2B_WF = tf.where(B[:,:,:,:4]!=0.0,A2B_WF,0.0)
 
             # Magnitude of water/fat images
             A2B_WF_real = A2B_WF[:,:,:,0::2]
