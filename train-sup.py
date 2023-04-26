@@ -99,6 +99,9 @@ out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
 # n3_div = 0
 # n4_div = 434
 
+trainX  = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+valX    = acqs_1
+
 trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
 valY    = out_maps_1
 
