@@ -62,32 +62,32 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                            acqs_data=False, te_data=False,
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+                            acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'),
                             MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                            acqs_data=False, te_data=False,
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                            acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'),
                             MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                            acqs_data=False, te_data=False,
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                            acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'),
                             MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                            acqs_data=False, te_data=False,
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                            acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'),
                             MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                            acqs_data=False, te_data=False,
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+                            acqs_data=True, te_data=False,
                             complex_data=(args.G_model=='complex'),
                             MEBCRN=(args.G_model=='MEBCRN'))
 
