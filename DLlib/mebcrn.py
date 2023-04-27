@@ -47,7 +47,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         for ech in range(n_ech):
             nf1,nf2 = nf*ech,nf*(ech+1)
             # x splitting
-            x_ech = keras.layers.Lambda(lambda x: x[:,ech,:,:,:])(x)
+            x_ech = keras.layers.Lambda(lambda x: x[:,ech:ech+1,:,:,:])(x)
             x_vec.append(x_ech)
             # F_prev splitting
             if F_prev is not None:
@@ -130,8 +130,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
             F_frw_ech = F_frw[k]
             F_rev_ech = F_rev[k]
             F_add_k = keras.layers.add([F_frw_ech,F_rev_ech])
-            F_k = keras.layers.concatenate([F_add_k,x_ech]) # nb,hgt,wdt,(nf+2)
-            F_k = keras.layers.Reshape((1,F_k.shape[-3],F_k.shape[-2],F_k.shape[-1]))(F_k) # nb,1,hgt,wdt,(nf+2)
+            F_k = keras.layers.concatenate([F_add_k,x_ech]) # nb,1,hgt,wdt,(nf+2)
             F.append(F_k)
 
         return keras.layers.concatenate(F,axis=-4)
@@ -145,7 +144,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         return keras.layers.add(F_all)
 
     # 0
-    h = inputs = keras.Input(shape=input_shape)
+    h = inputs = keras.Input(shape=input_shape) # nb,ne,hgt,wdt,2
 
     # MEBCN
     nfb = filters
@@ -154,7 +153,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         nfb = filters//8 + (2*i)
         h = _MEBC_block(inputs,n_ech,nfb,h)
 
-    h = keras.layers.Permute((2,3,1,4))(h)
+    h = keras.layers.Permute((2,3,1,4))(h) 
     h = keras.layers.Reshape((h.shape[-4],h.shape[-3],h.shape[-2]*h.shape[-1]))(h)
 
     dim = h.shape[-1]
