@@ -37,7 +37,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         h = x
         h = keras.layers.Conv2D(dim,3,padding='same',kernel_initializer='he_normal',activation='relu')(h)
         h = keras.layers.Conv2D(dim,3,padding='same',kernel_initializer='he_normal',activation='relu')(h)
-        # h = Norm()(h)
+        h = Norm()(h)
         h = keras.layers.add([x, h])
         return h
 
@@ -64,7 +64,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
             else:
                 Fi_frw = keras.layers.add([Fi_frw_A,Fi_frw_B])
             Fi_frw = tf.nn.relu(Fi_frw)
-            # Fi_frw = Norm()(Fi_frw)
+            Fi_frw = Norm()(Fi_frw)
             return Fi_frw
 
         x1 = x_vec[0] # (nb,hgt,wdt,nch)
@@ -76,7 +76,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         else:
             F1_frw = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal')(x1)
         F1_frw = tf.nn.relu(F1_frw)
-        # F1_frw = Norm()(F1_frw)
+        F1_frw = Norm()(F1_frw)
 
         F_frw = [F1_frw]
         for k in range(n_ech-1):
@@ -98,7 +98,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
             else:
                 Fi_rev = keras.layers.add([Fi_rev_A,Fi_rev_B])
             Fi_rev = tf.nn.relu(Fi_rev)
-            # Fi_rev = Norm()(Fi_rev)
+            Fi_rev = Norm()(Fi_rev)
             return Fi_rev
 
         x6 = x_vec[-1]
@@ -110,7 +110,7 @@ def MEBCRN(input_shape=(6, 192, 192, 2),
         else:
             F6_rev = keras.layers.Conv2D(nf,3,padding='same',kernel_initializer='he_normal')(x6)
         F6_rev = tf.nn.relu(F6_rev)
-        # F6_rev = Norm()(F6_rev)
+        F6_rev = Norm()(F6_rev)
 
         F_rev = [F6_rev]
         for k in range(n_ech-1):
