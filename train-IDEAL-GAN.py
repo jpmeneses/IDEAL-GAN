@@ -517,9 +517,6 @@ for ep in range(args.epochs):
             fig.delaxes(axs[2,0])
             fig.delaxes(axs[2,5])
 
-            fig.suptitle('TE1/dTE: '+str([TE_valid[0,0].numpy(),np.mean(np.diff(TE_valid))]), fontsize=16)
-
-            # plt.show()
             plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
             tl.make_space_above(axs,topmargin=0.8)
             plt.savefig(py.join(sample_dir, 'iter-%09d.png' % G_optimizer.iterations.numpy()),
