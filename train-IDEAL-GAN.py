@@ -63,8 +63,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # =                                    data                                    =
 # ==============================================================================
 
-A2B_R2_pool = data.ItemPool(args.pool_size)
-A2B_FM_pool = data.ItemPool(args.pool_size)
+A2B_pool = data.ItemPool(args.pool_size)
 
 ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200.0,300.0
