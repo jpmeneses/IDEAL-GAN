@@ -555,6 +555,168 @@ def PM_complex(
     else:
         return keras.Model(inputs=inputs, outputs=output)
 
+
+def encoder(
+    input_shape,
+    te_input=False,
+    te_shape=(6,),
+    filters=36,
+    num_layers=4,
+    dropout=0.0,
+    norm='instance_norm'):
+
+    Norm = _get_norm_layer(norm)
+    
+    def _conv2d_block(
+        inputs,
+        filters=16,
+        dropout=0.0,
+        kernel_size=(3, 3),
+        kernel_initializer="he_normal",
+        padding="same",
+    ):
+        c = keras.layers.Conv2D(
+            filters,
+            kernel_size,
+            activation='relu',
+            kernel_initializer=kernel_initializer,
+            padding=padding,
+            use_bias=False,
+            )(inputs)
+        c = Norm()(c)
+        if dropout > 0.0:
+            c = keras.layers.SpatialDropout2D(dropout)(c)
+        c = keras.layers.Conv2D(
+            filters,
+            kernel_size,
+            activation='relu',
+            kernel_initializer=kernel_initializer,
+            padding=padding,
+            use_bias=False,
+            )(c)
+        c = Norm()(c)
+        return c
+
+    x = inputs1 = keras.Input(input_shape)
+    if te_input:
+        te = inputs2 = keras.Input(te_shape)
+
+    down_layers = []
+    for l in range(num_layers):
+        x = _conv2d_block(
+            inputs=x,
+            filters=filters,
+            dropout=dropout
+            )
+        down_layers.append(x)
+        x = keras.layers.MaxPooling2D((2, 2))(x)
+        
+        if te_input and l==1:
+            # Fully-connected network for processing the vector with echo-times
+            y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
+            # Adaptive Instance Normalization for Style-Trasnfer
+            x = AdaIN(x, y)
+
+        filters = filters * 2  # double the number of filters with each layer
+
+    output = _conv2d_block(
+        inputs=x,
+        filters=filters,
+        dropout=dropout
+        )
+
+    if te_input:
+        return keras.Model(inputs=[inputs1,inputs2], outputs=output)
+    else:
+        return keras.Model(inputs=inputs1, outputs=output)
+
+
+def decoder(
+    input_shape,
+    n_out=1,
+    bayesian=False,
+    te_input=False,
+    te_shape=(6,),
+    num_layers=4,
+    dropout=0.0,
+    output_activation='tanh',
+    output_initializer='glorot_normal',
+    self_attention=True,
+    norm='instance_norm'):
+    
+    Norm = _get_norm_layer(norm)
+
+    def _upsample(filters, kernel_size, strides, padding):
+        return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+
+    def _conv2d_block(
+        inputs,
+        filters,
+        dropout=0.0,
+        kernel_size=(3, 3),
+        kernel_initializer="he_normal",
+        padding="same",
+    ):
+        c = keras.layers.Conv2D(
+            filters,
+            kernel_size,
+            activation='relu',
+            kernel_initializer=kernel_initializer,
+            padding=padding,
+            use_bias=False,
+            )(inputs)
+        c = Norm()(c)
+        if dropout > 0.0:
+            c = keras.layers.SpatialDropout2D(dropout)(c)
+        c = keras.layers.Conv2D(
+            filters,
+            kernel_size,
+            activation='relu',
+            kernel_initializer=kernel_initializer,
+            padding=padding,
+            use_bias=False,
+            )(c)
+        c = Norm()(c)
+        return c
+
+    x = inputs1 = keras.Input(input_shape)
+    if te_input:
+        te = inputs2 = keras.Input(te_shape)
+    filters = inputs1.shape[-1]
+
+    for cont in range(num_layers):
+        filters //= 2  # decreasing number of filters with each layer
+        x = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
+
+        if self_attention and cont == 0:
+            x = SelfAttention(ch=filters)(x)
+        x = _conv2d_block(
+            inputs=x,
+            filters=filters,
+            dropout=dropout
+            )
+
+    output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
+    if bayesian:
+        x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
+        out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
+        x_prob = tf.concat([output,out_var],axis=-1)
+        out_prob = tfp.layers.DistributionLambda(
+                    lambda t: tfp.distributions.Normal(
+                        loc=t[...,:n_out],
+                        scale=tf.math.sqrt(t[...,n_out:])),
+                    )(x_prob)
+
+    if te_input and bayesian:
+        return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_var])
+    elif te_input:
+        return keras.Model(inputs=[inputs1,inputs2], outputs=output)
+    elif bayesian:
+        return keras.Model(inputs=inputs1, outputs=[out_prob,output,out_var])
+    else:
+        return keras.Model(inputs=inputs1, outputs=output)
+
+
 # ==============================================================================
 # =                          learning rate scheduler                           =
 # ==============================================================================
