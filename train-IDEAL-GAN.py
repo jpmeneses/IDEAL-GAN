@@ -182,12 +182,12 @@ def train_G(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         A2B = G_A2B(A, training=True)
-        
+
         # Split A2B param maps
-        B_WF,B_R2,B_FM = tf.dynamic_partition(B,indices,num_partitions=3)
-        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
-        B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
-        B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+        A2B_WF,A2B_R2,A2B_FM = tf.dynamic_partition(A2B,indices,num_partitions=3)
+        A2B_WF = tf.reshape(A2B_WF,B[:,:,:,:4].shape)
+        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         
         # Correct R2 scaling
         A2B_R2 = 0.5*A2B_R2 + 0.5
