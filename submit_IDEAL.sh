@@ -2,6 +2,8 @@
 
 #SBATCH --job-name=v014-TEaug
 #SBATCH --output=out_TEaug_014.txt
+#SBATCH --partition=gpus
+#SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
