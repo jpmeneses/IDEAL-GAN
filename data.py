@@ -104,13 +104,16 @@ def gen_hdf5(filepaths,ech_idx,lims_list,acqs_data=True,te_data=False,remove_zer
             f.close()
         
 
-def group_TEs(A,B,TEs,TE1,dTE):
+def group_TEs(A,B,TEs,TE1,dTE,MEBCRN=False):
     TE1 = np.float32(TE1)
     dTE = np.float32(dTE)
     TE1_orig = np.float32(0.0013)
     dTE_orig = np.float32(0.0021)
 
-    len_dataset,hgt,wdt,d_ech = A.shape
+    if MEBCRN:
+        len_dataset,ne,hgt,wdt,_ = A.shape
+    else:
+        len_dataset,hgt,wdt,d_ech = A.shape
     _,_,_,n_out = B.shape
 
     num_pat = 0
@@ -164,10 +167,16 @@ def group_TEs(A,B,TEs,TE1,dTE):
             if flag_sel:
                 flag_sel = False
 
-    A[all_null_slices,:,:,:] = 0.0
+    if MEBCRN:
+        A[all_null_slices,:,:,:,:] = 0.0
+    else:
+        A[all_null_slices,:,:,:] = 0.0
     B[all_null_slices,:,:,:] = 0.0
 
-    A = A[all_sel_slices,:,:,:]
+    if MEBCRN:
+        A = A[all_sel_slices,:,:,:,:]
+    else:
+        A = A[all_sel_slices,:,:,:]
     B = B[all_sel_slices,:,:,:]
     TEs = TEs[all_sel_slices,:]
 
