@@ -37,19 +37,18 @@ dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/dataset
 dataset_hdf5 = 'phantom_GC_192_complex_2D.hdf5'
 testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
                                     acqs_data=True, te_data=True,
-                                    complex_data=(args.G_model=='complex'))
+                                    complex_data=(args.G_model=='complex'),
+                                    MEBCRN=(args.G_model=='MEBCRN'))
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
 # Overall dataset statistics
-len_dataset,hgt,wdt,d_ech = np.shape(testX)
-_,_,_,n_out = np.shape(testY)
-echoes = int(d_ech/2)
+len_dataset,hgt,wdt,n_out = np.shape(testY)
 
 print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',echoes)
+print('Echoes:',args.n_echoes)
 print('Output Maps:',n_out)
 
 # Input and output dimensions (testing data)
@@ -66,7 +65,7 @@ A_B_dataset_test.batch(1)
 # model
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
   if args.out_vars == 'WF-PM':
-    G_A2B = dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
+    G_A2B = dl.MDWF_Generator(input_shape=(hgt,wdt,ech_idx),
                               te_input=args.te_input,
                               te_shape=(args.n_echoes,),
                               filters=args.n_G_filters,
@@ -74,7 +73,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                               R2_self_attention=args.D2_SelfAttention,
                               FM_self_attention=args.D3_SelfAttention)
   else:
-    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,ech_idx),
                           filters=args.n_G_filters,
                           te_input=args.te_input,
                           te_shape=(args.n_echoes,),
@@ -91,6 +90,18 @@ elif args.G_model == 'U-Net':
                   te_input=args.te_input,
                   te_shape=(args.n_echoes,),
                   self_attention=args.D1_SelfAttention)
+elif args.G_model == 'MEBCRN':
+  if args.out_vars == 'WFc':
+    n_out = 4
+    out_activ = None
+  else:
+    n_out = 2
+    out_activ = 'sigmoid'
+  G_A2B = dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
+                    n_outputs=n_out,
+                    output_activation=out_activ,
+                    filters=args.n_G_filters,
+                    self_attention=args.D1_SelfAttention)
 
 # restore
 tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
@@ -123,10 +134,14 @@ def sample(A, B, TE=None):
       A2B_WF_abs = G_A2B(A, training=True)
     A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
     A2B_PM = tf.zeros_like(B_PM)
-    # Split A2B param maps
-    A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-    A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-    A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+    A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+  elif args.out_vars == 'WFc':
+    A2B_WF = G_A2B(A, training=False)
+    A2B_WF = tf.where(B[:,:,:,:4]!=0,A2B_WF,0.0)
+    A2B_WF_real = A2B_WF[:,:,:,0::2]
+    A2B_WF_imag = A2B_WF[:,:,:,1::2]
+    A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+    A2B_PM = tf.zeros_like(B_PM)
     A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
   elif args.out_vars == 'PM':
     if args.te_input:
