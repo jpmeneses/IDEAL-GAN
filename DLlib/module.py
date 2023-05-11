@@ -576,10 +576,10 @@ def encoder(
         kernel_initializer="he_normal",
         padding="same",
     ):
-    if downsampling:
-        last_stride=2
-    else:
-        last_stride=1
+        if downsampling:
+            last_stride=2
+        else:
+            last_stride=1
         c = keras.layers.Conv2D(
             filters,
             kernel_size,
