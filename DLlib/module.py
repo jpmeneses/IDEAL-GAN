@@ -428,13 +428,13 @@ def PM_Generator(
             dropout=dropout
             )
 
-        if te_input:
-            # Fully-connected network for processing the vector with echo-times
-            y2 = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
-            y3 = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
-            # Adaptive Instance Normalization for Style-Trasnfer
-            x2 = AdaIN(x2, y2)
-            x3 = AdaIN(x3, y3)
+        # if te_input:
+        #     # Fully-connected network for processing the vector with echo-times
+        #     y2 = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
+        #     y3 = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
+        #     # Adaptive Instance Normalization for Style-Trasnfer
+        #     x2 = AdaIN(x2, y2)
+        #     x3 = AdaIN(x3, y3)
 
         # Update counter
         cont += 1
@@ -571,10 +571,15 @@ def encoder(
         inputs,
         filters=16,
         dropout=0.0,
+        downsampling=False,
         kernel_size=(3, 3),
         kernel_initializer="he_normal",
         padding="same",
     ):
+    if downsampling:
+        last_stride=2
+    else:
+        last_stride=1
         c = keras.layers.Conv2D(
             filters,
             kernel_size,
@@ -589,6 +594,7 @@ def encoder(
         c = keras.layers.Conv2D(
             filters,
             kernel_size,
+            strides=last_stride,
             activation='relu',
             kernel_initializer=kernel_initializer,
             padding=padding,
@@ -606,10 +612,10 @@ def encoder(
         x = _conv2d_block(
             inputs=x,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            downsampling=True
             )
         down_layers.append(x)
-        x = keras.layers.MaxPooling2D((2, 2))(x)
         
         if te_input and l==1:
             # Fully-connected network for processing the vector with echo-times
