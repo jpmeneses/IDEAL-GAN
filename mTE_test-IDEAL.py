@@ -20,12 +20,9 @@ from skimage.metrics import structural_similarity
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','phantom'])
-py.arg('--out_vars', default='PM', choices=['WF','PM','WF-PM', 'FM'])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--UQ', type=bool, default=False)
-py.arg('--n_G_filters', type=int, default=72)
-py.arg('--D1_SelfAttention',type=bool, default=False)
-py.arg('--D2_SelfAttention',type=bool, default=True)
+py.arg('--n_plot',type=int,default=50)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
@@ -72,19 +69,18 @@ dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/dataset
 dataset_hdf5 = args.dataset + '_GC_192_complex_2D.hdf5'
 testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
                                     acqs_data=True, te_data=True,
-                                    complex_data=(args.G_model=='complex'))
+                                    complex_data=(args.G_model=='complex'),
+                                    MEBCRN=(args.G_model=='MEBCRN'))
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
 # Overall dataset statistics
-len_dataset,hgt,wdt,d_ech = np.shape(testX)
-_,_,_,n_out = np.shape(testY)
-echoes = int(d_ech/2)
+len_dataset,hgt,wdt,n_out = np.shape(testY)
 
 print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',echoes)
+print('Echoes:',args.n_echoes)
 print('Output Maps:',n_out)
 
 # Input and output dimensions (testing data)
@@ -97,7 +93,7 @@ A_B_dataset_test.batch(1)
 # model
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     if args.out_vars == 'WF-PM':
-        G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
+        G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,ech_idx),
                                 te_input=args.te_input,
                                 filters=args.n_G_filters,
                                 dropout=0.0,
@@ -105,7 +101,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                                 R2_self_attention=args.D2_SelfAttention,
                                 FM_self_attention=args.D3_SelfAttention)
     else:
-        G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+        G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,ech_idx),
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
                                 filters=args.n_G_filters,
@@ -120,7 +116,7 @@ elif args.G_model == 'U-Net':
         n_out = 1
     else:
         n_out = 2
-    G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+    G_A2B = dl.UNet(input_shape=(hgt,wdt,ech_idx),
                     n_out=n_out,
                     bayesian=args.UQ,
                     te_input=args.te_input,
@@ -129,15 +125,16 @@ elif args.G_model == 'U-Net':
                     self_attention=args.D1_SelfAttention)
 
 elif args.G_model == 'MEBCRN':
-    if args.out_vars == 'WF-PM':
+    if args.out_vars == 'WFc':
         n_out = 4
+        out_activ = None
     else:
         n_out = 2
-    G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
+        out_activ = 'sigmoid'
+    G_A2B=dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
                     n_outputs=n_out,
-                    n_res_blocks=5,
-                    n_downsamplings=2,
-                    filters=args.n_filters,
+                    output_activation=out_activ,
+                    filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
 
 else:
@@ -178,6 +175,20 @@ def sample(A, B, TE=None):
         A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
         A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
         A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+        A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+        A2B_var = None
+    elif args.out_vars == 'WFc':
+        if args.te_input:
+            A2B_WF = G_A2B([A,te], training=True)
+        else:
+            A2B_WF = G_A2B(A, training=True)
+        A2B_WF = tf.where(B[:,:,:,:4]!=0.0,A2B_WF,0.0)
+        # Magnitude of water/fat images
+        A2B_WF_real = A2B_WF[:,:,:,0::2]
+        A2B_WF_imag = A2B_WF[:,:,:,1::2]
+        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+        # Compute zero-valued param maps
+        A2B_PM = tf.zeros_like(A2B_WF_abs)
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
         A2B_var = None
     elif args.out_vars == 'PM':
@@ -279,7 +290,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     PDFFn_aux = fn_aux/(wn_aux+fn_aux)
     PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
     
-    if i%50 == 0 or args.dataset == 'phantom':
+    if i%args.n_plot == 0 or args.dataset == 'phantom':
         fig,axs=plt.subplots(figsize=(16, 9), nrows=2, ncols=3)
 
         # A2B maps in the first row
