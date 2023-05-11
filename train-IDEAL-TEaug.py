@@ -11,9 +11,7 @@ import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
 import wflib as wf
-
 import data
-from keras_unet.models import custom_unet
 
 from itertools import cycle
 
