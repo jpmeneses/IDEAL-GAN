@@ -84,7 +84,7 @@ elif args.G_model == 'U-Net':
     n_out = 4
   else:
     n_out = 2
-  G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+  G_A2B = dl.UNet(input_shape=(hgt,wdt,ech_idx),
                   n_out=n_out,
                   filters=args.n_G_filters,
                   te_input=args.te_input,
@@ -145,9 +145,9 @@ def sample(A, B, TE=None):
     A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
   elif args.out_vars == 'PM':
     if args.te_input:
-      A2B_PM = G_A2B([A,TE], training=True)
+      A2B_PM = G_A2B([A,TE], training=False)
     else:
-      A2B_PM = G_A2B(A, training=True)
+      A2B_PM = G_A2B(A, training=False)
     A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
     A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
     A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
