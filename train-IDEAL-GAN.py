@@ -152,7 +152,7 @@ if args.G_model == 'encod-decod':
                     n_out=6,
                     te_shape=(args.n_echoes,),
                     self_attention=args.D1_SelfAttention)
-    G_A2B = tf.keras.Sequential()
+    G_A2B = keras.Sequential()
     G_A2B.add(enc)
     G_A2B.add(dec)
 else:
