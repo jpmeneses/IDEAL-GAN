@@ -146,11 +146,9 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 if args.G_model == 'encod-decod':
     enc= dl.encoder(input_shape=(hgt,wdt,d_ech),
                     filters=args.n_G_filters,
-                    te_shape=(args.n_echoes,),
                     )
     dec= dl.decoder(input_shape=enc.output_shape[1:],
                     n_out=6,
-                    te_shape=(args.n_echoes,),
                     self_attention=args.D1_SelfAttention)
     G_A2B = keras.Sequential()
     G_A2B.add(enc)
