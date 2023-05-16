@@ -21,6 +21,49 @@ def _get_norm_layer(norm):
         return keras.layers.LayerNormalization
 
 
+def _upsample(filters, kernel_size, strides, padding):
+    return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+
+
+def _conv2d_block(
+    inputs,
+    filters,
+    dropout=0.0,
+    downsampling=False,
+    kernel_size=(3, 3),
+    kernel_initializer="he_normal",
+    padding="same",
+    norm="instance_norm"
+):
+    Norm = _get_norm_layer(norm)
+    if downsampling:
+        last_stride=2
+    else:
+        last_stride=1
+    c = keras.layers.Conv2D(
+        filters,
+        kernel_size,
+        activation='relu',
+        kernel_initializer=kernel_initializer,
+        padding=padding,
+        use_bias=False,
+        )(inputs)
+    c = Norm()(c)
+    if dropout > 0.0:
+        c = keras.layers.SpatialDropout2D(dropout)(c)
+    c = keras.layers.Conv2D(
+        filters,
+        kernel_size,
+        strides=last_stride,
+        activation='relu',
+        kernel_initializer=kernel_initializer,
+        padding=padding,
+        use_bias=False,
+        )(c)
+    c = Norm()(c)
+    return c
+
+
 def PatchGAN(input_shape,
             dim=64,
             n_downsamplings=3,
@@ -81,41 +124,6 @@ def UNet(
     output_initializer='glorot_normal',
     self_attention=False,
     norm='instance_norm'):
-    
-    Norm = _get_norm_layer(norm)
-
-    def _upsample(filters, kernel_size, strides, padding):
-        return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
-
-    def _conv2d_block(
-        inputs,
-        filters=16,
-        dropout=0.0,
-        kernel_size=(3, 3),
-        kernel_initializer="he_normal",
-        padding="same",
-    ):
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(inputs)
-        c = Norm()(c)
-        if dropout > 0.0:
-            c = keras.layers.SpatialDropout2D(dropout)(c)
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(c)
-        c = Norm()(c)
-        return c
 
     x = inputs1 = keras.Input(input_shape)
     if te_input:
@@ -126,7 +134,8 @@ def UNet(
         x = _conv2d_block(
             inputs=x,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
         down_layers.append(x)
         x = keras.layers.MaxPooling2D((2, 2))(x)
@@ -142,7 +151,8 @@ def UNet(
     x = _conv2d_block(
         inputs=x,
         filters=filters,
-        dropout=dropout
+        dropout=dropout,
+        norm=norm
         )
 
     cont = 0
@@ -157,7 +167,8 @@ def UNet(
         x = _conv2d_block(
             inputs=x,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
 
         # Update counter
@@ -197,41 +208,6 @@ def MDWF_Generator(
     FM_self_attention=True,
     norm='instance_norm'):
     
-    Norm = _get_norm_layer(norm)
-
-    def _upsample(filters, kernel_size, strides, padding):
-        return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
-
-    def _conv2d_block(
-        inputs,
-        filters=16,
-        dropout=0.0,
-        kernel_size=(3, 3),
-        kernel_initializer="he_normal",
-        padding="same",
-    ):
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(inputs)
-        c = Norm()(c)
-        if dropout > 0.0:
-            c = keras.layers.SpatialDropout2D(dropout)(c)
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(c)
-        c = Norm()(c)
-        return c
-
     x = inputs1 = keras.Input(input_shape)
     if te_input:
         te = inputs2 = keras.Input(te_shape)
@@ -241,7 +217,8 @@ def MDWF_Generator(
         x = _conv2d_block(
             inputs=x,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
         down_layers.append(x)
         x = keras.layers.MaxPooling2D((2, 2))(x)
@@ -262,7 +239,8 @@ def MDWF_Generator(
     x = _conv2d_block(
         inputs=x,
         filters=filters,
-        dropout=dropout
+        dropout=dropout,
+        norm=norm
         )
 
     cont = 0
@@ -284,7 +262,8 @@ def MDWF_Generator(
         x2 = _conv2d_block(
             inputs=x2,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
 
         # R2* decoder
@@ -294,7 +273,8 @@ def MDWF_Generator(
         x3 = _conv2d_block(
             inputs=x3,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
 
         # Field map decoder
@@ -304,7 +284,8 @@ def MDWF_Generator(
         x4 = _conv2d_block(
             inputs=x4,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
 
         # Update counter
@@ -334,41 +315,6 @@ def PM_Generator(
     FM_self_attention=True,
     norm='instance_norm'):
     
-    Norm = _get_norm_layer(norm)
-
-    def _upsample(filters, kernel_size, strides, padding):
-        return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
-
-    def _conv2d_block(
-        inputs,
-        filters=16,
-        dropout=0.0,
-        kernel_size=(3, 3),
-        kernel_initializer="he_normal",
-        padding="same",
-    ):
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(inputs)
-        c = Norm()(c)
-        if dropout > 0.0:
-            c = keras.layers.SpatialDropout2D(dropout)(c)
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(c)
-        c = Norm()(c)
-        return c
-
     x = inputs = keras.Input(input_shape)
     if te_input:
         te = inputs2 = keras.Input(te_shape)
@@ -378,7 +324,8 @@ def PM_Generator(
         x = _conv2d_block(
             inputs=x,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
 
         if te_input:
@@ -395,7 +342,8 @@ def PM_Generator(
     x = _conv2d_block(
         inputs=x,
         filters=filters,
-        dropout=dropout
+        dropout=dropout,
+        norm=norm
         )
 
     cont = 0
@@ -415,7 +363,8 @@ def PM_Generator(
         x2 = _conv2d_block(
             inputs=x2,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
 
         # Field map decoder
@@ -425,7 +374,8 @@ def PM_Generator(
         x3 = _conv2d_block(
             inputs=x3,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
 
         # if te_input:
@@ -473,7 +423,7 @@ def PM_complex(
     self_attention=False,
     norm='instance_norm'):
 
-    def _conv2d_block(
+    def _complex_conv2d_block(
         inputs,
         filters=16,
         kernel_size=(3, 3),
@@ -515,7 +465,7 @@ def PM_complex(
 
     down_layers = []
     for l in range(num_layers):
-        x = _conv2d_block(
+        x = _complex_conv2d_block(
             inputs=x,
             filters=filters,
             )
@@ -531,7 +481,7 @@ def PM_complex(
 
         filters *= 2  # double the number of filters with each layer
 
-    x = _conv2d_block(
+    x = _complex_conv2d_block(
         inputs=x,
         filters=filters,
         )
@@ -543,7 +493,7 @@ def PM_complex(
         x = keras.layers.concatenate([x, conv])
         # if self_attention and cont == 0:
         #     x = SelfAttention(ch=2*filters)(x)
-        x = _conv2d_block(
+        x = _complex_conv2d_block(
             inputs=x,
             filters=filters
             )
@@ -558,54 +508,12 @@ def PM_complex(
 
 def encoder(
     input_shape,
-    te_input=False,
-    te_shape=(6,),
     filters=36,
     num_layers=4,
     dropout=0.0,
     norm='instance_norm'):
 
-    Norm = _get_norm_layer(norm)
-    
-    def _conv2d_block(
-        inputs,
-        filters=16,
-        dropout=0.0,
-        downsampling=False,
-        kernel_size=(3, 3),
-        kernel_initializer="he_normal",
-        padding="same",
-    ):
-        if downsampling:
-            last_stride=2
-        else:
-            last_stride=1
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(inputs)
-        c = Norm()(c)
-        if dropout > 0.0:
-            c = keras.layers.SpatialDropout2D(dropout)(c)
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            strides=last_stride,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(c)
-        c = Norm()(c)
-        return c
-
     x = inputs1 = keras.Input(input_shape)
-    if te_input:
-        te = inputs2 = keras.Input(te_shape)
 
     down_layers = []
     for l in range(num_layers):
@@ -613,83 +521,58 @@ def encoder(
             inputs=x,
             filters=filters,
             dropout=dropout,
-            downsampling=True
+            downsampling=True,
+            norm=norm
             )
         down_layers.append(x)
-        
-        if te_input and l==1:
-            # Fully-connected network for processing the vector with echo-times
-            y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
-            # Adaptive Instance Normalization for Style-Trasnfer
-            x = AdaIN(x, y)
 
         filters = filters * 2  # double the number of filters with each layer
 
-    output = _conv2d_block(
-        inputs=x,
-        filters=filters,
-        dropout=dropout
-        )
+    # x = _conv2d_block(
+    #     inputs=x,
+    #     filters=filters,
+    #     dropout=dropout
+    #     )
 
-    if te_input:
-        return keras.Model(inputs=[inputs1,inputs2], outputs=output)
-    else:
-        return keras.Model(inputs=inputs1, outputs=output)
+    x = keras.layers.Flatten()(x)
+    encoded_size = x.shape[-1]
+    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=encoded_size, scale=1))
+    x = keras.layers.Dense(tfp.layers.IndependentNormal.params_size(encoded_size),activation=None)(x)
+    output = tfp.layers.IndependentNormal(
+                encoded_size,
+                activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=1.0))(x)
+
+    return keras.Model(inputs=inputs1, outputs=output)
 
 
 def decoder(
     input_shape,
-    n_out=1,
+    output_shape,
+    filters=36,
     bayesian=False,
-    te_input=False,
-    te_shape=(6,),
     num_layers=4,
+    style_latent_vec=False,
+    n_style_dense=8,
     dropout=0.0,
     output_activation='tanh',
     output_initializer='glorot_normal',
     self_attention=True,
     norm='instance_norm'):
+
+    hgt,wdt,n_out = output_shape
+    hls = hgt//(2*(num_layers*2))
+    wls = wdt//(2*(num_layers*2))
     
-    Norm = _get_norm_layer(norm)
-
-    def _upsample(filters, kernel_size, strides, padding):
-        return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
-
-    def _conv2d_block(
-        inputs,
-        filters,
-        dropout=0.0,
-        kernel_size=(3, 3),
-        kernel_initializer="he_normal",
-        padding="same",
-    ):
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(inputs)
-        c = Norm()(c)
-        if dropout > 0.0:
-            c = keras.layers.SpatialDropout2D(dropout)(c)
-        c = keras.layers.Conv2D(
-            filters,
-            kernel_size,
-            activation='relu',
-            kernel_initializer=kernel_initializer,
-            padding=padding,
-            use_bias=False,
-            )(c)
-        c = Norm()(c)
-        return c
-
     x = inputs1 = keras.Input(input_shape)
-    if te_input:
-        te = inputs2 = keras.Input(te_shape)
-    filters = inputs1.shape[-1]
+    x = keras.layers.Dense(filters*(num_layers*2)*hls*wls)(x)
+    x = keras.layers.Reshape(target_shape=(hls,wls,filters*(num_layers*2)))(x)
 
+    if style_latent_vec:
+        w = keras.layers.Flatten()(x)
+        for _ in range(n_style_dense):
+            w = keras.layers.Dense(filters)(w)
+
+    filters = x.shape[-1]
     for cont in range(num_layers):
         filters //= 2  # decreasing number of filters with each layer
         x = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
@@ -699,28 +582,17 @@ def decoder(
         x = _conv2d_block(
             inputs=x,
             filters=filters,
-            dropout=dropout
+            dropout=dropout,
+            norm=norm
             )
 
-    output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
-    if bayesian:
-        x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
-        out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
-        x_prob = tf.concat([output,out_var],axis=-1)
-        out_prob = tfp.layers.DistributionLambda(
-                    lambda t: tfp.distributions.Normal(
-                        loc=t[...,:n_out],
-                        scale=tf.math.sqrt(t[...,n_out:])),
-                    )(x_prob)
+        # Adaptive Instance Normalization for Style-Trasnfer
+        if style_latent_vec:
+            x = AdaIN(x, w)
 
-    if te_input and bayesian:
-        return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_var])
-    elif te_input:
-        return keras.Model(inputs=[inputs1,inputs2], outputs=output)
-    elif bayesian:
-        return keras.Model(inputs=inputs1, outputs=[out_prob,output,out_var])
-    else:
-        return keras.Model(inputs=inputs1, outputs=output)
+    output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
+
+    return keras.Model(inputs=inputs1, outputs=output)
 
 
 # ==============================================================================
@@ -745,6 +617,7 @@ class LinearDecay(keras.optimizers.schedules.LearningRateSchedule):
             false_fn=lambda: self._initial_learning_rate
         ))
         return self.current_learning_rate
+
 
 # ==============================================================================
 # =                         Indexes of decoder layers                          =
