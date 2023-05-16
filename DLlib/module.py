@@ -530,14 +530,22 @@ def encoder(
 
         filters = filters * 2  # double the number of filters with each layer
 
-    x = _conv2d_block(
-        inputs=x,
-        filters=filters,
-        dropout=dropout
-        )
+    x_mean= _conv2d_block(
+            inputs=x,
+            filters=filters,
+            dropout=dropout
+            )
 
+    x_std = _conv2d_block(
+            inputs=x,
+            filters=filters,
+            dropout=dropout
+            )
+
+    x = keras.layers.concatenate([x_mean,x_std])
     x = keras.layers.Flatten()(x)
-    encoded_size = x.shape[-1]
+    encoded_size = x.shape[-1]//2
+    
     prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=encoded_size, scale=1))
     # x = keras.layers.Dense(tfp.layers.IndependentNormal.params_size(encoded_size),activation=None)(x)
     output = tfp.layers.IndependentNormal(
