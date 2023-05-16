@@ -25,7 +25,6 @@ py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='encod-decod', choices=['multi-decod','encod-decod','U-Net','MEBCRN'])
 py.arg('--n_G_filters', type=int, default=36)
-py.arg('--encoded_size', type=int, default=512)
 py.arg('--n_D_filters', type=int, default=72)
 py.arg('--frac_labels', type=bool, default=False)
 py.arg('--batch_size', type=int, default=1)
@@ -146,11 +145,10 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 if args.G_model == 'encod-decod':
     enc= dl.encoder(input_shape=(hgt,wdt,d_ech),
-                    encoded_size=args.encoded_size,
                     filters=args.n_G_filters,
                     )
-    dec= dl.decoder(input_shape=args.encoded_size,
-                    output_shape=(hgt,wdt,n_out),
+    dec= dl.decoder(output_shape=(hgt,wdt,n_out),
+                    filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
     G_A2B = keras.Sequential()
     G_A2B.add(enc)
