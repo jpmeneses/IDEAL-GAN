@@ -509,7 +509,6 @@ def PM_complex(
 
 def encoder(
     input_shape,
-    encoded_size,
     filters=36,
     num_layers=4,
     dropout=0.0,
@@ -531,15 +530,16 @@ def encoder(
 
         filters = filters * 2  # double the number of filters with each layer
 
-    # x = _conv2d_block(
-    #     inputs=x,
-    #     filters=filters,
-    #     dropout=dropout
-    #     )
+    x = _conv2d_block(
+        inputs=x,
+        filters=filters,
+        dropout=dropout
+        )
 
     x = keras.layers.Flatten()(x)
+    encoded_size = x.shape[-1]
     prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=encoded_size, scale=1))
-    x = keras.layers.Dense(tfp.layers.IndependentNormal.params_size(encoded_size),activation=None)(x)
+    # x = keras.layers.Dense(tfp.layers.IndependentNormal.params_size(encoded_size),activation=None)(x)
     output = tfp.layers.IndependentNormal(
                 encoded_size,
                 activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=1.0))(x)
@@ -548,7 +548,6 @@ def encoder(
 
 
 def decoder(
-    input_shape,
     output_shape,
     filters=36,
     bayesian=False,
@@ -562,12 +561,13 @@ def decoder(
     norm='instance_norm'):
 
     hgt,wdt,n_out = output_shape
-    hls = hgt//(2*(num_layers*2))
-    wls = wdt//(2*(num_layers*2))
+    hls = hgt//(2**(num_layers))
+    wls = wdt//(2**(num_layers))
+    input_shape = (hls*wls*filters*(2**num_layers))
     
     x = inputs1 = keras.Input(input_shape)
-    x = keras.layers.Dense(filters*(num_layers*2)*hls*wls)(x)
-    x = keras.layers.Reshape(target_shape=(hls,wls,filters*(num_layers*2)))(x)
+    # x = keras.layers.Dense(filters*(num_layers*2)*hls*wls)(x)
+    x = keras.layers.Reshape(target_shape=(hls,wls,filters*(2**num_layers)))(x)
 
     if style_latent_vec:
         w = keras.layers.Flatten()(x)
