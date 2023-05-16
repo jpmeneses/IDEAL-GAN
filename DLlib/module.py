@@ -32,6 +32,7 @@ def _conv2d_block(
     downsampling=False,
     kernel_size=(3, 3),
     kernel_initializer="he_normal",
+    activation='relu',
     padding="same",
     norm="instance_norm"
 ):
@@ -43,7 +44,7 @@ def _conv2d_block(
     c = keras.layers.Conv2D(
         filters,
         kernel_size,
-        activation='relu',
+        activation=activation,
         kernel_initializer=kernel_initializer,
         padding=padding,
         use_bias=False,
@@ -55,7 +56,7 @@ def _conv2d_block(
         filters,
         kernel_size,
         strides=last_stride,
-        activation='relu',
+        activation=activation,
         kernel_initializer=kernel_initializer,
         padding=padding,
         use_bias=False,
@@ -522,6 +523,7 @@ def encoder(
             filters=filters,
             dropout=dropout,
             downsampling=True,
+            activation=tf.nn.leaky_relu,
             norm=norm
             )
         down_layers.append(x)
