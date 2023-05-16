@@ -509,6 +509,7 @@ def PM_complex(
 
 def encoder(
     input_shape,
+    encoded_size,
     filters=36,
     num_layers=4,
     dropout=0.0,
@@ -537,7 +538,6 @@ def encoder(
     #     )
 
     x = keras.layers.Flatten()(x)
-    encoded_size = x.shape[-1]
     prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=encoded_size, scale=1))
     x = keras.layers.Dense(tfp.layers.IndependentNormal.params_size(encoded_size),activation=None)(x)
     output = tfp.layers.IndependentNormal(
