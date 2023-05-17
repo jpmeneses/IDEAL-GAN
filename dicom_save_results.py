@@ -1,0 +1,332 @@
+import functools
+
+import random
+import tensorflow as tf
+import tensorflow.keras as keras
+import numpy as np
+import matplotlib.pyplot as plt
+import tqdm
+
+import DLlib as dl
+import pylib as py
+import tf2lib as tl
+import tf2gan as gan
+import wflib as wf
+import data
+
+import os
+import pydicom
+from pydicom.dataset import Dataset, FileDataset
+from pydicom.uid import ExplicitVRLittleEndian
+import pydicom._storage_sopclass_uids
+
+# ==============================================================================
+# =                                   param                                    =
+# ==============================================================================
+
+py.arg('--experiment_dir',default='output/WF-IDEAL')
+py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
+py.arg('--is_GC',type=bool,default=False)
+py.arg('--te_input', type=bool, default=False)
+py.arg('--TE1', type=float, default=0.0013)
+py.arg('--dTE', type=float, default=0.0021)
+test_args = py.args()
+args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
+args.__dict__.update(test_args.__dict__)
+
+
+#################################################################################
+############################### SAVE FUNCTION ###################################
+#################################################################################
+
+if args.is_GC:
+	method_prefix = 'm000'
+else:
+	method_prefix = 'm' + args.experiment_dir.split('-')[1]
+
+if args.TE1 == 0.0013:
+	if args.dTE == 0.0021:
+		prot_prefix = 'p00'
+	elif args.dTE == 0.0022:
+		prot_prefix = 'p01'
+	elif args.dTE == 0.0023:
+		prot_prefix = 'p02'
+	elif args.dTE == 0.0024:
+		prot_prefix = 'p03'
+elif args.TE1 == 0.0014:
+	if args.dTE == 0.0021:
+		prot_prefix = 'p04'
+	elif args.dTE == 0.0022:
+		prot_prefix = 'p05'
+
+def gen_ds(idx):
+	# DICOM constant information
+	file_meta = pydicom.Dataset()
+	file_meta.MediaStorageSOPClassUID = pydicom._storage_sopclass_uids.MRImageStorage
+	file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+	file_meta.TransferSyntaxUID= pydicom.uid.ExplicitVRLittleEndian
+
+	ds = Dataset()
+	ds.file_meta = file_meta
+
+	ds.is_little_endian = True
+	ds.is_implicit_VR = False
+
+	ds.SOPClassUID = pydicom._storage_sopclass_uids.MRImageStorage
+	ds.PatientName = "Volunteer^" + str(idx+1).zfill(3) + "^-" + method_prefix
+	ds.PatientID = str(idx).zfill(6) # "123456"
+
+	ds.Modality = "MR"
+	ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+	ds.StudyInstanceUID = pydicom.uid.generate_uid()
+	ds.FrameOfReferenceUID = pydicom.uid.generate_uid()
+
+	## These are the necessary imaging components of the FileDataset object.
+	ds.BitsStored = 16
+	ds.BitsAllocated = 16
+	ds.SamplesPerPixel = 1
+	ds.HighBit = 15
+
+	ds.ImagePositionPatient = r"0\0\1"
+	ds.ImageOrientationPatient = r"1\0\0\0\-1\0"
+	ds.ImageType = r"ORIGINAL\PRIMARY\AXIAL"
+
+	ds.RescaleIntercept = "0"
+	ds.RescaleSlope = "0.4"
+	ds.PixelSpacing = r"1\1"
+	ds.PhotometricInterpretation = "MONOCHROME2"
+	ds.PixelRepresentation = 1
+
+	return ds
+
+def write_dicom(ds, pixel_array, filename, level, slices):
+	image2d = np.squeeze(pixel_array)*255
+	image2d = image2d.astype(np.uint16)
+
+	path = args.experiment_dir + "/out_dicom/"
+	suffix = "_s" + str(level).zfill(2) + ".dcm"
+
+	filename_endian= path + filename + suffix
+
+	ds.ImagesInAcquisition = str(slices)
+	ds.InstanceNumber = level
+
+	ds.Columns = image2d.shape[0]
+	ds.Rows = image2d.shape[1]
+	ds.PixelData = image2d.tobytes()
+
+	ds.save_as(filename_endian)
+	return
+
+
+#################################################################################
+################################# LOAD DATA #####################################
+#################################################################################
+
+# data
+ech_idx = args.n_echoes * 2
+r2_sc,fm_sc = 200,300
+
+dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
+dataset_hdf5 = 'multiTE_GC_192_complex_2D.hdf5'
+testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
+                                  te_data=True,complex_data=(args.G_model=='complex'),
+                                  remove_zeros=False,MEBCRN=(args.G_model=='MEBCRN'))
+testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=(args.G_model=='MEBCRN'))
+
+len_dataset,hgt,wdt,n_out = np.shape(testY)
+
+print('Acquisition Dimensions:', hgt,wdt)
+print('Echoes:',args.n_echoes)
+print('Output Maps:',n_out)
+
+# Input and output dimensions (testing data)
+print('Testing input shape:',testX.shape)
+print('Testing output shape:',testY.shape)
+
+A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,testY,TEs))
+A_B_dataset_test.batch(1)
+
+# Input and output dimensions (testing data)
+print('Testing input shape:',testX.shape)
+print('Testing output shape:',testY.shape)
+
+
+#################################################################################
+######################### LOAD MODEL AND GET RESULTS ############################
+#################################################################################
+
+# model
+if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
+  if args.out_vars == 'WF-PM':
+    G_A2B = dl.MDWF_Generator(input_shape=(hgt,wdt,ech_idx),
+                              te_input=args.te_input,
+                              te_shape=(args.n_echoes,),
+                              filters=args.n_G_filters,
+                              WF_self_attention=args.D1_SelfAttention,
+                              R2_self_attention=args.D2_SelfAttention,
+                              FM_self_attention=args.D3_SelfAttention)
+  else:
+    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,ech_idx),
+                          filters=args.n_G_filters,
+                          te_input=args.te_input,
+                          te_shape=(args.n_echoes,),
+                          R2_self_attention=args.D1_SelfAttention,
+                          FM_self_attention=args.D2_SelfAttention)
+elif args.G_model == 'U-Net':
+  if args.out_vars == 'WF-PM':
+    n_out = 4
+  else:
+    n_out = 2
+  G_A2B = dl.UNet(input_shape=(hgt,wdt,ech_idx),
+                  n_out=n_out,
+                  filters=args.n_G_filters,
+                  te_input=args.te_input,
+                  te_shape=(args.n_echoes,),
+                  self_attention=args.D1_SelfAttention)
+elif args.G_model == 'MEBCRN':
+  if args.out_vars == 'WFc':
+    n_out = 4
+    out_activ = None
+  else:
+    n_out = 2
+    out_activ = 'sigmoid'
+  G_A2B = dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
+                    n_outputs=n_out,
+                    output_activation=out_activ,
+                    filters=args.n_G_filters,
+                    self_attention=args.D1_SelfAttention)
+
+# restore
+if not(args.is_GC):
+	tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+
+@tf.function
+def sample(A, B, TE=None):
+  indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
+                      tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
+  indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
+                          tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
+  indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
+                      tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
+  # Split B
+  B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
+  B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
+  B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
+  # Magnitude of water/fat images
+  B_WF_real = B_WF[:,:,:,0::2]
+  B_WF_imag = B_WF[:,:,:,1::2]
+  B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
+  # Split B param maps
+  B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
+  B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
+  B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+  # Estimate A2B
+  if args.out_vars == 'WF':
+    if args.te_input:
+      A2B_WF_abs = G_A2B([A,TE], training=True)
+    else:
+      A2B_WF_abs = G_A2B(A, training=True)
+    A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+    A2B_PM = tf.zeros_like(B_PM)
+    A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+  elif args.out_vars == 'WFc':
+    A2B_WF = G_A2B(A, training=False)
+    A2B_WF = tf.where(B[:,:,:,:4]!=0,A2B_WF,0.0)
+    A2B_WF_real = A2B_WF[:,:,:,0::2]
+    A2B_WF_imag = A2B_WF[:,:,:,1::2]
+    A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+    A2B_PM = tf.zeros_like(B_PM)
+    A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+  elif args.out_vars == 'PM':
+    if args.te_input:
+      A2B_PM = G_A2B([A,TE], training=True)
+    else:
+      A2B_PM = G_A2B(A, training=True)
+    A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
+    A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+    A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+    A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+    if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+      A2B_FM = (A2B_FM - 0.5) * 2
+      A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
+      A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+    A2B_WF = wf.get_rho(A,A2B_PM)
+    A2B_WF_real = A2B_WF[:,:,:,0::2]
+    A2B_WF_imag = A2B_WF[:,:,:,1::2]
+    A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
+    A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+  elif args.out_vars == 'WF-PM':
+    B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
+    if args.te_input:
+      A2B_abs = G_A2B([A,TE], training=True)
+    else:
+      A2B_abs = G_A2B(A, training=True)
+    A2B_abs = tf.where(B_abs!=0.0,A2B_abs,0.0)
+    A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
+    A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
+    A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
+    A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+    A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
+    A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+    if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+      A2B_FM = (A2B_FM - 0.5) * 2
+      A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,A2B_FM,0.0)
+      A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
+
+  return A2B_abs
+
+if not(args.is_GC):
+	all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
+	i = 0
+	for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
+		A = tf.expand_dims(A,axis=0)
+		B = tf.expand_dims(B,axis=0)
+		TE= tf.expand_dims(TE,axis=0)
+		A2B = sample(A,B,TE)
+		all_test_ans[i,:,:,:] = A2B
+		i += 1
+
+	w_all_ans = all_test_ans[:,:,:,0]
+	f_all_ans = all_test_ans[:,:,:,1]
+	r2_all_ans = all_test_ans[:,:,:,2]*r2_sc
+else:
+	# Ground truth
+	w_all_ans = np.abs(tf.complex(testY[:,:,:,0],testY[:,:,:,1]))
+	f_all_ans = np.abs(tf.complex(testY[:,:,:,2],testY[:,:,:,3]))
+	r2_all_ans = testY[:,:,:,4]*r2_sc
+
+if args.map == 'PDFF':
+  PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
+  PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0
+  np.clip(PDFF_all_ans,0,1,out=PDFF_all_ans)
+  X = PDFF_all_ans
+elif args.map == 'R2':
+  X = r2_all_ans
+elif args.map == 'Water':
+  X = w_all_ans
+else:
+  raise TypeError('The selected map is not available')
+
+save_dir = py.join(args.experiment_dir, 'out_dicom', args.map)
+py.mkdir(save_dir)
+pre_filename = args.map + '/' + args.map + '_' + method_prefix + '_' + prot_prefix + '_v'
+
+n_slices = [21,24,24,24,22,24,25,24,18,21,24,18,21,24,21,18,16,18,24,21]
+cont = 0
+for idx in range(len(n_slices)):
+	ini = cont
+	fin = cont + n_slices[idx]
+	cont = cont + n_slices[idx]
+
+	filename = pre_filename + str(idx).zfill(3)
+
+	# image3d = np.squeeze(out_maps[0:21,:,:,0])
+	image3d = np.squeeze(X[ini:fin,:,:])
+	image3d = np.moveaxis(image3d,0,-1)
+
+	# Populate required values for file meta information
+	ds = gen_ds(idx)
+
+	for i in range(0, np.shape(image3d)[2]):
+		write_dicom(ds, image3d[:,:,i], filename, i, np.shape(image3d)[2])
