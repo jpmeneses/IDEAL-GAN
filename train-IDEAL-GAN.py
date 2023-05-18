@@ -184,7 +184,7 @@ def train_G(A, B):
         A2B = tf.where(B!=0.0,A2B,0.0)
         
         # Reconstructed multi-echo images
-        A2B2A = wf.IDEAL_model(A2B,args.n_echoes)
+        A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
 
         ##################### B Cycle #####################
         B2A = wf.IDEAL_model(B,args.n_echoes)
@@ -288,7 +288,7 @@ def sample(A, B):
     # A2B Mask
     A2B = tf.where(B!=0.0,A2B,0.0)
     # Reconstructed multi-echo images
-    A2B2A = wf.IDEAL_model(A2B,args.n_echoes)
+    A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
 
     # B2A2B Cycle
     B2A = wf.IDEAL_model(B,args.n_echoes)
@@ -358,6 +358,7 @@ for ep in range(args.epochs):
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
+        A = tf.squeeze(A,axis=0)
         p = np.random.rand()
         if p <= 0.4:
             # Random 90 deg rotations
@@ -373,6 +374,7 @@ for ep in range(args.epochs):
             # Random vertical reflections
             A = tf.image.random_flip_up_down(A)
             B = tf.image.random_flip_up_down(B)
+        A = tf.expand_dims(A,axis=0)
         # ==============================================================================
 
         # ==============================================================================
@@ -404,16 +406,16 @@ for ep in range(args.epochs):
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,0],B2A[:,:,:,1])))
-            im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,2],B2A[:,:,:,3])))
+            im_ech1 = np.squeeze(np.abs(tf.complex(B2A[0,:,:,:,0],B2A[0,:,:,:,1])))
+            im_ech2 = np.squeeze(np.abs(tf.complex(B2A[1,:,:,:,0],B2A[1,:,:,:,1])))
             if args.n_echoes >= 3:
-                im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,4],B2A[:,:,:,5])))
+                im_ech3 = np.squeeze(np.abs(tf.complex(B2A[2,:,:,:,0],B2A[2,:,:,:,1])))
             if args.n_echoes >= 4:
-                im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,6],B2A[:,:,:,7])))
+                im_ech4 = np.squeeze(np.abs(tf.complex(B2A[3,:,:,:,0],B2A[3,:,:,:,1])))
             if args.n_echoes >= 5:
-                im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,8],B2A[:,:,:,9])))
+                im_ech5 = np.squeeze(np.abs(tf.complex(B2A[4,:,:,:,0],B2A[4,:,:,:,1])))
             if args.n_echoes >= 6:
-                im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,10],B2A[:,:,:,11])))
+                im_ech6 = np.squeeze(np.abs(tf.complex(B2A[5,:,:,:,0],B2A[5,:,:,:,1])))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
