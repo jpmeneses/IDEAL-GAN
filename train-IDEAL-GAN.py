@@ -26,6 +26,7 @@ py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='encod-decod', choices=['multi-decod','encod-decod','U-Net','MEBCRN'])
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_D_filters', type=int, default=72)
+py.arg('--encoded_size', type=int, default=256)
 py.arg('--frac_labels', type=bool, default=False)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=200)
@@ -41,6 +42,7 @@ py.arg('--R1_reg_weight', type=float, default=0.2)
 py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--cycle_loss_weight', type=float, default=10.0)
 py.arg('--B2A2B_weight', type=float, default=1.0)
+py.arg('--ls_reg_weight', type=float, default=1.0)
 py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--R2_L1_weight', type=float, default=0.0)
@@ -73,51 +75,40 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx)
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx, MEBCRN=True)
 
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx)
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, MEBCRN=True)
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx)
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx, MEBCRN=True)
 
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx)
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx, MEBCRN=True)
 
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx)
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-n1_div = 248
-n3_div = 0
-n4_div = 434
-
-trainX  = np.concatenate((acqs_1[n1_div:,:,:,:],acqs_3,acqs_4[n4_div:,:,:,:],acqs_5),axis=0)
+trainX  = np.concatenate((acqs_1,acqs_3,acqs_4,acqs_5),axis=0)
 valX    = acqs_2
-testX   = np.concatenate((acqs_1[:n1_div,:,:,:],acqs_4[:n4_div,:,:,:]),axis=0)
-
-valY    = out_maps_2
-testY   = np.concatenate((out_maps_1[:n1_div,:,:,:],out_maps_4[:n4_div,:,:,:]),axis=0)
 
 if args.frac_labels:
-    n1_div = 384
-    n3_div = 730
-    n4_div = 888
+    n1_div,n3_div,n4_div = 384,730,888
+else:
+    n1_div,n3_div,n4_div = 0,0,0
 trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
+valY    = out_maps_2
 
 # Overall dataset statistics
-len_dataset,hgt,wdt,d_ech = np.shape(trainX)
+len_dataset,_,hgt,wdt,n_ch = np.shape(trainX)
 _,_,_,n_out = np.shape(trainY)
-if args.G_model == 'complex':
-    echoes = d_ech
-else:
-    echoes = int(d_ech/2)
 
 print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',echoes)
+print('Echoes:',args.n_echoes)
 print('Output Maps:',n_out)
 
 # Input and output dimensions (training data)
@@ -127,10 +118,6 @@ print('Training output shape:',trainY.shape)
 # Input and output dimensions (validations data)
 print('Validation input shape:',valX.shape)
 print('Validation output shape:',valY.shape)
-
-# Input and output dimensions (testing data)
-print('Testing input shape:',testX.shape)
-print('Testing output shape:',testY.shape)
 
 A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
@@ -144,10 +131,13 @@ A_B_dataset_val.batch(1)
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 if args.G_model == 'encod-decod':
-    enc= dl.encoder(input_shape=(hgt,wdt,d_ech),
+    enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+                    encoded_size=args.encoded_size,
                     filters=args.n_G_filters,
+                    ls_reg_weight=args.ls_reg_weight,
                     )
-    dec= dl.decoder(output_shape=(hgt,wdt,n_out),
+    dec= dl.decoder(input_shape=(encoded_size),
+                    output_shape=(hgt,wdt,n_out),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
     G_A2B = keras.Sequential()
@@ -194,10 +184,10 @@ def train_G(A, B):
         A2B = tf.where(B!=0.0,A2B,0.0)
         
         # Reconstructed multi-echo images
-        A2B2A = wf.IDEAL_model(A2B,echoes)
+        A2B2A = wf.IDEAL_model(A2B,args.n_echoes)
 
         ##################### B Cycle #####################
-        B2A = wf.IDEAL_model(B,echoes)
+        B2A = wf.IDEAL_model(B,args.n_echoes)
         B2A2B = G_A2B(B2A, training=True)
         
         # Split A2B param maps
@@ -298,10 +288,10 @@ def sample(A, B):
     # A2B Mask
     A2B = tf.where(B!=0.0,A2B,0.0)
     # Reconstructed multi-echo images
-    A2B2A = wf.IDEAL_model(A2B,echoes)
+    A2B2A = wf.IDEAL_model(A2B,args.n_echoes)
 
     # B2A2B Cycle
-    B2A = wf.IDEAL_model(B,echoes)
+    B2A = wf.IDEAL_model(B,args.n_echoes)
     B2A2B = G_A2B(B2A, training=False)
     # Split B2A2B param maps
     B2A2B_WF,B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
