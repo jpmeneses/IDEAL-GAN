@@ -187,7 +187,7 @@ def train_G(A, B):
         A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
 
         ##################### B Cycle #####################
-        B2A = wf.IDEAL_model(B,args.n_echoes)
+        B2A = wf.IDEAL_model(B,args.n_echoes,MEBCRN=True)
         B2A2B = G_A2B(B2A, training=True)
         
         # Split A2B param maps
@@ -291,7 +291,7 @@ def sample(A, B):
     A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
 
     # B2A2B Cycle
-    B2A = wf.IDEAL_model(B,args.n_echoes)
+    B2A = wf.IDEAL_model(B,args.n_echoes,MEBCRN=True)
     B2A2B = G_A2B(B2A, training=False)
     # Split B2A2B param maps
     B2A2B_WF,B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
@@ -362,10 +362,8 @@ for ep in range(args.epochs):
         p = np.random.rand()
         if p <= 0.4:
             # Random 90 deg rotations
-            for _ in range(np.random.randint(3)):
-                A = tf.image.rot90(A)
-            for _ in range(np.random.randint(3)):
-                B = tf.image.rot90(B)
+            A = tf.image.rot90(A,k=np.random.randint(3))
+            B = tf.image.rot90(B,k=np.random.randint(3))
 
             # Random horizontal reflections
             A = tf.image.random_flip_left_right(A)
