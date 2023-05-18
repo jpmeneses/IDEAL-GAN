@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=v000-Unsup
-#SBATCH --account=jmeneses
+#SBATCH --account=dq13
 #SBATCH --time=01:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
