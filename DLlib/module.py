@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow.keras as keras
@@ -509,12 +510,16 @@ def PM_complex(
 
 def encoder(
     input_shape,
+    encoded_size,
     filters=36,
     num_layers=4,
     dropout=0.0,
+    ls_reg_weight=1.0,
     norm='instance_norm'):
 
     x = inputs1 = keras.Input(input_shape)
+
+    x = keras.layers.ConvLSTM2D(filters,3,padding="same")(x)
 
     down_layers = []
     for l in range(num_layers):
@@ -530,32 +535,21 @@ def encoder(
 
         filters = filters * 2  # double the number of filters with each layer
 
-    x_mean= _conv2d_block(
-            inputs=x,
-            filters=filters,
-            dropout=dropout
-            )
-
-    x_std = _conv2d_block(
-            inputs=x,
-            filters=filters,
-            dropout=dropout
-            )
-
-    x = keras.layers.concatenate([x_mean,x_std])
+    x = keras.layers.Reshape((x.shape[1]*x.shape[2],x.shape[3]))(x)
+    x = keras.layers.Conv1D(int(np.ceil(2*encoded_size/(x.shape[1]))),10,padding="same")(x)
     x = keras.layers.Flatten()(x)
-    encoded_size = x.shape[-1]//2
+    x = keras.layers.Dense(2*encoded_size)(x)
     
     prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros(encoded_size), scale=1))
-    # x = keras.layers.Dense(tfp.layers.IndependentNormal.params_size(encoded_size),activation=None)(x)
     output = tfp.layers.IndependentNormal(
                 encoded_size,
-                activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=1.0))(x)
+                activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
 
 def decoder(
+    input_shape,
     output_shape,
     filters=36,
     bayesian=False,
@@ -571,18 +565,19 @@ def decoder(
     hgt,wdt,n_out = output_shape
     hls = hgt//(2**(num_layers))
     wls = wdt//(2**(num_layers))
-    input_shape = (hls*wls*filters*(2**num_layers))
+    decod_size = hls*wls*4
     
     x = inputs1 = keras.Input(input_shape)
-    # x = keras.layers.Dense(filters*(num_layers*2)*hls*wls)(x)
-    x = keras.layers.Reshape(target_shape=(hls,wls,filters*(2**num_layers)))(x)
+    x = keras.layers.Dense(decod_size)(x)
+    x = keras.layers.Reshape(target_shape=(hls,wls,4))(x)
+
+    filters = filters*(2**num_layers)
 
     if style_latent_vec:
         w = keras.layers.Flatten()(x)
         for _ in range(n_style_dense):
             w = keras.layers.Dense(filters)(w)
 
-    filters = x.shape[-1]
     for cont in range(num_layers):
         filters //= 2  # decreasing number of filters with each layer
         x = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
