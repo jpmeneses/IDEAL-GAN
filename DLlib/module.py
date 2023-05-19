@@ -519,7 +519,7 @@ def encoder(
 
     x = inputs1 = keras.Input(input_shape)
 
-    x = keras.layers.ConvLSTM2D(filters,3,padding="same")(x)
+    x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
 
     down_layers = []
     for l in range(num_layers):
