@@ -536,9 +536,10 @@ def encoder(
         filters = filters * 2  # double the number of filters with each layer
 
     x = keras.layers.Reshape((x.shape[1]*x.shape[2],x.shape[3]))(x)
-    x = keras.layers.Conv1D(int(np.ceil(2*encoded_size/(x.shape[1]))),10,padding="same")(x)
+    x = keras.layers.Conv1D(int(np.ceil(2*encoded_size/(x.shape[1]))),10,padding="same",
+                            activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
     x = keras.layers.Flatten()(x)
-    x = keras.layers.Dense(2*encoded_size)(x)
+    x = keras.layers.Dense(2*encoded_size,activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
     
     prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros(encoded_size), scale=1))
     output = tfp.layers.IndependentNormal(
@@ -568,7 +569,7 @@ def decoder(
     decod_size = hls*wls*4
     
     x = inputs1 = keras.Input(input_shape)
-    x = keras.layers.Dense(decod_size)(x)
+    x = keras.layers.Dense(decod_size,activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
     x = keras.layers.Reshape(target_shape=(hls,wls,4))(x)
 
     filters = filters*(2**num_layers)
@@ -588,6 +589,7 @@ def decoder(
             inputs=x,
             filters=filters,
             dropout=dropout,
+            activation=tf.nn.leaky_relu,
             norm=norm
             )
 
