@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-GAN.py --dataset 'GAN-009' --n_G_filters 24 --encoded_size 4096 --epochs 100 --B2A2B_weight 0.5 --ls_reg_weight 10.0 --D1_SelfAttention True
+python train-IDEAL-GAN.py --dataset 'GAN-009' --n_G_filters 24 --encoded_size 4096 --epochs 150 --epoch_decay 150 --epoch_ckpt 25 --B2A2B_weight 0.5 --ls_reg_weight 10.0 --D1_SelfAttention True
