@@ -164,7 +164,7 @@ D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.be
 def train_G(A, B):
     indices =tf.concat([tf.zeros((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
                         tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
-                        2*tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=-1)
+                        2*tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
     PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1]),
                         tf.ones_like(B[:,:,:,:1])],axis=-1)
     
@@ -284,7 +284,7 @@ def train_step(A, B):
 def sample(A, B):
     indices =tf.concat([tf.zeros((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
                         tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
-                        2*tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=-1)
+                        2*tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
     PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1]),
                         tf.ones_like(B[:,:,:,:1])],axis=-1)
 
