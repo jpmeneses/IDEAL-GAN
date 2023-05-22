@@ -110,7 +110,7 @@ q2 = ggplot(res_id, aes(wXs_r, wXs)) +
 	# geom_errorbar(aes(xmin=wXs_r-wSDs_r, xmax=wXs_r+wSDs_r,
 	# 			ymin=wXs-wSDs, ymax=wXs+wSDs),
 	# 			width=0.005) +
-      geom_smooth(method="lm") +
+      geom_smooth(method="lm",fullrange=TRUE) +
 	labs(x='Reference', y='Measurement') +
 	theme(text = element_text(size = 12)) +
 	xlim(0.0,0.3) +
@@ -128,7 +128,7 @@ mean_diff <- mean(res_id$bias)
 lower <- mean_diff - 1.96*sd(res_id$bias)
 upper <- mean_diff + 1.96*sd(res_id$bias)
 if (map=="PDFF"){
-  yl = 0.03
+  yl = 0.2
   xl = 0.33
 } else {
   yl = 35.0

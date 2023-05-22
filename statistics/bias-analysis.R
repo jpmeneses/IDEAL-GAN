@@ -10,7 +10,7 @@ library(rstatix)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-010/"
+model = "/TEaug-004/"
 map = "PDFF"
 epoch = "200"
 
@@ -70,11 +70,11 @@ cat('Overall bias:',overall_bias,'+-',std_bias,'\n')
 if (map=="PDFF") {yl=1.0} else {yl=40.0}
 q = ggplot(pdff_Data, aes(refs, mean)) +
        geom_point(aes(color = Site_Prot))+
-       geom_smooth(method="lm") +
+       geom_smooth(method="lm", se=FALSE, fullrange=TRUE) +
 	 theme(text = element_text(size = 14)) +
 	 ylim(0.0,yl) +
 	 ylab("Measurements") +
-	 xlab("References")
+	 xlab("References") +
   stat_regline_equation(
     aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"))
     )
@@ -88,13 +88,13 @@ ggsave(plot=q, width=5, height=3, dpi=400, filename=fn1)
 mean_diff <- mean(pdff_Data$bias)
 lower <- mean_diff - 1.96*sd(pdff_Data$bias)
 upper <- mean_diff + 1.96*sd(pdff_Data$bias)
-if (map=="PDFF") {yl_ba=0.8} else {yl_ba=40.0}
+if (map=="PDFF") {yl_ba=1.0} else {yl_ba=40.0}
 q2= ggplot(pdff_Data, aes(refs, bias)) +
   geom_point(aes(color = Site_Prot))+
   geom_hline(yintercept = mean_diff) +
   geom_hline(yintercept = lower, color = "red", linetype="dashed") +
   geom_hline(yintercept = upper, color = "red", linetype="dashed") +
-  theme(text = element_text(size = 13)) +
+  theme(text = element_text(size = 14)) +
   ylim(-yl_ba,yl_ba) +
   ylab("Difference") +
   xlab("Ground-Truth")
