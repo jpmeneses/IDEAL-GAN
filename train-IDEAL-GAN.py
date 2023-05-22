@@ -300,7 +300,7 @@ def sample(A, B):
     A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
     # Correct R2 scaling
     A2B_R2 = 0.5*A2B_R2 + 0.5
-    A2B = tf.concat([A2B_WF,A2B_R2,A2B_FM],axis=-1)
+    A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
     # A2B Mask
     A2B = tf.where(B!=0.0,A2B,0.0)
     # Reconstructed multi-echo images
@@ -319,7 +319,7 @@ def sample(A, B):
     B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
     # Correct R2 scaling
     B2A2B_R2 = 0.5*B2A2B_R2 + 0.5
-    B2A2B = tf.concat([B2A2B_WF,B2A2B_R2,B2A2B_FM],axis=-1)
+    B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
     # B2A2B Mask
     B2A2B = tf.where(B!=0.0,B2A2B,0.0)
     
