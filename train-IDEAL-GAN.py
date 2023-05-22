@@ -165,8 +165,8 @@ def train_G(A, B):
     indices =tf.concat([tf.zeros((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
                         tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
                         2*tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
-    PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1]),
-                        tf.ones_like(B[:,:,:,:1])],axis=-1)
+    PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
+                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
