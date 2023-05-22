@@ -551,7 +551,8 @@ def encoder(
 
 def decoder(
     input_shape,
-    output_shape,
+    output_2D_shape,
+    n_species=3,
     filters=36,
     bayesian=False,
     num_layers=4,
@@ -563,7 +564,7 @@ def decoder(
     self_attention=True,
     norm='instance_norm'):
 
-    hgt,wdt,n_out = output_shape
+    hgt,wdt = output_2D_shape
     hls = hgt//(2**(num_layers))
     wls = wdt//(2**(num_layers))
     decod_size = hls*wls*4
@@ -572,32 +573,38 @@ def decoder(
     x = keras.layers.Dense(decod_size,activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
     x = keras.layers.Reshape(target_shape=(hls,wls,4))(x)
 
-    filters = filters*(2**num_layers)
+    filt_ini = filters*(2**num_layers)
 
     if style_latent_vec:
         w = keras.layers.Flatten()(x)
         for _ in range(n_style_dense):
             w = keras.layers.Dense(filters)(w)
 
-    for cont in range(num_layers):
-        filters //= 2  # decreasing number of filters with each layer
-        x = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
+    x_list = [x for i in range(n_species)]
+    for sp in range(n_species):
+        filters = filt_ini
+        for cont in range(num_layers):
+            filters //= 2  # decreasing number of filters with each layer
+            x_list[sp] = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x_list[sp])
 
-        if self_attention and cont == 0:
-            x = SelfAttention(ch=filters)(x)
-        x = _conv2d_block(
-            inputs=x,
-            filters=filters,
-            dropout=dropout,
-            activation=tf.nn.leaky_relu,
-            norm=norm
-            )
+            if self_attention and cont == 0:
+                x_list[sp] = SelfAttention(ch=filters)(x_list[sp])
+            x_list[sp] = _conv2d_block(
+                    inputs=x_list[sp],
+                    filters=filters,
+                    dropout=dropout,
+                    activation=tf.nn.leaky_relu,
+                    norm=norm
+                    )
 
-        # Adaptive Instance Normalization for Style-Trasnfer
-        if style_latent_vec:
-            x = AdaIN(x, w)
+            # Adaptive Instance Normalization for Style-Trasnfer
+            if style_latent_vec:
+                x_list[sp] = AdaIN(x_list[sp], w)
 
-    output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
+        x_list[sp] = keras.layers.Lambda(lambda x: tf.expand_dims(x,axis=1))(x_list[sp])
+        x_list[sp] = keras.layers.Conv2D(2,3,padding="same",activation=output_activation,kernel_initializer=output_initializer)(x_list[sp])
+
+    output = keras.layers.concatenate(x_list,axis=1)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
