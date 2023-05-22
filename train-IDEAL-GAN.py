@@ -137,7 +137,7 @@ if args.G_model == 'encod-decod':
                     ls_reg_weight=args.ls_reg_weight,
                     )
     dec= dl.decoder(input_shape=(args.encoded_size),
-                    output_shape=(hgt,wdt,n_out),
+                    output_2D_shape=(hgt,wdt),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
     G_A2B = keras.Sequential()
@@ -162,23 +162,29 @@ D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(A, B):
-    indices =tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32),
-                        2*tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
+    indices =tf.concat([tf.zeros((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
+                        tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
+                        2*tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=-1)
+    PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1]),
+                        tf.ones_like(B[:,:,:,1])],axis=-1)
     
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         A2B = G_A2B(A, training=True)
 
         # Split A2B param maps
-        A2B_WF,A2B_R2,A2B_FM = tf.dynamic_partition(A2B,indices,num_partitions=3)
-        A2B_WF = tf.reshape(A2B_WF,B[:,:,:,:4].shape)
+        A2B_W,A2B_F,A2B_PM = tf.dynamic_partition(A2B,indices,num_partitions=3)
+        A2B_W = tf.reshape(A2B_W,B[:,:,:,:2].shape)
+        A2B_F = tf.reshape(A2B_F,B[:,:,:,:2].shape)
+        A2B_PM = tf.reshape(A2B_PM,B[:,:,:,:2].shape)
+
+        A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
         A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
         A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         
         # Correct R2 scaling
         A2B_R2 = 0.5*A2B_R2 + 0.5
-        A2B = tf.concat([A2B_WF,A2B_R2,A2B_FM],axis=-1)
+        A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
         
         # Mask
         A2B = tf.where(B!=0.0,A2B,0.0)
@@ -190,14 +196,19 @@ def train_G(A, B):
         B2A = wf.IDEAL_model(B,args.n_echoes,MEBCRN=True)
         B2A2B = G_A2B(B2A, training=True)
         
-        # Split A2B param maps
-        B2A2B_WF,B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
-        B2A2B_WF = tf.reshape(B2A2B_WF,B[:,:,:,:4].shape)
+        # Split B2A2B param maps
+        B2A2B_W,B2A2B_F,B2A2B_PM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
+        B2A2B_W = tf.reshape(B2A2B_W,B[:,:,:,:2].shape)
+        B2A2B_F = tf.reshape(B2A2B_F,B[:,:,:,:2].shape)
+        B2A2B_PM = tf.reshape(B2A2B_PM,B[:,:,:,:2].shape)
+
+        B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
         B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
         B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+
         # Correct R2s scaling
         B2A2B_R2 = 0.5*B2A2B_R2 + 0.5
-        B2A2B = tf.concat([B2A2B_WF,B2A2B_R2,B2A2B_FM],axis=-1)
+        B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
         
         # B2A2B Mask
         B2A2B = tf.where(B!=0.0,B2A2B,0.0)
@@ -271,15 +282,20 @@ def train_step(A, B):
 
 @tf.function
 def sample(A, B):
-    indices =tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32),
-                        2*tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
+    indices =tf.concat([tf.zeros((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
+                        tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
+                        2*tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=-1)
+    PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1]),
+                        tf.ones_like(B[:,:,:,1])],axis=-1)
 
     # A2B2A Cycle
     A2B = G_A2B(A, training=False)
     # Split A2B param maps
-    A2B_WF,A2B_R2,A2B_FM = tf.dynamic_partition(A2B,indices,num_partitions=3)
-    A2B_WF = tf.reshape(A2B_WF,B[:,:,:,:4].shape)
+    A2B_W,A2B_F,A2B_PM = tf.dynamic_partition(A2B,indices,num_partitions=3)
+    A2B_W = tf.reshape(A2B_W,B[:,:,:,:2].shape)
+    A2B_F = tf.reshape(A2B_F,B[:,:,:,:2].shape)
+    A2B_PM = tf.reshape(A2B_PM,B[:,:,:,:2].shape)
+    A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
     A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
     A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
     # Correct R2 scaling
@@ -294,8 +310,11 @@ def sample(A, B):
     B2A = wf.IDEAL_model(B,args.n_echoes,MEBCRN=True)
     B2A2B = G_A2B(B2A, training=False)
     # Split B2A2B param maps
-    B2A2B_WF,B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
-    B2A2B_WF = tf.reshape(B2A2B_WF,B[:,:,:,:4].shape)
+    B2A2B_W,B2A2B_F,B2A2B_PM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
+    B2A2B_W = tf.reshape(B2A2B_W,B[:,:,:,:2].shape)
+    B2A2B_F = tf.reshape(B2A2B_F,B[:,:,:,:2].shape)
+    B2A2B_PM= tf.reshape(B2A2B_PM,B[:,:,:,:2].shape)
+    B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
     B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
     B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
     # Correct R2 scaling
