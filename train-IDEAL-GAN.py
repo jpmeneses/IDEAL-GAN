@@ -178,7 +178,7 @@ def train_G(A, B):
         A2B_F = tf.reshape(A2B_F,B[:,:,:,:2].shape)
         A2B_PM = tf.reshape(A2B_PM,B[:,:,:,:2].shape)
 
-        A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+        A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
         A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
         A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         
@@ -202,7 +202,7 @@ def train_G(A, B):
         B2A2B_F = tf.reshape(B2A2B_F,B[:,:,:,:2].shape)
         B2A2B_PM = tf.reshape(B2A2B_PM,B[:,:,:,:2].shape)
 
-        B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+        B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
         B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
         B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
 
@@ -295,7 +295,7 @@ def sample(A, B):
     A2B_W = tf.reshape(A2B_W,B[:,:,:,:2].shape)
     A2B_F = tf.reshape(A2B_F,B[:,:,:,:2].shape)
     A2B_PM = tf.reshape(A2B_PM,B[:,:,:,:2].shape)
-    A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
+    A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
     A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
     A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
     # Correct R2 scaling
@@ -314,7 +314,7 @@ def sample(A, B):
     B2A2B_W = tf.reshape(B2A2B_W,B[:,:,:,:2].shape)
     B2A2B_F = tf.reshape(B2A2B_F,B[:,:,:,:2].shape)
     B2A2B_PM= tf.reshape(B2A2B_PM,B[:,:,:,:2].shape)
-    B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+    B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
     B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
     B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
     # Correct R2 scaling
