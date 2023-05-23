@@ -54,7 +54,7 @@ if args.G_model == 'encod-decod':
                     filters=args.n_G_filters,
                     )
     dec= dl.decoder(input_shape=(args.encoded_size),
-                    output_shape=(hgt,wdt,n_out),
+                    output_2D_shape=(hgt,wdt),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
     G_A2B = tf.keras.Sequential()
@@ -67,24 +67,29 @@ tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).re
 
 @tf.function
 def sample(A):
-	indices =tf.concat([tf.zeros((A.shape[0],hgt,wdt,4),dtype=tf.int32),
-                        tf.ones((A.shape[0],hgt,wdt,1),dtype=tf.int32),
-                        2*tf.ones((A.shape[0],hgt,wdt,1),dtype=tf.int32)],axis=-1)
+	indices =tf.concat([tf.zeros((A.shape[0],1,hgt,wdt,2),dtype=tf.int32),
+                        tf.ones((A.shape[0],1,hgt,wdt,2),dtype=tf.int32),
+                        2*tf.ones((A.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
+	PM_idx = tf.concat([tf.zeros((A.shape[0],hgt,wdt,1),dtype=tf.int32),
+    					tf.ones((A.shape[0],hgt,wdt,1),dtype=tf.int32)],axis=-1)
 	A2Z = enc(A, training=False)
 	A2Z2B = dec(A2Z, training=False)
 	# Split A2B param maps
-	A2Z2B_WF,A2Z2B_R2,A2Z2B_FM = tf.dynamic_partition(A2Z2B,indices,num_partitions=3)
-	A2Z2B_WF = tf.reshape(A2Z2B_WF,A2Z2B[:,:,:,:4].shape)
-	A2Z2B_R2 = tf.reshape(A2Z2B_R2,A2Z2B[:,:,:,:1].shape)
-	A2Z2B_FM = tf.reshape(A2Z2B_FM,A2Z2B[:,:,:,:1].shape)
+	A2Z2B_W,A2Z2B_F,A2Z2B_PM = tf.dynamic_partition(A2Z2B,indices,num_partitions=3)
+	A2Z2B_W = tf.reshape(A2Z2B_W,(A.shape[0],hgt,wdt,2))
+	A2Z2B_F = tf.reshape(A2Z2B_F,(A.shape[0],hgt,wdt,2))
+	A2Z2B_PM = tf.reshape(A2Z2B_PM,(A.shape[0],hgt,wdt,2))
+	A2Z2B_R2,A2Z2B_FM = tf.dynamic_partition(A2Z2B_PM,PM_idx,num_partitions=2)
+	A2Z2B_R2 = tf.reshape(A2Z2B_R2,(A.shape[0],hgt,wdt,1))
+	A2Z2B_FM = tf.reshape(A2Z2B_FM,(A.shape[0],hgt,wdt,1))
 	# Correct R2 scaling
 	A2Z2B_R2 = 0.5*A2Z2B_R2 + 0.5
-	A2Z2B = tf.concat([A2Z2B_WF,A2Z2B_R2,A2Z2B_FM],axis=-1)
+	A2Z2B = tf.concat([A2Z2B_W,A2Z2B_F,A2Z2B_R2,A2Z2B_FM],axis=-1)
 	return A2Z, A2Z2B
 
 # run
-save_dir = py.join(args.experiment_dir, 'samples_testing', 'A2Z')
-py.mkdir(save_dir)
+# save_dir = py.join(args.experiment_dir, 'samples_testing', 'A2Z')
+# py.mkdir(save_dir)
 
 idxs = np.random.choice([a for a in range(len_dataset)],args.n_samples)
 cont = 0
