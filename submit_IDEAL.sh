@@ -2,8 +2,6 @@
 
 #SBATCH --job-name=v011-GAN
 #SBATCH --output=out_GAN_011.txt
-#SBATCH --partition=gpus
-#SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
