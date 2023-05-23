@@ -18,6 +18,7 @@ r2_sc = 200.0   # HR:150 / GC:200
 fm_sc = 300.0   # HR:300 / GC:400
 rho_sc = 1.4
 
+
 @tf.function
 def gen_M(te,get_Mpinv=True,get_P0=False):
     ne = te.shape[1] # len(te)
@@ -41,6 +42,7 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
         return M, M_pinv
     elif not(get_Mpinv) and not(get_P0):
         return M
+
 
 @tf.function
 def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
@@ -122,6 +124,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     else:
         return (res_rho,S_hat)
 
+
 @tf.function
 def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=False):
     n_batch,hgt,wdt,_ = out_maps.shape
@@ -197,6 +200,7 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
         res_gt = re_aux + im_aux
         return res_gt
 
+
 @tf.function
 def get_Ps_norm(acqs,param_maps,te=None):
     n_batch,hgt,wdt,d_ech = acqs.shape
@@ -250,6 +254,7 @@ def get_Ps_norm(acqs,param_maps,te=None):
     L2_norm = tf.abs(tf.reduce_sum(L2_norm_vec))
 
     return L2_norm
+
 
 @tf.function
 def get_rho(acqs,param_maps,te=None,complex_data=False):
@@ -313,6 +318,7 @@ def get_rho(acqs,param_maps,te=None,complex_data=False):
     
     return res_rho
 
+
 @tf.function
 def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
@@ -331,10 +337,8 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     ne = te.shape[1]
     M, M_pinv = gen_M(te)
 
-    te_complex = tf.complex(0.0,te)
-    te_complex = tf.expand_dims(te_complex,-1)
-    te_real = tf.complex(te,0.0)
-    te_real = tf.expand_dims(te_real, -1)
+    te_complex = tf.expand_dims(tf.complex(0.0,te),-1)
+    te_real = tf.expand_dims(tf.complex(te,0.0), -1)
 
     # Generate complex signal
     if not(complex_data):
@@ -352,26 +356,28 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     phi = mean_maps[:,:,:,1] * fm_sc
     r2s_unc = var_maps[:,:,:,0] * (r2_sc**2)
     phi_unc = var_maps[:,:,:,1] * (fm_sc**2)
+    
+    phi_unc_rav = tf.reshape(tf.complex(phi_unc,0.0),[n_batch,-1])
+    phi_unc_rav = tf.expand_dims(phi_unc_rav,1)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
-    xi_rav = tf.reshape(xi,[n_batch,-1])
-    xi_rav = tf.expand_dims(xi_rav,1)
+    xi_rav = tf.expand_dims(tf.reshape(xi,[n_batch,-1]),1)
 
-    xi_unc = tf.complex(phi_unc+r2s_unc/((2*np.pi)**2),0.0)
-    xi_unc_rav = tf.reshape(xi_unc,[n_batch,-1])
-    xi_unc_rav = tf.expand_dims(xi_unc_rav,1)
+    xi_unc = tf.complex(phi_unc-r2s_unc/((2*np.pi)**2),0.0)
+    xi_unc_rav = tf.expand_dims(tf.reshape(xi_unc,[n_batch,-1]),1)
 
     # Diagonal matrix with the exponential of fieldmap variance
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav))
     Wm_unc_var = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, xi_unc_rav))
+    Wm_unc_var_phi = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, phi_unc_rav))
 
     # Matrix operations (mean)
     WmS = Wm * tf.math.sqrt(Wm_unc_var) * Smtx
     MWmS = tf.linalg.matmul(M_pinv,WmS)
 
     # Matrix operations (variance)
-    WmZS = (1 - Wm_unc_var) * (Smtx * tf.math.conj(Smtx)) #  * (Wm_r2s_var - 1) * (Wm_r2s**2 * Wm_r2s_var)
+    WmZS = (1 - Wm_unc_var_phi) * (Smtx * tf.math.conj(Smtx)) #  * (Wm_r2s_var - 1) * (Wm_r2s**2 * Wm_r2s_var)
     MWmZS = tf.linalg.matmul(M_pinv * tf.math.conj(M_pinv),WmZS)
 
     # Extract corresponding Water/Fat signals
