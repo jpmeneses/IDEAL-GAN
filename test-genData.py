@@ -29,9 +29,9 @@ args.__dict__.update(test_args.__dict__)
 # =                                    data                                    =
 # ==============================================================================
 
-hgt,wdt = 192,192
 ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200.0,300.0
+hgt,wdt,n_ch = 192,192,2
 
 
 # ==============================================================================
@@ -39,13 +39,13 @@ r2_sc,fm_sc = 200.0,300.0
 # ==============================================================================
 
 if args.G_model == 'encod-decod':
-    enc= dl.encoder(input_shape=(hgt,wdt,ech_idx),
+    enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+    				encoded_size=args.encoded_size,
                     filters=args.n_G_filters,
-                    te_shape=(args.n_echoes,),
                     )
-    dec= dl.decoder(input_shape=enc.output_shape[1:],
-                    n_out=6,
-                    te_shape=(args.n_echoes,),
+    dec= dl.decoder(input_shape=(args.encoded_size),
+                    output_2D_shape=(hgt,wdt),
+                    filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
     G_A2B = tf.keras.Sequential()
     G_A2B.add(enc)
@@ -58,22 +58,31 @@ tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).re
 
 @tf.function
 def sample(Z,TE=None):
-	indices =tf.concat([tf.zeros((Z.shape[0],hgt,wdt,4),dtype=tf.int32),
-                        tf.ones((Z.shape[0],hgt,wdt,1),dtype=tf.int32),
-                        2*tf.ones((Z.shape[0],hgt,wdt,1),dtype=tf.int32)],axis=-1)
+	indices =tf.concat([tf.zeros((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32),
+						tf.ones((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32),
+                        2*tf.ones((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
+	PM_idx = tf.concat([tf.zeros((Z.shape[0],hgt,wdt,1),dtype=tf.int32),
+						tf.ones((Z.shape[0],hgt,wdt,1),dtype=tf.int32)],axis=-1)
+	# A2Z_1 = enc(A_1, training=False)
+	# A2Z_2 = enc(A_2, training=False)
+	# A2Z = keras.layers.Lambda(lambda x: 0.6*x[0] + 0.4*x[1])([A2Z_1,A2Z_2])
+	# A2Z = keras.layers.SpatialDropout2D(rate=0.1)(A2Z, training=True)
 	# Z2B2A Cycle
 	Z2B = dec(Z, training=False)
 	# Split A2B param maps
-	Z2B_WF,Z2B_R2,Z2B_FM = tf.dynamic_partition(Z2B,indices,num_partitions=3)
-	Z2B_WF = tf.reshape(Z2B_WF,Z2B[:,:,:,:4].shape)
-	Z2B_R2 = tf.reshape(Z2B_R2,Z2B[:,:,:,:1].shape)
-	Z2B_FM = tf.reshape(Z2B_FM,Z2B[:,:,:,:1].shape)
+	Z2B_W,Z2B_F,Z2B_PM = tf.dynamic_partition(Z2B,indices,num_partitions=3)
+	Z2B_W = tf.reshape(Z2B_W,(Z.shape[0],hgt,wdt,2))
+	Z2B_F = tf.reshape(Z2B_F,(Z.shape[0],hgt,wdt,2))
+	Z2B_PM = tf.reshape(Z2B_PM,(Z.shape[0],hgt,wdt,2))
+	Z2B_R2,Z2B_FM = tf.dynamic_partition(Z2B_PM,PM_idx,num_partitions=2)
+	Z2B_R2 = tf.reshape(Z2B_R2,(Z.shape[0],hgt,wdt,1))
+	Z2B_FM = tf.reshape(Z2B_FM,(Z.shape[0],hgt,wdt,1))
 	# Correct R2 scaling
 	Z2B_R2 = 0.5*Z2B_R2 + 0.5
-	Z2B = tf.concat([Z2B_WF,Z2B_R2,Z2B_FM],axis=-1)
+	Z2B = tf.concat([Z2B_W,Z2B_F,Z2B_R2,Z2B_FM],axis=-1)
 	# Water/fat magnitudes
-	Z2B_WF_real = Z2B_WF[:,:,:,0::2]
-	Z2B_WF_imag = Z2B_WF[:,:,:,1::2]
+	Z2B_WF_real = tf.concat([Z2B_W[:,:,:,:1],Z2B_F[:,:,:,:1]],axis=-1)
+	Z2B_WF_imag = tf.concat([Z2B_W[:,:,:,1:],Z2B_F[:,:,:,1:]],axis=-1)
 	Z2B_WF_abs = tf.abs(tf.complex(Z2B_WF_real,Z2B_WF_imag))
 	Z2B_abs = tf.concat([Z2B_WF_abs,Z2B_R2,Z2B_FM],axis=-1)
 	# Reconstructed multi-echo images
@@ -85,8 +94,11 @@ def sample(Z,TE=None):
 save_dir = py.join(args.experiment_dir, 'samples_testing', 'Z2B')
 py.mkdir(save_dir)
 
-Z_shape = (args.n_samples,enc.output_shape[1],enc.output_shape[2],enc.output_shape[3])
-Z = tf.random.uniform(Z_shape)
+# num_layers = 4
+# hls = hgt//(2**(num_layers))
+# wls = wdt//(2**(num_layers))
+# z_shape = hls*wls*args.n_G_filters*(2**num_layers)
+Z = tf.random.normal((args.n_samples,args.encoded_size))
 
 TE = wf.gen_TEvar(args.n_echoes,args.n_samples,orig=False)
 
