@@ -65,7 +65,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # =                                    data                                    =
 # ==============================================================================
 
-A2B_pool = data.ItemPool(args.pool_size)
+A2B2A_pool = data.ItemPool(args.pool_size)
 
 ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200.0,300.0
@@ -146,7 +146,7 @@ if args.G_model == 'encod-decod':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-D_B = dl.PatchGAN(input_shape=(hgt,wdt,6), dim=args.n_D_filters, self_attention=(args.D1_SelfAttention))
+D_A = dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.D1_SelfAttention))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -214,8 +214,8 @@ def train_G(A, B):
         B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
         ############## Discriminative Losses ##############
-        A2B_d_logits = D_B(A2B, training=True)
-        A2B_g_loss = g_loss_fn(A2B_d_logits)
+        A2B2A_d_logits = D_A(A2B2A, training=True)
+        A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -228,54 +228,54 @@ def train_G(A, B):
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
         reg_term = R2_TV + FM_TV + R2_L1 + FM_L1
         
-        G_loss = (A2B_g_loss) + (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + reg_term
+        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + reg_term
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
-    return A2B, B2A, {'A2B_g_loss': A2B_g_loss,
-                      'A2B2A_cycle_loss': A2B2A_cycle_loss,
-                      'B2A2B_cycle_loss': B2A2B_cycle_loss,
-                      'TV_R2': R2_TV,
-                      'L1_R2': R2_L1,
-                      'TV_FM': FM_TV,
-                      'L1_FM': FM_L1}
+    return A2B, A2B2A, {'A2B2A_g_loss': A2B2A_g_loss,
+                        'A2B2A_cycle_loss': A2B2A_cycle_loss,
+                        'B2A2B_cycle_loss': B2A2B_cycle_loss,
+                        'TV_R2': R2_TV,
+                        'L1_R2': R2_L1,
+                        'TV_FM': FM_TV,
+                        'L1_FM': FM_L1}
 
 
 @tf.function
-def train_D(B, A2B):
+def train_D(A, A2B2A):
     with tf.GradientTape() as t:
-        B_d_logits = D_B(B, training=True)
-        A2B_d_logits = D_B(A2B, training=True)
+        A_d_logits = D_A(A, training=True)
+        A2B2A_d_logits = D_A(A2B2A, training=True)
         
-        B_d_loss, A2B_d_loss = d_loss_fn(B_d_logits, A2B_d_logits)
+        A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
         
-        D_B_gp = gan.gradient_penalty(functools.partial(D_B, training=True), B, A2B, mode=args.gradient_penalty_mode)
+        D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
-        D_B_r1 = gan.R1_regularization(functools.partial(D_B, training=True), B)
+        D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
 
-        D_B_r2 = gan.R1_regularization(functools.partial(D_B, training=True), A2B)
+        D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
 
-        D_loss = (B_d_loss + A2B_d_loss) + (D_B_gp) * args.gradient_penalty_weight + (D_B_r1) * args.R1_reg_weight + (D_B_r2) * args.R2_reg_weight
+        D_loss = (A_d_loss + A2B2A_d_loss) + (D_A_gp) * args.gradient_penalty_weight + (D_A_r1) * args.R1_reg_weight + (D_A_r2) * args.R2_reg_weight
 
-    D_grad = t.gradient(D_loss, D_B.trainable_variables)
-    D_optimizer.apply_gradients(zip(D_grad, D_B.trainable_variables))
-    return {'D_loss': B_d_loss + A2B_d_loss,
-            'B_d_loss': B_d_loss,
-            'A2B_d_loss': A2B_d_loss,
-            'D_B_gp': D_B_gp,
-            'D_B_r1': D_B_r1,
-            'D_B_r2': D_B_r2,}
+    D_grad = t.gradient(D_loss, D_A.trainable_variables)
+    D_optimizer.apply_gradients(zip(D_grad, D_A.trainable_variables))
+    return {'D_loss': A_d_loss + A2B2A_d_loss,
+            'A_d_loss': B_d_loss,
+            'A2B2A_d_loss': A2B2A_d_loss,
+            'D_A_gp': D_A_gp,
+            'D_A_r1': D_A_r1,
+            'D_A_r2': D_A_r2,}
 
 
 def train_step(A, B):
-    A2B, B2A, G_loss_dict = train_G(A, B)
+    A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     # cannot autograph `A2B_pool`
-    A2B = A2B_pool(A2B)
+    A2B2A = A2B2A_pool(A2B2A)
 
     for _ in range(5):
-        D_loss_dict = train_D(B, A2B)
+        D_loss_dict = train_D(A, A2B2A)
 
     return G_loss_dict, D_loss_dict
 
@@ -322,11 +322,16 @@ def sample(A, B):
     B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
     # B2A2B Mask
     B2A2B = tf.where(B!=0.0,B2A2B,0.0)
+
+    # Discriminative Losses
+    A2B2A_d_logits = D_A(A2B2A, training=True)
+    val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     
     # Validation losses
     val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
     val_B2A2B_loss = cycle_loss_fn(B, B2A2B)
-    return A2B, B2A, A2B2A, B2A2B, {'A2B2A_cycle_loss': val_A2B2A_loss,
+    return A2B, B2A, A2B2A, B2A2B, {'A2B2A_g_loss': val_A2B2A_g_loss,
+                                    'A2B2A_cycle_loss': val_A2B2A_loss,
                                     'B2A2B_cycle_loss': val_B2A2B_loss}
 
 def validation_step(A, B):
@@ -342,7 +347,7 @@ ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
 checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
-                                D_B=D_B,
+                                D_A=D_A,
                                 G_optimizer=G_optimizer,
                                 D_optimizer=D_optimizer,
                                 ep_cnt=ep_cnt),
