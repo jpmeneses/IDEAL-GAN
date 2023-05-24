@@ -214,8 +214,8 @@ def train_G(A, B):
         B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
         ############## Discriminative Losses ##############
-        A2B2A_d_logits = D_A(A2B2A, training=True)
-        A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        # A2B2A_d_logits = D_A(A2B2A, training=True)
+        # A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -272,12 +272,12 @@ def train_step(A, B):
     A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     # cannot autograph `A2B_pool`
-    A2B2A = A2B2A_pool(A2B2A)
+    # A2B2A = A2B2A_pool(A2B2A)
 
-    for _ in range(5):
-        D_loss_dict = train_D(A, A2B2A)
+    # for _ in range(5):
+        # D_loss_dict = train_D(A, A2B2A)
 
-    return G_loss_dict, D_loss_dict
+    return G_loss_dict #, D_loss_dict
 
 
 @tf.function
@@ -324,14 +324,13 @@ def sample(A, B):
     B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
     # Discriminative Losses
-    A2B2A_d_logits = D_A(A2B2A, training=True)
-    val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+    # A2B2A_d_logits = D_A(A2B2A, training=True)
+    # val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     
     # Validation losses
     val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
     val_B2A2B_loss = cycle_loss_fn(B, B2A2B)
-    return A2B, B2A, A2B2A, B2A2B, {'A2B2A_g_loss': val_A2B2A_g_loss,
-                                    'A2B2A_cycle_loss': val_A2B2A_loss,
+    return A2B, B2A, A2B2A, B2A2B, {'A2B2A_cycle_loss': val_A2B2A_loss,
                                     'B2A2B_cycle_loss': val_B2A2B_loss}
 
 def validation_step(A, B):
@@ -403,16 +402,16 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        G_loss_dict, D_loss_dict = train_step(A, B)
+        G_loss_dict = train_step(A, B)
 
         # summary
         with train_summary_writer.as_default():
             tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
-            tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
+            # tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
             tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
                         step=G_optimizer.iterations, name='G learning rate')
-            tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
-                        step=G_optimizer.iterations, name='D learning rate')
+            # tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
+                        # step=G_optimizer.iterations, name='D learning rate')
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
