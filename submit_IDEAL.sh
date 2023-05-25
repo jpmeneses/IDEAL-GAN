@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=v012-GAN
-#SBATCH --output=out_GAN_011.txt
+#SBATCH --output=out_GAN_012.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
