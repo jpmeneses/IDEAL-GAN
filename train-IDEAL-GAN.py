@@ -187,7 +187,7 @@ def train_G(A, B):
         A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
         
         # Mask
-        A2B = tf.where(B!=0.0,A2B,0.0)
+        # A2B = tf.where(B!=0.0,A2B,0.0)
         
         # Reconstructed multi-echo images
         A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
@@ -211,7 +211,7 @@ def train_G(A, B):
         B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
         
         # B2A2B Mask
-        B2A2B = tf.where(B!=0.0,B2A2B,0.0)
+        # B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
         ############## Discriminative Losses ##############
         # A2B2A_d_logits = D_A(A2B2A, training=True)
@@ -301,7 +301,7 @@ def sample(A, B):
     A2B_R2 = 0.5*A2B_R2 + 0.5
     A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
     # A2B Mask
-    A2B = tf.where(B!=0.0,A2B,0.0)
+    # A2B = tf.where(B!=0.0,A2B,0.0)
     # Reconstructed multi-echo images
     A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
 
@@ -320,7 +320,7 @@ def sample(A, B):
     B2A2B_R2 = 0.5*B2A2B_R2 + 0.5
     B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
     # B2A2B Mask
-    B2A2B = tf.where(B!=0.0,B2A2B,0.0)
+    # B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
     # Discriminative Losses
     # A2B2A_d_logits = D_A(A2B2A, training=True)
