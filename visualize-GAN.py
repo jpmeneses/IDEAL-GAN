@@ -23,7 +23,7 @@ import data
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--te_input', type=bool, default=False)
-py.arg('--n_samples', type=int, default=10)
+py.arg('--n_samples', type=int, default=100)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
@@ -110,7 +110,7 @@ print('A2Z2B shape:',A2Z2B.shape)
 # umap.plot.points(mapper)#, labels=digits.target)
 # plt.show()
 
-pca = PCA(n_components = 10)
+pca = PCA(n_components = 2)
 encoded_imgs = pca.fit_transform(A2Z)
 print(encoded_imgs.shape)
 
