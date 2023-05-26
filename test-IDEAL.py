@@ -11,6 +11,7 @@ import data
 import matplotlib.pyplot as plt
 import tqdm
 import xlsxwriter
+from matplotlib.colors import LogNorm
 from skimage.metrics import structural_similarity
 
 # ==============================================================================
@@ -124,7 +125,6 @@ elif args.k_fold == 5:
 len_dataset,hgt,wdt,d_ech = np.shape(testX)
 _,_,_,n_out = np.shape(testY)
 echoes = int(d_ech/2)
-r2_sc,fm_sc = 200,300
 
 print('Length dataset:', len_dataset)
 print('Acquisition Dimensions:', hgt,wdt)
@@ -329,13 +329,18 @@ def sample(A, B, TE=None):
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
 
+        A2B = tf.concat([A2B_WF,A2B_R2,A2B_FM], axis=-1)
         A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
 
         # Variance map mask
         if args.UQ:
-            A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
-            A2B_R2_var = tf.where(A[:,:,:,:1]!=0.0,A2B_R2_var,0.0)
-            A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
+            A2B_PM_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
+            A2B_PM_var = tf.where(A2B_PM_var!=0.0,A2B_PM_var,1e-12)
+            A2B_PM_var = tf.where(A[:,:,:,:2]!=0.0,A2B_PM_var,1e-12)
+            A2B_WF_var = wf.PDFF_uncertainty(A,A2B,A2B_PM_var)
+            A2B_WF_var = tf.where(A2B_WF_var!=0.0,A2B_WF_var,1e-12)
+            A2B_WF_var = tf.where(A[:,:,:,:4]!=0.0,A2B_WF_var,1e-12)
+            A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=-1)
         else:
             A2B_var = None
 
@@ -360,15 +365,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
 
     if args.UQ:
         # Get water/fat uncertainties
-        WF, WF_var = wf.PDFF_uncertainty(A,A2B,A2B_var)
-        w_aux = np.squeeze(tf.abs(tf.complex(WF[:,:,:,0],WF[:,:,:,1])))
-        f_aux = np.squeeze(tf.abs(tf.complex(WF[:,:,:,2],WF[:,:,:,3])))
-        # w_aux = np.squeeze(A2B[:,:,:,0])
-        # f_aux = np.squeeze(A2B[:,:,:,1])
-        W_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,0],WF_var[:,:,:,1])))
-        F_var = np.squeeze(tf.abs(tf.complex(WF_var[:,:,:,2],WF_var[:,:,:,3])))
-        r2s_var = np.squeeze(A2B_var[:,:,:,:1])*(r2_sc**2)
-        field_var = np.squeeze(A2B_var[:,:,:,-1:])*(fm_sc**2)
+        w_aux = np.squeeze(A2B[:,:,:,0])
+        f_aux = np.squeeze(A2B[:,:,:,1])
+        W_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,:,:,0],A2B_var[:,:,:,1])))
+        F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,:,:,2],A2B_var[:,:,:,3])))
+        r2s_var = np.squeeze(A2B_var[:,:,:,4])*(r2_sc**2)
+        field_var = np.squeeze(A2B_var[:,:,:,5])*(fm_sc**2)
         hgt_plt, wdt_plt, nr, nc = 10, 20, 3, 5
     else:
         w_aux = np.squeeze(A2B[:,:,:,0])
@@ -449,23 +451,23 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             # Uncertainty maps in the 3rd row
             fig.delaxes(axs[2,0]) # No PDFF variance map
 
-            W_uq =  axs[2,1].imshow(W_var, cmap='gnuplot2',
-                                    interpolation='none', vmin=0, vmax=0.00005)
+            W_uq = axs[2,1].matshow(W_var, cmap='gnuplot2',
+                                    norm=LogNorm(vmin=1e-12,vmax=1e-8))
             fig.colorbar(W_uq, ax=axs[2,1])
             axs[2,1].axis('off')
 
-            F_uq =  axs[2,2].imshow(F_var, cmap='gnuplot2',
-                                    interpolation='none', vmin=0, vmax=0.00005)
+            F_uq = axs[2,2].matshow(F_var, cmap='gnuplot2',
+                                    norm=LogNorm(vmin=1e-12,vmax=1e-8))
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            r2s_uq =axs[2,3].imshow(r2s_var, cmap='gnuplot',
-                                    interpolation='none', vmin=0, vmax=2)
+            r2s_uq=axs[2,3].matshow(r2s_var, cmap='gnuplot',
+                                    norm=LogNorm(vmin=10,vmax=0.1))
             fig.colorbar(r2s_uq, ax=axs[2,3])
             axs[2,3].axis('off')
 
-            field_uq =  axs[2,4].imshow(field_var, cmap='gnuplot2',
-                                        interpolation='none', vmin=0, vmax=3)
+            field_uq = axs[2,4].matshow(field_var, cmap='gnuplot2',
+                                        norm=LogNorm(vmin=10,vmax=0.1))
             fig.colorbar(field_uq, ax=axs[2,4])
             axs[2,4].axis('off')
         else:
