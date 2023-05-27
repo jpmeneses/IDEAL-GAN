@@ -36,8 +36,7 @@ class SelfAttention(Layer):
  
         super(SelfAttention, self).build(input_shape)
         # Set input spec.
-        self.input_spec = InputSpec(ndim=4,
-                                    axes={3: input_shape[-1]})
+        self.input_spec = InputSpec(axes={3: input_shape[-1]})
         self.built = True
  
     def call(self, x):
