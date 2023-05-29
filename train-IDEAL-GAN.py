@@ -259,12 +259,12 @@ def train_D(A, A2B2A):
 
         D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
 
-        D_loss = (A_d_loss + A2B2A_d_loss) + (D_A_gp) * args.gradient_penalty_weight + (D_A_r1) * args.R1_reg_weight + (D_A_r2) * args.R2_reg_weight
+        D_loss = (A_d_loss + A2B2A_d_loss) #+ (D_A_gp) * args.gradient_penalty_weight + (D_A_r1) * args.R1_reg_weight + (D_A_r2) * args.R2_reg_weight
 
     D_grad = t.gradient(D_loss, D_A.trainable_variables)
     D_optimizer.apply_gradients(zip(D_grad, D_A.trainable_variables))
     return {'D_loss': A_d_loss + A2B2A_d_loss,
-            'A_d_loss': B_d_loss,
+            'A_d_loss': A_d_loss,
             'A2B2A_d_loss': A2B2A_d_loss,
             'D_A_gp': D_A_gp,
             'D_A_r1': D_A_r1,
@@ -411,11 +411,11 @@ for ep in range(args.epochs):
         # summary
         with train_summary_writer.as_default():
             tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
-            # tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
+            tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
             tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
                         step=G_optimizer.iterations, name='G learning rate')
-            # tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
-                        # step=G_optimizer.iterations, name='D learning rate')
+            tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
+                        step=G_optimizer.iterations, name='D learning rate')
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
