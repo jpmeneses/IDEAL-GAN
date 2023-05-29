@@ -149,7 +149,7 @@ else:
 D_A = dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.D1_SelfAttention))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
-cycle_loss_fn = tf.losses.MeanAbsoluteError()
+cycle_loss_fn = tf.losses.MeanSquaredError()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 D_lr_scheduler = dl.LinearDecay(4*args.lr, 5 * total_steps, 5 * args.epoch_decay * total_steps / args.epochs)
@@ -214,8 +214,8 @@ def train_G(A, B):
         # B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
         ############## Discriminative Losses ##############
-        # A2B2A_d_logits = D_A(A2B2A, training=True)
-        # A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        A2B2A_d_logits = D_A(A2B2A, training=True)
+        A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -230,12 +230,13 @@ def train_G(A, B):
 
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + reg_term + activ_reg
+        G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + reg_term + activ_reg
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
-    return A2B, A2B2A, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
+    return A2B, A2B2A, {'A2B2A_g_loss': A2B2A_g_loss,
+                        'A2B2A_cycle_loss': A2B2A_cycle_loss,
                         'B2A2B_cycle_loss': B2A2B_cycle_loss,
                         'LS_reg':activ_reg,
                         'TV_R2': R2_TV,
@@ -274,12 +275,12 @@ def train_step(A, B):
     A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     # cannot autograph `A2B_pool`
-    # A2B2A = A2B2A_pool(A2B2A)
+    A2B2A = A2B2A_pool(A2B2A)
 
-    # for _ in range(5):
-        # D_loss_dict = train_D(A, A2B2A)
+    for _ in range(5):
+        D_loss_dict = train_D(A, A2B2A)
 
-    return G_loss_dict #, D_loss_dict
+    return G_loss_dict, D_loss_dict
 
 
 @tf.function
@@ -326,13 +327,14 @@ def sample(A, B):
     # B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
     # Discriminative Losses
-    # A2B2A_d_logits = D_A(A2B2A, training=True)
-    # val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+    A2B2A_d_logits = D_A(A2B2A, training=True)
+    val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     
     # Validation losses
     val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
     val_B2A2B_loss = cycle_loss_fn(B, B2A2B)
-    return A2B, B2A, A2B2A, B2A2B, {'A2B2A_cycle_loss': val_A2B2A_loss,
+    return A2B, B2A, A2B2A, B2A2B, {'A2B2A_g_loss': val_A2B2A_g_loss,
+                                    'A2B2A_cycle_loss': val_A2B2A_loss,
                                     'B2A2B_cycle_loss': val_B2A2B_loss}
 
 def validation_step(A, B):
