@@ -131,7 +131,7 @@ if args.G_model == 'encod-decod':
                     ls_reg_weight=args.ls_reg_weight,
                     NL_self_attention=args.NL_SelfAttention
                     )
-    dec= dl.decoder(input_shape=(args.encoded_size),
+    dec= dl.decoder(encoded_dims=args.encoded_size,
                     output_2D_shape=(hgt,wdt),
                     filters=args.n_G_filters,
                     NL_self_attention=args.NL_SelfAttention)
