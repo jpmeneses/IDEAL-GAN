@@ -43,13 +43,7 @@ py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--cycle_loss_weight', type=float, default=10.0)
 py.arg('--B2A2B_weight', type=float, default=1.0)
 py.arg('--ls_reg_weight', type=float, default=1.0)
-py.arg('--R2_TV_weight', type=float, default=0.0)
-py.arg('--FM_TV_weight', type=float, default=0.0)
-py.arg('--R2_L1_weight', type=float, default=0.0)
-py.arg('--FM_L1_weight', type=float, default=0.0)
-py.arg('--D1_SelfAttention',type=bool, default=False)
-py.arg('--D2_SelfAttention',type=bool, default=True)
-py.arg('--D3_SelfAttention',type=bool, default=True)
+py.arg('--NL_SelfAttention',type=bool, default=False)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
 args = py.args()
 
@@ -132,14 +126,15 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 if args.G_model == 'encod-decod':
     enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
-                    encoded_size=args.encoded_size,
+                    encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     ls_reg_weight=args.ls_reg_weight,
+                    NL_self_attention=args.NL_SelfAttention
                     )
     dec= dl.decoder(input_shape=(args.encoded_size),
                     output_2D_shape=(hgt,wdt),
                     filters=args.n_G_filters,
-                    self_attention=args.D1_SelfAttention)
+                    NL_self_attention=args.NL_SelfAttention)
     G_A2B = keras.Sequential()
     G_A2B.add(enc)
     G_A2B.add(dec)
@@ -214,23 +209,17 @@ def train_G(A, B):
         # B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
         ############## Discriminative Losses ##############
-        A2B2A_d_logits = D_A(A2B2A, training=True)
-        A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        # A2B2A_d_logits = D_A(A2B2A, training=True)
+        # A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B, B2A2B)
 
         ################ Regularizers #####################
-        R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
-        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
-        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_R2),axis=(1,2,3))) * args.FM_L1_weight
-        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
-        reg_term = R2_TV + FM_TV + R2_L1 + FM_L1
-
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + reg_term + activ_reg
+        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + activ_reg
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
@@ -255,7 +244,7 @@ def train_D(A, A2B2A):
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
-        # D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
+        D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
 
         # D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
 
@@ -275,12 +264,12 @@ def train_step(A, B):
     A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     # cannot autograph `A2B_pool`
-    A2B2A = A2B2A_pool(A2B2A)
+    # A2B2A = A2B2A_pool(A2B2A)
 
-    for _ in range(5):
-        D_loss_dict = train_D(A, A2B2A)
+    # for _ in range(5):
+        # D_loss_dict = train_D(A, A2B2A)
 
-    return G_loss_dict, D_loss_dict
+    return G_loss_dict #, D_loss_dict
 
 
 @tf.function
@@ -406,16 +395,16 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        G_loss_dict, D_loss_dict = train_step(A, B)
+        G_loss_dict = train_step(A, B)
 
         # summary
         with train_summary_writer.as_default():
             tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
-            tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
+            # tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
             tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
                         step=G_optimizer.iterations, name='G learning rate')
-            tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
-                        step=G_optimizer.iterations, name='D learning rate')
+            # tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
+                        # step=G_optimizer.iterations, name='D learning rate')
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
