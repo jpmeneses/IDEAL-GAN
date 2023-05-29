@@ -66,6 +66,23 @@ def _conv2d_block(
     return c
 
 
+def _residual_block(x, norm):
+    Norm = _get_norm_layer(norm)
+    dim = x.shape[-1]
+    h = x
+
+    h = tf.pad(h, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
+    h = keras.layers.Conv2D(dim, 3, padding='valid', use_bias=False)(h)
+    h = Norm()(h)
+    h = tf.nn.relu(h)
+
+    h = tf.pad(h, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
+    h = keras.layers.Conv2D(dim, 3, padding='valid', use_bias=False)(h)
+    h = Norm()(h)
+
+    return keras.layers.add([x, h])
+
+
 def PatchGAN(input_shape,
             dim=64,
             n_downsamplings=3,
@@ -510,36 +527,39 @@ def PM_complex(
 
 def encoder(
     input_shape,
-    encoded_size,
+    encoded_dims,
     filters=36,
     num_layers=4,
+    num_res_blocks=2,
     dropout=0.0,
     ls_reg_weight=1.0,
+    NL_self_attention=True,
     norm='instance_norm'):
 
+    Norm = _get_norm_layer(norm)
     x = inputs1 = keras.Input(input_shape)
 
     x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    x = keras.layers.Conv2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
-    down_layers = []
     for l in range(num_layers):
-        x = _conv2d_block(
-            inputs=x,
-            filters=filters,
-            dropout=dropout,
-            downsampling=True,
-            activation=tf.nn.leaky_relu,
-            norm=norm
-            )
-        down_layers.append(x)
+        for n_res in range(num_res_blocks):
+            x = _residual_block(x, norm=norm)
 
-        filters = filters * 2  # double the number of filters with each layer
+        # Double the number of filters and downsample
+        filters = filters * 2  
+        x = keras.layers.Conv2D(filters,3,strides=2,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
-    x = keras.layers.Reshape((x.shape[1]*x.shape[2],x.shape[3]))(x)
-    x = keras.layers.Conv1D(int(np.ceil(2*encoded_size/(x.shape[1]))),10,padding="same",
-                            activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    if NL_self_attention:
+        x = _residual_block(x, norm=norm)
+        x = SelfAttention(ch=filters)(x)
+        x = _residual_block(x, norm=norm)
+    
+    x = Norm()(x)
+    x = keras.layers.Conv2D(2*encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+
     x = keras.layers.Flatten()(x)
-    x = keras.layers.Dense(2*encoded_size,activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    encoded_size = x.shape[-1]//2
     
     prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros(encoded_size), scale=1))
     output = tfp.layers.IndependentNormal(
@@ -550,58 +570,46 @@ def encoder(
 
 
 def decoder(
-    input_shape,
+    encoded_dims,
     output_2D_shape,
     n_species=3,
     filters=36,
-    bayesian=False,
     num_layers=4,
-    style_latent_vec=False,
-    n_style_dense=8,
+    num_res_blocks=2,
     dropout=0.0,
     output_activation='tanh',
     output_initializer='glorot_normal',
-    self_attention=True,
+    NL_self_attention=True,
     norm='instance_norm'):
+    Norm = _get_norm_layer(norm)
 
     hgt,wdt = output_2D_shape
     hls = hgt//(2**(num_layers))
     wls = wdt//(2**(num_layers))
-    decod_size = hls*wls*4
+    decod_2D_size = hls*wls
+    input_shape = decod_2D_size*encoded_dims
+    filt_ini = filters*(2**num_layers)
     
     x = inputs1 = keras.Input(input_shape)
-    x = keras.layers.Dense(decod_size,activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
-    x = keras.layers.Reshape(target_shape=(hls,wls,4))(x)
+    x = keras.layers.Reshape(target_shape=(hls,wls,x.shape[-1]//decod_2D_size))(x)
+    x = keras.layers.Conv2D(filt_ini,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
-    filt_ini = filters*(2**num_layers)
-
-    if style_latent_vec:
-        w = keras.layers.Flatten()(x)
-        for _ in range(n_style_dense):
-            w = keras.layers.Dense(filters)(w)
+    if NL_self_attention:
+        x = _residual_block(x, norm=norm)
+        x = SelfAttention(ch=filt_ini)(x)
+        x = _residual_block(x, norm=norm)    
 
     x_list = [x for i in range(n_species)]
     for sp in range(n_species):
-        filters = filt_ini
+        filt_iter = filt_ini
         for cont in range(num_layers):
-            filters //= 2  # decreasing number of filters with each layer
-            x_list[sp] = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x_list[sp])
-
-            if self_attention and cont == 0:
-                x_list[sp] = SelfAttention(ch=filters)(x_list[sp])
-            x_list[sp] = _conv2d_block(
-                    inputs=x_list[sp],
-                    filters=filters,
-                    dropout=dropout,
-                    activation=tf.nn.leaky_relu,
-                    norm=norm
-                    )
-
-            # Adaptive Instance Normalization for Style-Trasnfer
-            if style_latent_vec:
-                x_list[sp] = AdaIN(x_list[sp], w)
+            filt_iter //= 2  # decreasing number of filters with each layer
+            x_list[sp] = _upsample(filt_iter, (2, 2), strides=(2, 2), padding="same")(x_list[sp])
+            for n_res in range(num_res_blocks):
+                x_list[sp] = _residual_block(x_list[sp], norm=norm)
 
         x_list[sp] = keras.layers.Lambda(lambda x: tf.expand_dims(x,axis=1))(x_list[sp])
+        x_list[sp] = Norm()(x_list[sp])
         x_list[sp] = keras.layers.Conv2D(2,3,padding="same",activation=output_activation,kernel_initializer=output_initializer)(x_list[sp])
 
     output = keras.layers.concatenate(x_list,axis=1)
