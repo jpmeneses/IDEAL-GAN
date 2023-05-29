@@ -141,7 +141,7 @@ if args.G_model == 'encod-decod':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-D_A = dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.D1_SelfAttention))
+D_A = dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.NL_SelfAttention))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -227,11 +227,7 @@ def train_G(A, B):
     return A2B, A2B2A, {'A2B2A_g_loss': A2B2A_g_loss,
                         'A2B2A_cycle_loss': A2B2A_cycle_loss,
                         'B2A2B_cycle_loss': B2A2B_cycle_loss,
-                        'LS_reg':activ_reg,
-                        'TV_R2': R2_TV,
-                        'L1_R2': R2_L1,
-                        'TV_FM': FM_TV,
-                        'L1_FM': FM_L1}
+                        'LS_reg':activ_reg}
 
 
 @tf.function
