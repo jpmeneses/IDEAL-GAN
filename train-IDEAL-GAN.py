@@ -224,8 +224,7 @@ def train_G(A, B):
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
-    return A2B, A2B2A, {'A2B2A_g_loss': A2B2A_g_loss,
-                        'A2B2A_cycle_loss': A2B2A_cycle_loss,
+    return A2B, A2B2A, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
                         'B2A2B_cycle_loss': B2A2B_cycle_loss,
                         'LS_reg':activ_reg}
 
