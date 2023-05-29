@@ -149,7 +149,7 @@ else:
 D_A = dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.D1_SelfAttention))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
-cycle_loss_fn = tf.losses.MeanSquaredError()
+cycle_loss_fn = tf.losses.MeanAbsoluteError()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 D_lr_scheduler = dl.LinearDecay(4*args.lr, 5 * total_steps, 5 * args.epoch_decay * total_steps / args.epochs)
