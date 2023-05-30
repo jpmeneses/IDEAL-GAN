@@ -72,12 +72,12 @@ def _residual_block(x, norm):
     h = x
 
     h = tf.pad(h, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
-    h = keras.layers.Conv2D(dim, 3, padding='valid', use_bias=False)(h)
+    h = keras.layers.Conv2D(dim, 3, kernel_initializer='he_normal', padding='valid', use_bias=False)(h)
     h = Norm()(h)
-    h = tf.nn.relu(h)
+    h = tf.nn.leaky_relu(h)
 
     h = tf.pad(h, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
-    h = keras.layers.Conv2D(dim, 3, padding='valid', use_bias=False)(h)
+    h = keras.layers.Conv2D(dim, 3, kernel_initializer='he_normal', padding='valid', use_bias=False)(h)
     h = Norm()(h)
 
     return keras.layers.add([x, h])
