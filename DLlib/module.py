@@ -592,7 +592,8 @@ def decoder(
     filt_ini = filters*(2**num_layers)
     
     x = inputs1 = keras.Input(input_shape)
-    x = keras.layers.Reshape(target_shape=(hls,wls,x.shape[-1]//decod_2D_size))(x)
+    x = keras.layers.Reshape(target_shape=(x.shape[-1]//decod_2D_size,hls,wls))(x)
+    x = keras.layers.Lambda(lambda x: tf.transpose(x,perm=[0,2,3,1]))(x)
     x = keras.layers.Conv2D(filt_ini,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
     if NL_self_attention:
