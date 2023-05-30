@@ -40,13 +40,13 @@ hgt,wdt,n_ch = 192,192,2
 
 if args.G_model == 'encod-decod':
     enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
-    				encoded_size=args.encoded_size,
+    				encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
-                    )
-    dec= dl.decoder(input_shape=(args.encoded_size),
+                    NL_self_attention=args.NL_SelfAttention)
+    dec= dl.decoder(encoded_dims=args.encoded_size,
                     output_2D_shape=(hgt,wdt),
                     filters=args.n_G_filters,
-                    self_attention=args.D1_SelfAttention)
+                    NL_self_attention=args.NL_SelfAttention)
     G_A2B = tf.keras.Sequential()
     G_A2B.add(enc)
     G_A2B.add(dec)
