@@ -556,8 +556,12 @@ def encoder(
         x = _residual_block(x, norm=norm)
     
     x = Norm()(x)
-    x = keras.layers.Conv2D(2*encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
+    x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+    x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
+    x = keras.layers.concatenate([x_mean,x_std],axis=-1)
+    
     x = keras.layers.Lambda(lambda x: tf.transpose(x,perm=[0,3,1,2]))(x)
     x = keras.layers.Flatten()(x)
     encoded_size = x.shape[-1]//2
