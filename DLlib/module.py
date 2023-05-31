@@ -559,11 +559,12 @@ def encoder(
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
     x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+    x_mean = keras.layers.Flatten()(x_mean)
+
     x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
-    x = keras.layers.concatenate([x_mean,x_std],axis=-1)
+    x_std = keras.layers.Flatten()(x_std)
     
-    x = keras.layers.Lambda(lambda x: tf.transpose(x,perm=[0,3,1,2]))(x)
-    x = keras.layers.Flatten()(x)
+    x = keras.layers.concatenate([x_mean,x_std],axis=-1)
     encoded_size = x.shape[-1]//2
     
     prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros(encoded_size), scale=1))
@@ -596,8 +597,7 @@ def decoder(
     filt_ini = filters*(2**num_layers)
     
     x = inputs1 = keras.Input(input_shape)
-    x = keras.layers.Reshape(target_shape=(x.shape[-1]//decod_2D_size,hls,wls))(x)
-    x = keras.layers.Lambda(lambda x: tf.transpose(x,perm=[0,2,3,1]))(x)
+    x = keras.layers.Reshape(target_shape=(hls,wls,encoded_dims))(x)
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
     x = keras.layers.Conv2D(filt_ini,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
