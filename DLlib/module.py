@@ -598,17 +598,16 @@ def decoder(
     
     x = inputs1 = keras.Input(input_shape)
     x = keras.layers.Reshape(target_shape=(hls,wls,encoded_dims))(x)
-    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
-    x = keras.layers.Conv2D(filt_ini,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
-
-    if NL_self_attention:
-        x = _residual_block(x, norm=norm)
-        x = SelfAttention(ch=filt_ini)(x)
-        x = _residual_block(x, norm=norm)    
 
     x_list = [x for i in range(n_species)]
     for sp in range(n_species):
         filt_iter = filt_ini
+        x_list[sp] = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x_list[sp])
+        x_list[sp] = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x_list[sp])
+        if NL_self_attention:
+            x_list[sp] = _residual_block(x_list[sp], norm=norm)
+            x_list[sp] = SelfAttention(ch=filt_ini)(x_list[sp])
+            x_list[sp] = _residual_block(x_list[sp], norm=norm)
         for cont in range(num_layers):
             filt_iter //= 2  # decreasing number of filters with each layer
             x_list[sp] = _upsample(filt_iter, (2, 2), strides=(2, 2), padding="same")(x_list[sp])
