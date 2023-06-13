@@ -173,16 +173,13 @@ def train_G(A, B):
         A2B_F = tf.reshape(A2B_F,B[:,:,:,:2].shape)
         A2B_PM = tf.reshape(A2B_PM,B[:,:,:,:2].shape)
 
-        A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
+        A2B_FM,A2B_R2 = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
         A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
         A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
         
         # Correct R2 scaling
-        A2B_R2 = 0.5*A2B_R2 + 0.5
+        A2B_R2 = tf.nn.relu(2*np.pi*A2B_R2)
         A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
-        
-        # Mask
-        # A2B = tf.where(B!=0.0,A2B,0.0)
         
         # Reconstructed multi-echo images
         A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
@@ -197,16 +194,13 @@ def train_G(A, B):
         B2A2B_F = tf.reshape(B2A2B_F,B[:,:,:,:2].shape)
         B2A2B_PM = tf.reshape(B2A2B_PM,B[:,:,:,:2].shape)
 
-        B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
+        B2A2B_FM,B2A2B_R2 = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
         B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
         B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
 
         # Correct R2s scaling
-        B2A2B_R2 = 0.5*B2A2B_R2 + 0.5
+        B2A2B_R2 = tf.nn.relu(2*np.pi*B2A2B_R2)
         B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
-        
-        # B2A2B Mask
-        # B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
         ############## Discriminative Losses ##############
         # A2B2A_d_logits = D_A(A2B2A, training=True)
@@ -282,14 +276,12 @@ def sample(A, B):
     A2B_W = tf.reshape(A2B_W,B[:,:,:,:2].shape)
     A2B_F = tf.reshape(A2B_F,B[:,:,:,:2].shape)
     A2B_PM = tf.reshape(A2B_PM,B[:,:,:,:2].shape)
-    A2B_R2,A2B_FM = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
+    A2B_FM,A2B_R2 = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
     A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
     A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
     # Correct R2 scaling
-    A2B_R2 = 0.5*A2B_R2 + 0.5
+    A2B_R2 = tf.nn.relu(2*np.pi*A2B_R2)
     A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
-    # A2B Mask
-    # A2B = tf.where(B!=0.0,A2B,0.0)
     # Reconstructed multi-echo images
     A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
 
@@ -301,14 +293,12 @@ def sample(A, B):
     B2A2B_W = tf.reshape(B2A2B_W,B[:,:,:,:2].shape)
     B2A2B_F = tf.reshape(B2A2B_F,B[:,:,:,:2].shape)
     B2A2B_PM= tf.reshape(B2A2B_PM,B[:,:,:,:2].shape)
-    B2A2B_R2,B2A2B_FM = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
+    B2A2B_FM,B2A2B_R2 = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
     B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
     B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
     # Correct R2 scaling
-    B2A2B_R2 = 0.5*B2A2B_R2 + 0.5
+    B2A2B_R2 = tf.nn.relu(2*np.pi*B2A2B_R2)
     B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
-    # B2A2B Mask
-    # B2A2B = tf.where(B!=0.0,B2A2B,0.0)
 
     # Discriminative Losses
     # A2B2A_d_logits = D_A(A2B2A, training=True)
