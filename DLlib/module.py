@@ -534,7 +534,6 @@ def encoder(
     NL_self_attention=True,
     norm='instance_norm'):
 
-    Norm = _get_norm_layer(norm)
     x = inputs1 = keras.Input(input_shape)
 
     x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
@@ -553,7 +552,6 @@ def encoder(
         x = SelfAttention(ch=filters)(x)
         x = _residual_block(x, norm=norm)
     
-    x = Norm()(x)
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
     x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
