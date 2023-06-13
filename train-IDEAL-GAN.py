@@ -169,9 +169,9 @@ def train_G(A, B):
 
         # Split A2B param maps
         A2B_W,A2B_F,A2B_PM = tf.dynamic_partition(A2B,indices,num_partitions=3)
-        A2B_W = tf.squeeze(tf.reshape(A2B_W,A[:,:1,:,:,:2].shape),axis=1)
-        A2B_F = tf.squeeze(tf.reshape(A2B_F,A[:,:1,:,:,:2].shape),axis=1)
-        A2B_PM = tf.squeeze(tf.reshape(A2B_PM,A[:,:1,:,:,:2].shape),axis=1)
+        A2B_W = tf.squeeze(tf.reshape(A2B_W,A[:,:1,:,:,:].shape),axis=1)
+        A2B_F = tf.squeeze(tf.reshape(A2B_F,A[:,:1,:,:,:].shape),axis=1)
+        A2B_PM = tf.squeeze(tf.reshape(A2B_PM,A[:,:1,:,:,:].shape),axis=1)
 
         A2B_FM,A2B_R2 = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
         A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
@@ -190,9 +190,9 @@ def train_G(A, B):
         
         # Split B2A2B param maps
         B2A2B_W,B2A2B_F,B2A2B_PM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
-        B2A2B_W = tf.squeeze(tf.reshape(B2A2B_W,A[:,:1,:,:,:2].shape),axis=1)
-        B2A2B_F = tf.squeeze(tf.reshape(B2A2B_F,A[:,:1,:,:,:2].shape),axis=1)
-        B2A2B_PM = tf.squeeze(tf.reshape(B2A2B_PM,A[:,:1,:,:,:2].shape),axis=1)
+        B2A2B_W = tf.squeeze(tf.reshape(B2A2B_W,A[:,:1,:,:,:].shape),axis=1)
+        B2A2B_F = tf.squeeze(tf.reshape(B2A2B_F,A[:,:1,:,:,:].shape),axis=1)
+        B2A2B_PM = tf.squeeze(tf.reshape(B2A2B_PM,A[:,:1,:,:,:].shape),axis=1)
 
         B2A2B_FM,B2A2B_R2 = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
         B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
@@ -273,9 +273,9 @@ def sample(A, B):
     A2B = G_A2B(A, training=False)
     # Split A2B param maps
     A2B_W,A2B_F,A2B_PM = tf.dynamic_partition(A2B,indices,num_partitions=3)
-    A2B_W = tf.squeeze(tf.reshape(A2B_W,A[:,:1,:,:,:2].shape),axis=1)
-    A2B_F = tf.squeeze(tf.reshape(A2B_F,A[:,:1,:,:,:2].shape),axis=1)
-    A2B_PM = tf.squeeze(tf.reshape(A2B_PM,A[:,:1,:,:,:2].shape),axis=1)
+    A2B_W = tf.squeeze(tf.reshape(A2B_W,A[:,:1,:,:,:].shape),axis=1)
+    A2B_F = tf.squeeze(tf.reshape(A2B_F,A[:,:1,:,:,:].shape),axis=1)
+    A2B_PM = tf.squeeze(tf.reshape(A2B_PM,A[:,:1,:,:,:].shape),axis=1)
     A2B_FM,A2B_R2 = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
     A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
     A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
@@ -290,9 +290,9 @@ def sample(A, B):
     B2A2B = G_A2B(B2A, training=False)
     # Split B2A2B param maps
     B2A2B_W,B2A2B_F,B2A2B_PM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
-    B2A2B_W = tf.squeeze(tf.reshape(B2A2B_W,A[:,:1,:,:,:2].shape),axis=1)
-    B2A2B_F = tf.squeeze(tf.reshape(B2A2B_F,A[:,:1,:,:,:2].shape),axis=1)
-    B2A2B_PM= tf.squeeze(tf.reshape(B2A2B_PM,A[:,:1,:,:,:2].shape),axis=1)
+    B2A2B_W = tf.squeeze(tf.reshape(B2A2B_W,A[:,:1,:,:,:].shape),axis=1)
+    B2A2B_F = tf.squeeze(tf.reshape(B2A2B_F,A[:,:1,:,:,:].shape),axis=1)
+    B2A2B_PM= tf.squeeze(tf.reshape(B2A2B_PM,A[:,:1,:,:,:].shape),axis=1)
     B2A2B_FM,B2A2B_R2 = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
     B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
     B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
