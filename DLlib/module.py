@@ -556,6 +556,7 @@ def encoder(
         x = _residual_block(x, norm=norm)
     
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+    _,ls_hgt,ls_wdt,ls_dims = x.shape
 
     x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
     x_mean = keras.layers.Flatten()(x_mean)
@@ -564,11 +565,9 @@ def encoder(
     x_std = keras.layers.Flatten()(x_std)
     
     x = keras.layers.concatenate([x_mean,x_std],axis=-1)
-    encoded_size = x.shape[-1]//2
     
-    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros(encoded_size), scale=1))
-    output = tfp.layers.IndependentNormal(
-                encoded_size,
+    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,encoded_dims)), scale=1))
+    output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
                 activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
@@ -591,12 +590,10 @@ def decoder(
     hgt,wdt = output_2D_shape
     hls = hgt//(2**(num_layers))
     wls = wdt//(2**(num_layers))
-    decod_2D_size = hls*wls
-    input_shape = decod_2D_size*encoded_dims
     filt_ini = filters*(2**num_layers)
+    input_shape = (hls,wls,encoded_dims)
     
     x = inputs1 = keras.Input(input_shape)
-    x = keras.layers.Reshape(target_shape=(hls,wls,encoded_dims))(x)
 
     x_list = [x for i in range(n_species)]
     for sp in range(n_species):
