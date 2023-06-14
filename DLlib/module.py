@@ -83,9 +83,11 @@ def _residual_block(x, norm):
 
 def PatchGAN(input_shape,
             dim=64,
+            lstm_dim=36,
             n_downsamplings=3,
             in_kernel=4,
             n_kernel=4,
+            lstm_kernel=3,
             self_attention=True,
             norm='instance_norm'):
     dim_ = dim
@@ -93,6 +95,7 @@ def PatchGAN(input_shape,
 
     # 0
     h = inputs = keras.Input(shape=input_shape)
+    h = keras.layers.ConvLSTM2D(lstm_dim, lstm_kernel, padding='same', activation=tf.nn.leaky_relu, kernel_initializer='he_normal')(h)
 
     # 1
     conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, in_kernel, strides=2, padding='same', kernel_initializer='he_normal'))
