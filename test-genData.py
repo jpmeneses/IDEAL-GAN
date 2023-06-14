@@ -71,14 +71,14 @@ def sample(Z,TE=None):
 	Z2B = dec(Z, training=False)
 	# Split A2B param maps
 	Z2B_W,Z2B_F,Z2B_PM = tf.dynamic_partition(Z2B,indices,num_partitions=3)
-	Z2B_W = tf.reshape(Z2B_W,(Z.shape[0],hgt,wdt,2))
-	Z2B_F = tf.reshape(Z2B_F,(Z.shape[0],hgt,wdt,2))
-	Z2B_PM = tf.reshape(Z2B_PM,(Z.shape[0],hgt,wdt,2))
-	Z2B_R2,Z2B_FM = tf.dynamic_partition(Z2B_PM,PM_idx,num_partitions=2)
+	Z2B_W = tf.squeeze(tf.reshape(Z2B_W,(Z.shape[0],1,hgt,wdt,2)),axis=1)
+	Z2B_F = tf.squeeze(tf.reshape(Z2B_F,(Z.shape[0],1,hgt,wdt,2)),axis=1)
+	Z2B_PM= tf.squeeze(tf.reshape(Z2B_PM,(Z.shape[0],1,hgt,wdt,2)),axis=1)
+	Z2B_FM,Z2B_R2 = tf.dynamic_partition(Z2B_PM,PM_idx,num_partitions=2)
 	Z2B_R2 = tf.reshape(Z2B_R2,(Z.shape[0],hgt,wdt,1))
 	Z2B_FM = tf.reshape(Z2B_FM,(Z.shape[0],hgt,wdt,1))
 	# Correct R2 scaling
-	Z2B_R2 = 0.5*Z2B_R2 + 0.5
+	Z2B_R2 = 2*np.pi*(0.5*Z2B_R2 + 0.5)
 	Z2B = tf.concat([Z2B_W,Z2B_F,Z2B_R2,Z2B_FM],axis=-1)
 	# Water/fat magnitudes
 	Z2B_WF_real = tf.concat([Z2B_W[:,:,:,:1],Z2B_F[:,:,:,:1]],axis=-1)
@@ -94,32 +94,32 @@ def sample(Z,TE=None):
 save_dir = py.join(args.experiment_dir, 'samples_testing', 'Z2B')
 py.mkdir(save_dir)
 
-# num_layers = 4
-# hls = hgt//(2**(num_layers))
-# wls = wdt//(2**(num_layers))
-# z_shape = hls*wls*args.n_G_filters*(2**num_layers)
-Z = tf.random.normal((args.n_samples,args.encoded_size))
+num_layers = 4
+hls = hgt//(2**(num_layers))
+wls = wdt//(2**(num_layers))
+z_shape = hls*wls*args.encoded_size
 
-TE = wf.gen_TEvar(args.n_echoes,args.n_samples,orig=False)
-
-Z2B, Z2B2A = sample(Z,TE)
+TE = wf.gen_TEvar(1,args.n_samples,orig=False)
 
 for k in range(args.n_samples):
-	w_aux = np.squeeze(Z2B[k,:,:,0])
-	f_aux = np.squeeze(Z2B[k,:,:,1])
-	r2_aux = np.squeeze(Z2B[k,:,:,2])
-	field_aux = np.squeeze(Z2B[k,:,:,3])
+	Z = tf.random.normal((1,z_shape),seed=0)
+	Z2B, Z2B2A = sample(Z)
 
-	im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[k,:,:,0],Z2B2A[k,:,:,1])))
-	im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[k,:,:,2],Z2B2A[k,:,:,3])))
+	w_aux = np.squeeze(Z2B[:,:,:,0])
+	f_aux = np.squeeze(Z2B[:,:,:,1])
+	r2_aux = np.squeeze(Z2B[:,:,:,2])
+	field_aux = np.squeeze(Z2B[:,:,:,3])
+
+	im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,0],Z2B2A[:,:,:,1])))
+	im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,2],Z2B2A[:,:,:,3])))
 	if args.n_echoes >= 3:
-	    im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[k,:,:,4],Z2B2A[k,:,:,5])))
+	    im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,4],Z2B2A[:,:,:,5])))
 	if args.n_echoes >= 4:
-	    im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[k,:,:,6],Z2B2A[k,:,:,7])))
+	    im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,6],Z2B2A[:,:,:,7])))
 	if args.n_echoes >= 5:
-	    im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[k,:,:,8],Z2B2A[k,:,:,9])))
+	    im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,8],Z2B2A[:,:,:,9])))
 	if args.n_echoes >= 6:
-	    im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[k,:,:,10],Z2B2A[k,:,:,11])))
+	    im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,10],Z2B2A[:,:,:,11])))
 
 	fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
