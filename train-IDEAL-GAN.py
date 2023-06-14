@@ -305,7 +305,7 @@ def sample(A, B):
     val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     
     # Validation losses
-    val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
+    val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, B2A2B)
     return A2B, B2A, A2B2A, B2A2B, {'A2B2A_cycle_loss': val_A2B2A_loss,
                                     'B2A2B_cycle_loss': val_B2A2B_loss,
