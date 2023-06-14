@@ -122,7 +122,7 @@ def R1_regularization(f, real_sample):
     grad_real = t.gradient(pred_real,real_sample)
     norm_grad = tf.reduce_sum(tf.reshape(grad_real**2, [tf.shape(grad_real)[0], -1]), axis=1)
     reg_loss = tf.reduce_mean(norm_grad)
-    return reg_loss
+    return tf.cast(reg_loss, tf.float32)
 
 
 def VarMeanSquaredError(A, A2B2A, var_map):
