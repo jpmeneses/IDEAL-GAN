@@ -236,16 +236,17 @@ def train_D(A, A2B2A):
 
         D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
 
-        # D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
+        D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
 
-        D_loss = (A_d_loss + A2B2A_d_loss) + (D_A_r1 * args.R1_reg_weight) #+ (D_A_r2) * args.R2_reg_weight
+        D_loss = (A_d_loss + A2B2A_d_loss) + (D_A_r1 * args.R1_reg_weight) + (D_A_r2 * args.R2_reg_weight)
 
     D_grad = t.gradient(D_loss, D_A.trainable_variables)
     D_optimizer.apply_gradients(zip(D_grad, D_A.trainable_variables))
     return {'D_loss': A_d_loss + A2B2A_d_loss,
             'A_d_loss': A_d_loss,
             'A2B2A_d_loss': A2B2A_d_loss,
-            'D_A_r1': D_A_r1}
+            'D_A_r1': D_A_r1,
+            'D_A_r2': D_A_r2}
 
 
 def train_step(A, B):
