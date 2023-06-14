@@ -203,8 +203,8 @@ def train_G(A, B):
         B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
 
         ############## Discriminative Losses ##############
-        # A2B2A_d_logits = D_A(A2B2A, training=True)
-        # A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        A2B2A_d_logits = D_A(A2B2A, training=True)
+        A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -213,13 +213,14 @@ def train_G(A, B):
         ################ Regularizers #####################
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + activ_reg
+        G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + activ_reg
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
     return A2B, A2B2A, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
                         'B2A2B_cycle_loss': B2A2B_cycle_loss,
+                        'A2B2A_g_loss': A2B2A_g_loss,
                         'LS_reg':activ_reg}
 
 
@@ -237,28 +238,26 @@ def train_D(A, A2B2A):
 
         # D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
 
-        D_loss = (A_d_loss + A2B2A_d_loss) #+ (D_A_r1 * args.R1_reg_weight) #+ (D_A_r2) * args.R2_reg_weight
+        D_loss = (A_d_loss + A2B2A_d_loss) + (D_A_r1 * args.R1_reg_weight) #+ (D_A_r2) * args.R2_reg_weight
 
     D_grad = t.gradient(D_loss, D_A.trainable_variables)
     D_optimizer.apply_gradients(zip(D_grad, D_A.trainable_variables))
     return {'D_loss': A_d_loss + A2B2A_d_loss,
             'A_d_loss': A_d_loss,
             'A2B2A_d_loss': A2B2A_d_loss,
-            'D_A_gp': D_A_gp,
-            'D_A_r1': D_A_r1,
-            'D_A_r2': D_A_r2,}
+            'D_A_r1': D_A_r1}
 
 
 def train_step(A, B):
     A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     # cannot autograph `A2B_pool`
-    # A2B2A = A2B2A_pool(A2B2A)
+    A2B2A = A2B2A_pool(A2B2A)
 
-    # for _ in range(5):
-        # D_loss_dict = train_D(A, A2B2A)
+    for _ in range(5):
+        D_loss_dict = train_D(A, A2B2A)
 
-    return G_loss_dict #, D_loss_dict
+    return G_loss_dict, D_loss_dict
 
 
 @tf.function
@@ -301,14 +300,15 @@ def sample(A, B):
     B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
 
     # Discriminative Losses
-    # A2B2A_d_logits = D_A(A2B2A, training=True)
-    # val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+    A2B2A_d_logits = D_A(A2B2A, training=True)
+    val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     
     # Validation losses
     val_A2B2A_loss = tf.abs(cycle_loss_fn(A, A2B2A))
     val_B2A2B_loss = cycle_loss_fn(B, B2A2B)
     return A2B, B2A, A2B2A, B2A2B, {'A2B2A_cycle_loss': val_A2B2A_loss,
-                                    'B2A2B_cycle_loss': val_B2A2B_loss}
+                                    'B2A2B_cycle_loss': val_B2A2B_loss,
+                                    'A2B2A_g_loss': val_A2B2A_g_loss}
 
 def validation_step(A, B):
     A2B, B2A, A2B2A, B2A2B, val_loss_dict = sample(A, B)
@@ -384,11 +384,11 @@ for ep in range(args.epochs):
         # summary
         with train_summary_writer.as_default():
             tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
-            # tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
+            tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
             tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
                         step=G_optimizer.iterations, name='G learning rate')
-            # tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
-                        # step=G_optimizer.iterations, name='D learning rate')
+            tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
+                        step=G_optimizer.iterations, name='D learning rate')
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
