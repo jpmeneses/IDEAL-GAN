@@ -78,7 +78,7 @@ def sample(Z,TE=None):
 	Z2B_R2 = tf.reshape(Z2B_R2,(Z.shape[0],hgt,wdt,1))
 	Z2B_FM = tf.reshape(Z2B_FM,(Z.shape[0],hgt,wdt,1))
 	# Correct R2 scaling
-	Z2B_R2 = 2*np.pi*(0.5*Z2B_R2 + 0.5)
+	Z2B_R2 = 0.5*Z2B_R2 + 0.5
 	Z2B = tf.concat([Z2B_W,Z2B_F,Z2B_R2,Z2B_FM],axis=-1)
 	# Water/fat magnitudes
 	Z2B_WF_real = tf.concat([Z2B_W[:,:,:,:1],Z2B_F[:,:,:,:1]],axis=-1)
