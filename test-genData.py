@@ -102,7 +102,7 @@ z_shape = (1,hls,wls,args.encoded_size)
 TE = wf.gen_TEvar(1,args.n_samples,orig=False)
 
 for k in range(args.n_samples):
-	Z = tf.random.normal(z_shape,seed=0)
+	Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
 	Z2B, Z2B2A = sample(Z)
 
 	w_aux = np.squeeze(Z2B[:,:,:,0])
