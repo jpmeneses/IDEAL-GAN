@@ -231,6 +231,8 @@ def train_D(A, A2B2A):
         A2B2A_d_logits = D_A(A2B2A, training=True)
         
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
+        D_loss = A_d_loss + A2B2A_d_loss
+        tf.debugging.check_numerics(D_loss, message='NaN: grad real')
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
@@ -238,11 +240,11 @@ def train_D(A, A2B2A):
 
         D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
 
-        D_loss = (A_d_loss + A2B2A_d_loss) + (D_A_r1 * args.R1_reg_weight) + (D_A_r2 * args.R2_reg_weight)
+        D_loss = D_loss + (D_A_r1 * args.R1_reg_weight) + (D_A_r2 * args.R2_reg_weight)
 
     D_grad = t.gradient(D_loss, D_A.trainable_variables)
     D_optimizer.apply_gradients(zip(D_grad, D_A.trainable_variables))
-    return {'D_loss': A_d_loss + A2B2A_d_loss,
+    return {'D_loss': D_loss,
             'A_d_loss': A_d_loss,
             'A2B2A_d_loss': A2B2A_d_loss,
             'D_A_r1': D_A_r1,

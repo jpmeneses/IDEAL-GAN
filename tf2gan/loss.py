@@ -120,8 +120,11 @@ def R1_regularization(f, real_sample):
         t.watch(real_sample)
         pred_real = f(real_sample)
     grad_real = t.gradient(pred_real,real_sample)
+    tf.debugging.check_numerics(grad_real, message='NaN: grad_real')
     norm_grad = tf.reduce_sum(tf.reshape(grad_real**2, [tf.shape(grad_real)[0], -1]), axis=1)
+    tf.debugging.check_numerics(grad_real, message='NaN: norm_grad')
     reg_loss = tf.reduce_mean(norm_grad)
+    tf.debugging.check_numerics(grad_real, message='NaN: reg_loss')
     return tf.cast(reg_loss, tf.float32)
 
 
