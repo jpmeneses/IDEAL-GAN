@@ -231,6 +231,7 @@ def train_D(A, A2B2A):
         A2B2A_d_logits = D_A(A2B2A, training=True)
         
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
+        tf.debugging.check_numerics(A2B2A_d_loss, message='A2B2A numerical error')
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
