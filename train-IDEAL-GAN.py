@@ -380,7 +380,7 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        G_loss_dict = train_step(A, B)
+        G_loss_dict, D_loss_dict = train_step(A, B)
 
         # summary
         with train_summary_writer.as_default():
