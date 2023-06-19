@@ -149,7 +149,7 @@ cycle_loss_fn = tf.losses.MeanSquaredError()
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 D_lr_scheduler = dl.LinearDecay(4*args.lr, 5 * total_steps, 5 * args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
-D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2, clipvalue=1e3)
 
 # ==============================================================================
 # =                                 train step                                 =
@@ -231,24 +231,22 @@ def train_D(A, A2B2A):
         A2B2A_d_logits = D_A(A2B2A, training=True)
         
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
-        D_loss = A_d_loss + A2B2A_d_loss
-        tf.debugging.check_numerics(D_loss, message='NaN: grad real')
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
-        D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
+        # D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
 
-        D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
+        # D_A_r2 = gan.R1_regularization(functools.partial(D_A, training=True), A2B2A)
 
-        D_loss = D_loss + (D_A_r1 * args.R1_reg_weight) + (D_A_r2 * args.R2_reg_weight)
+        D_loss = (A_d_loss + A2B2A_d_loss) #+ (D_A_r1 * args.R1_reg_weight) + (D_A_r2 * args.R2_reg_weight)
 
     D_grad = t.gradient(D_loss, D_A.trainable_variables)
     D_optimizer.apply_gradients(zip(D_grad, D_A.trainable_variables))
-    return {'D_loss': D_loss,
+    return {'D_loss': A_d_loss + A2B2A_d_loss,
             'A_d_loss': A_d_loss,
-            'A2B2A_d_loss': A2B2A_d_loss,
-            'D_A_r1': D_A_r1,
-            'D_A_r2': D_A_r2}
+            'A2B2A_d_loss': A2B2A_d_loss,}
+            #'D_A_r1': D_A_r1,
+            #'D_A_r2': D_A_r2}
 
 
 def train_step(A, B):
