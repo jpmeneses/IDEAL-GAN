@@ -257,7 +257,8 @@ def train_step(A, B):
     # for _ in range(5):
         # D_loss_dict = train_D(A, A2B2A)
 
-    D_loss_dict = {'D_loss': 0, 'A_d_loss': 0, 'A2B2A_d_loss': 0}
+    D_aux_val = tf.constant(0.0,dtype=tf.float32)
+    D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
 
     return G_loss_dict, D_loss_dict
 
