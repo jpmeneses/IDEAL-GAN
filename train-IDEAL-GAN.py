@@ -11,9 +11,7 @@ import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
 import wflib as wf
-
 import data
-from keras_unet.models import custom_unet
 
 from itertools import cycle
 
@@ -221,7 +219,7 @@ def train_G(A, B):
     return A2B, A2B2A, {'A2B2A_g_loss': A2B2A_g_loss,
                         'A2B2A_cycle_loss': A2B2A_cycle_loss,
                         'B2A2B_cycle_loss': B2A2B_cycle_loss,
-                        'LS_reg':activ_reg}
+                        'LS_reg': activ_reg}
 
 
 @tf.function
@@ -254,10 +252,12 @@ def train_step(A, B):
     A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     # cannot autograph `A2B_pool`
-    A2B2A = A2B2A_pool(A2B2A)
+    # A2B2A = A2B2A_pool(A2B2A)
 
-    for _ in range(5):
-        D_loss_dict = train_D(A, A2B2A)
+    # for _ in range(5):
+        # D_loss_dict = train_D(A, A2B2A)
+
+    D_loss_dict = {'D_loss': 0, 'A_d_loss': 0, 'A2B2A_d_loss': 0}
 
     return G_loss_dict, D_loss_dict
 
