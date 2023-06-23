@@ -125,7 +125,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
         return (res_rho,S_hat)
 
 
-@tf.function
+@tf.custom_gradient
 def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=False):
     n_batch,hgt,wdt,_ = out_maps.shape
 
@@ -168,13 +168,23 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1)
 
-    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # (nb,ne,nv)
+
+    def grad(upstream): # Must be same shape as out_maps
+        # M shape: (ne,ns) || rho shape: (nb,ns,nv) || xi shape: (nb,1,nv)
+        Wp_t = tf.transpose(Wp, perm=[0,2,1]) # (nb,nv,ne)
+        ds_dp = tf.transpose(tf.linalg.matmul(Wp_t,M), perm=[0,2,1]) # (nb,nv,ns) --> (nb,ns,nv)
+        # reshape ds_dp to (nb,hgt,wdt,[2 x ns])
+
+        ds_dxi = tf.complex(1.0,2*np.pi*xi_rav) # (nb,1,nv)
+        # reshape ds_dxi to (nb,hgt,wdt,2)
+
 
     # Matrix operations
     if only_mag:
         Smtx = tf.abs(Wp) * tf.abs(tf.linalg.matmul(M,rho_mtx))
     else:
-        Smtx = Wp * tf.linalg.matmul(M,rho_mtx)
+        Smtx = Wp * tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
     S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
