@@ -252,13 +252,13 @@ def train_step(A, B):
     A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     # cannot autograph `A2B_pool`
-    A2B2A = A2B2A_pool(A2B2A)
+    # A2B2A = A2B2A_pool(A2B2A)
 
-    for _ in range(5):
-        D_loss_dict = train_D(A, A2B2A)
+    # for _ in range(5):
+        # D_loss_dict = train_D(A, A2B2A)
 
-    # D_aux_val = tf.constant(0.0,dtype=tf.float32)
-    # D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
+    D_aux_val = tf.constant(0.0,dtype=tf.float32)
+    D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
 
     return G_loss_dict, D_loss_dict
 
