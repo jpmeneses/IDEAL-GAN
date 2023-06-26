@@ -201,8 +201,9 @@ def train_G(A, B):
         B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
 
         ############## Discriminative Losses ##############
-        A2B2A_d_logits = D_A(A2B2A, training=False)
-        A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        # A2B2A_d_logits = D_A(A2B2A, training=False)
+        # A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -211,7 +212,7 @@ def train_G(A, B):
         ################ Regularizers #####################
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + activ_reg
+        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + activ_reg #+ A2B2A_g_loss
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
