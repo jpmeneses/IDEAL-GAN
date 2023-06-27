@@ -163,7 +163,7 @@ def IDEAL_model(out_maps):
     Smtx = Wp * tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
+    S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,6])
     S_hat = tf.expand_dims(tf.transpose(S_hat, perm=[0,3,1,2]),-1)
     
     # Split into real and imaginary channels
