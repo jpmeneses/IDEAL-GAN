@@ -192,17 +192,18 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
         res_ds_dp = re_aux + im_aux
 
         # Xi gradient, considering Taylor approximation
-        te_complex_t = tf.transpose(te_complex,perm=[0,2,1]) # (nb,ne,1) --> (nb,1,ne)
-        ds_dxi = tf.linalg.matmul(2*np.pi*te_complex_t, Smtx) # (nb,1,nv)
-        # Reshape ds_dxi to (nb,hgt,wdt,2)
-        Re_xi = tf.math.real(ds_dxi)
-        Im_xi = tf.math.imag(ds_dxi)
-        zero_fill = tf.zeros_like(Re_xi)
-        re_stack = tf.stack([Re_xi,zero_fill],4)
-        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2])
-        im_stack = tf.stack([zero_fill,Im_xi],4)
-        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2])
-        res_ds_dxi = re_aux + im_aux
+        # te_complex_t = tf.transpose(te_complex,perm=[0,2,1]) # (nb,ne,1) --> (nb,1,ne)
+        # ds_dxi = tf.linalg.matmul(2*np.pi*te_complex_t, Smtx) # (nb,1,nv)
+        # # Reshape ds_dxi to (nb,hgt,wdt,2)
+        # Re_xi = tf.math.real(ds_dxi)
+        # Im_xi = tf.math.imag(ds_dxi)
+        # zero_fill = tf.zeros_like(Re_xi)
+        # re_stack = tf.stack([Re_xi,zero_fill],4)
+        # re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2])
+        # im_stack = tf.stack([zero_fill,Im_xi],4)
+        # im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2])
+        # res_ds_dxi = re_aux + im_aux
+        res_ds_dxi = tf.ones_like(param_maps,dtype=tf.float32)*1e-12
 
         res_ds = tf.concat([res_ds_dp,res_ds_dxi],axis=-1)
 
