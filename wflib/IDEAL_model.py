@@ -140,7 +140,7 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
     M = gen_M(te,get_Mpinv=False)
 
     te_complex = tf.complex(0.0,te)
-    te_complex = tf.expand_dims(te_complex,-1)
+    te_complex = tf.expand_dims(te_complex,-1) # (nb,ne,1)
 
     # Split water/fat images (orig_rho) and param. maps
     if only_mag:
@@ -166,25 +166,47 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
-    xi_rav = tf.expand_dims(xi_rav,1)
+    xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # (nb,ne,nv)
-
-    # def grad(upstream): # Must be same shape as out_maps
-        # M shape: (ne,ns) || rho shape: (nb,ns,nv) || xi shape: (nb,1,nv)
-        # Wp_t = tf.transpose(Wp, perm=[0,2,1]) # (nb,nv,ne)
-        # ds_dp = tf.transpose(tf.linalg.matmul(Wp_t,M), perm=[0,2,1]) # (nb,nv,ns) --> (nb,ns,nv)
-        # reshape ds_dp to (nb,hgt,wdt,[2 x ns])
-
-        # ds_dxi = tf.complex(1.0,2*np.pi*xi_rav) # (nb,1,nv)
-        # reshape ds_dxi to (nb,hgt,wdt,2)
-
 
     # Matrix operations
     if only_mag:
         Smtx = tf.abs(Wp) * tf.abs(tf.linalg.matmul(M,rho_mtx))
     else:
         Smtx = Wp * tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
+
+    def grad(upstream): # Must be same shape as out_maps
+        # M shape: (ne,ns) || rho shape: (nb,ns,nv) || xi shape: (nb,1,nv)
+        # Water/fat gradient
+        Wp_t = tf.transpose(Wp, perm=[0,2,1]) # (nb,nv,ne)
+        ds_dp = tf.transpose(tf.linalg.matmul(Wp_t,M), perm=[0,2,1]) # (nb,nv,ns) --> (nb,ns,nv)
+        # Reshape ds_dp to (nb,hgt,wdt,[2 x ns])
+        Re_rho = tf.math.real(ds_dp)
+        Im_rho = tf.math.imag(ds_dp)
+        zero_fill = tf.zeros_like(Re_rho)
+        re_stack = tf.stack([Re_rho,zero_fill],4)
+        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
+        im_stack = tf.stack([zero_fill,Im_rho],4)
+        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
+        res_ds_dp = re_aux + im_aux
+
+        # Xi gradient, considering Taylor approximation
+        te_complex_t = tf.transpose(te_complex,perm=[0,2,1]) # (nb,ne,1) --> (nb,1,ne)
+        ds_dxi = tf.linalg.matmul(2*np.pi*te_complex_t, Smtx) # (nb,1,nv)
+        # Reshape ds_dxi to (nb,hgt,wdt,2)
+        Re_xi = tf.math.real(ds_dxi)
+        Im_xi = tf.math.imag(ds_dxi)
+        zero_fill = tf.zeros_like(Re_xi)
+        re_stack = tf.stack([Re_xi,zero_fill],4)
+        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2])
+        im_stack = tf.stack([zero_fill,Im_xi],4)
+        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2])
+        res_ds_dxi = re_aux + im_aux
+
+        res_ds = tf.concat([res_ds_dp,res_ds_dxi],axis=-1)
+
+        return upstream * res_ds
 
     # Reshape to original acquisition dimensions
     S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
