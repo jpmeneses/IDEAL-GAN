@@ -125,7 +125,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
         return (res_rho,S_hat)
 
 
-@tf.function
+@tf.custom_gradient
 def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=False):
     n_batch,hgt,wdt,_ = out_maps.shape
 
