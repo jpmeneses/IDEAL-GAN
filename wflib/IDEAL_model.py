@@ -198,10 +198,10 @@ def IDEAL_model(out_maps):
         Im_xi = tf.math.imag(ds_dxi)
         zero_fill = tf.zeros_like(Re_xi)
         re_stack = tf.stack([Re_xi,zero_fill],3)
-        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt])
+        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2])
         im_stack = tf.stack([zero_fill,Im_xi],3)
-        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt])
-        res_ds_dxi = tf.expand_dims(re_aux + im_aux, axis=-1)
+        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2])
+        res_ds_dxi = re_aux + im_aux
         # res_ds_dxi = tf.ones_like(param_maps,dtype=tf.float32)*1e-12
 
         res_ds = tf.concat([res_ds_dp,res_ds_dxi],axis=-1)
