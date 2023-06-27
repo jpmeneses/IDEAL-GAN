@@ -142,6 +142,8 @@ else:
 
 D_A = dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.NL_SelfAttention))
 
+IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
+
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
 
@@ -181,10 +183,10 @@ def train_G(A, B):
         A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
         
         # Reconstructed multi-echo images
-        A2B2A = wf.IDEAL_Layer(A2B,args.n_echoes,MEBCRN=True)
+        A2B2A = IDEAL_op(A2B, training=False)
 
         ##################### B Cycle #####################
-        B2A = wf.IDEAL_Layer(B,args.n_echoes,MEBCRN=True)
+        B2A = IDEAL_op(B, training=False)
         B2A2B = G_A2B(B2A, training=True)
         
         # Split B2A2B param maps
