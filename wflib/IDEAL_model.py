@@ -220,7 +220,7 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
         Re_gt = tf.math.real(S_hat)
         Im_gt = tf.math.imag(S_hat)
         res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
-        return res_gt
+        return res_gt, grad
     else:
         # Split into real and imaginary channels
         Re_gt = tf.math.real(S_hat)
@@ -231,7 +231,23 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
         im_stack = tf.stack([zero_fill,Im_gt],4)
         im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ne])
         res_gt = re_aux + im_aux
-        return res_gt
+        return res_gt, grad
+
+
+class IDEAL_Layer(tf.keras.layers.Layer):
+    def __init__(self,n_ech,MEBCRN=False):
+        super().__init__()
+        self.n_ech = n_ech
+        self.MEBCRN = MEBCRN
+
+    def build(self, input_shape):
+        super().build(input_shape)
+        if (self.MEBCRN and self.n_ech!=input_shape[2]) or (not(self.MEBCRN) and 2*self.n_ech!=input_shape[-1]):
+            raise ValueError("Input doesn't match the echo-train length")
+        self.built = True
+
+    def call(self,out_maps,te=None,training=None):
+        return IDEAL_model(out_maps,self.n_ech,te,MEBCRN=self.MEBCRN)
 
 
 @tf.function
