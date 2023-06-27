@@ -307,8 +307,11 @@ def sample(A, B):
     B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
 
     # Discriminative Losses
-    A2B2A_d_logits = D_A(A2B2A, training=True)
-    val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+    if args.adv_train:
+        A2B2A_d_logits = D_A(A2B2A, training=True)
+        val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+    else:
+        val_A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
     
     # Validation losses
     val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
