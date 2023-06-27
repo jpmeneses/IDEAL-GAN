@@ -181,10 +181,10 @@ def train_G(A, B):
         A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
         
         # Reconstructed multi-echo images
-        A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
+        A2B2A = wf.IDEAL_Layer(A2B,args.n_echoes,MEBCRN=True)
 
         ##################### B Cycle #####################
-        B2A = wf.IDEAL_model(B,args.n_echoes,MEBCRN=True)
+        B2A = wf.IDEAL_Layer(B,args.n_echoes,MEBCRN=True)
         B2A2B = G_A2B(B2A, training=True)
         
         # Split B2A2B param maps
