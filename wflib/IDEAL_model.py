@@ -128,6 +128,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
 @tf.custom_gradient
 def IDEAL_model(out_maps):
     n_batch,hgt,wdt,_ = out_maps.shape
+    ne = 6
     
     te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
     te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0)
@@ -163,7 +164,7 @@ def IDEAL_model(out_maps):
     Smtx = Wp * tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,6])
+    S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
     S_hat = tf.expand_dims(tf.transpose(S_hat, perm=[0,3,1,2]),-1)
     
     # Split into real and imaginary channels
@@ -174,39 +175,27 @@ def IDEAL_model(out_maps):
     def grad(upstream): # Must be same shape as out_maps
         # M shape: (ne,ns) || rho shape: (nb,ns,nv) || xi shape: (nb,1,nv)
         # Water/fat gradient
-        Wp_t = tf.transpose(Wp, perm=[0,2,1]) # (nb,nv,ne)
-        ds_dp = tf.linalg.matmul(Wp_t,M) # (nb,nv,ns)
-        # Reshape ds_dp to (nb,hgt,wdt,[2 x ns])
-        ds_dp = tf.reshape(ds_dp,[n_batch,hgt,wdt,ns])
-        # Split into real and imaginary components
-        Re_rho = tf.math.real(ds_dp)
-        Im_rho = tf.math.imag(ds_dp)
-        zero_fill = tf.zeros_like(Re_rho)
-        re_stack = tf.stack([Re_rho,zero_fill],4)
-        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
-        im_stack = tf.stack([zero_fill,Im_rho],4)
-        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
-        res_ds_dp = re_aux + im_aux
+        ds_dp = Wp * tf.linalg.matmul(M,tf.ones_like(rho_mtx,dtype=tf.float32)) # (nb,ne,nv)
+        # Reshape ds_dp to multi-echo images
+        ds_dp = tf.reshape(ds_dp,[n_batch,ne,hgt,wdt])
+        # Split into real and imaginary components (nb,ne,hgt,wdt,2)
+        Re_rho = tf.expand_dims(tf.math.real(ds_dp),axis=-1)
+        Im_rho = tf.expand_dims(tf.math.imag(ds_dp),axis=-1)
+        res_ds_dp = tf.concat([Re_rho,Im_rho],axis=-1)
 
         # Xi gradient, considering Taylor approximation
         te_complex_t = tf.transpose(te_complex,perm=[0,2,1]) # (nb,ne,1) --> (nb,1,ne)
-        ds_dxi = tf.linalg.matmul(2*np.pi*te_complex_t, Smtx) # (nb,1,nv)
-        # Reshape ds_dxi to (nb,hgt,wdt) [omit last unitary dim]
-        ds_dxi = tf.reshape(tf.squeeze(ds_dxi,axis=1),[n_batch,hgt,wdt])
+        dWp = tf.linalg.matmul(2*np.pi*te_complex, tf.ones_like(xi_rav,dtype=tf.float32)) # (nb,ne,nv)
+        ds_dxi = dWp * Smtx # (nb,ne,nv)
+        # Reshape ds_dxi to multi-echo images (nb,ne,hgt,wdt,2) 
+        ds_dxi = tf.reshape(ds_dxi,[n_batch,ne,hgt,wdt])
         # Split into real and imaginary components
         Re_xi = tf.math.real(ds_dxi)
         Im_xi = tf.math.imag(ds_dxi)
-        zero_fill = tf.zeros_like(Re_xi)
-        re_stack = tf.stack([Re_xi,zero_fill],3)
-        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2])
-        im_stack = tf.stack([zero_fill,Im_xi],3)
-        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2])
-        res_ds_dxi = re_aux + im_aux
+        res_ds_dxi = tf.concat([Re_xi,Im_xi],axis=-1)
         # res_ds_dxi = tf.ones_like(param_maps,dtype=tf.float32)*1e-12
 
-        res_ds = tf.concat([res_ds_dp,res_ds_dxi],axis=-1)
-
-        return upstream * res_ds
+        return upstream * (res_ds_dp + res_ds_dxi)
     
     return res_gt, grad
 
