@@ -126,34 +126,23 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
 
 
 @tf.custom_gradient
-def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=False):
+def IDEAL_model(out_maps):
     n_batch,hgt,wdt,_ = out_maps.shape
-
-    if te is None:
-        stop_te = (n_ech*12/6)*1e-3
-        te = np.arange(start=1.3e-3,stop=stop_te,step=2.1e-3)
-        te = tf.convert_to_tensor(te,dtype=tf.float32)
-        te = tf.expand_dims(te,0)
-        te = tf.tile(te,[n_batch,1])
-
-    ne = te.shape[1]
-    M = gen_M(te,get_Mpinv=False)
-
+    
+    te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
+    te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0)
     te_complex = tf.complex(0.0,te)
     te_complex = tf.expand_dims(te_complex,-1) # (nb,ne,1)
+    
+    M = gen_M(te,get_Mpinv=False)
 
     # Split water/fat images (orig_rho) and param. maps
-    if only_mag:
-        real_rho = out_maps[:,:,:,:2]
-        imag_rho = tf.zeros_like(real_rho)
-        param_maps = out_maps[:,:,:,2:]
-    else:
-        orig_rho = out_maps[:,:,:,:4]
-        param_maps = out_maps[:,:,:,4:]
-        # Generate complex water/fat signals
-        real_rho = orig_rho[:,:,:,0::2]
-        imag_rho = orig_rho[:,:,:,1::2]
+    orig_rho = out_maps[:,:,:,:4]
+    param_maps = out_maps[:,:,:,4:]
     
+    # Generate complex water/fat signals
+    real_rho = orig_rho[:,:,:,0::2]
+    imag_rho = orig_rho[:,:,:,1::2]
     rho = tf.complex(real_rho,imag_rho) * rho_sc
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
@@ -171,11 +160,17 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # (nb,ne,nv)
 
     # Matrix operations
-    if only_mag:
-        Smtx = tf.abs(Wp) * tf.abs(tf.linalg.matmul(M,rho_mtx))
-    else:
-        Smtx = Wp * tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
+    Smtx = Wp * tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
 
+    # Reshape to original acquisition dimensions
+    S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
+    S_hat = tf.expand_dims(tf.transpose(S_hat, perm=[0,3,1,2]),-1)
+    
+    # Split into real and imaginary channels
+    Re_gt = tf.math.real(S_hat)
+    Im_gt = tf.math.imag(S_hat)
+    res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+    
     def grad(upstream): # Must be same shape as out_maps
         # M shape: (ne,ns) || rho shape: (nb,ns,nv) || xi shape: (nb,1,nv)
         # Water/fat gradient
@@ -208,46 +203,18 @@ def IDEAL_model(out_maps,n_ech,te=None,complex_data=False,only_mag=False,MEBCRN=
         res_ds = tf.concat([res_ds_dp,res_ds_dxi],axis=-1)
 
         return upstream * res_ds
-
-    # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
-
-    if only_mag or complex_data:
-        return S_hat
-    elif MEBCRN:
-        S_hat = tf.expand_dims(tf.transpose(S_hat, perm=[0,3,1,2]),-1)
-        # Split into real and imaginary channels
-        Re_gt = tf.math.real(S_hat)
-        Im_gt = tf.math.imag(S_hat)
-        res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
-        return res_gt, grad
-    else:
-        # Split into real and imaginary channels
-        Re_gt = tf.math.real(S_hat)
-        Im_gt = tf.math.imag(S_hat)
-        zero_fill = tf.zeros_like(Re_gt)
-        re_stack = tf.stack([Re_gt,zero_fill],4)
-        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ne])
-        im_stack = tf.stack([zero_fill,Im_gt],4)
-        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ne])
-        res_gt = re_aux + im_aux
-        return res_gt, grad
+    
+    return res_gt, grad
 
 
 class IDEAL_Layer(tf.keras.layers.Layer):
     def __init__(self,n_ech,MEBCRN=False):
-        super().__init__()
+        super(IDEAL_Layer, self).__init__()
         self.n_ech = n_ech
         self.MEBCRN = MEBCRN
 
-    def build(self, input_shape):
-        super().build(input_shape)
-        if input_shape[-1] < 6:
-            raise ValueError("Insufficient number of parameter maps")
-        self.built = True
-
     def call(self,out_maps,te=None,training=None):
-        return IDEAL_model(out_maps,self.n_ech,te,MEBCRN=self.MEBCRN)
+        return IDEAL_model(out_maps)
 
 
 @tf.function
