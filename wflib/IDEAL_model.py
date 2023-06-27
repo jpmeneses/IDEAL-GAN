@@ -242,8 +242,8 @@ class IDEAL_Layer(tf.keras.layers.Layer):
 
     def build(self, input_shape):
         super().build(input_shape)
-        if (self.MEBCRN and self.n_ech!=input_shape[2]) or (not(self.MEBCRN) and 2*self.n_ech!=input_shape[-1]):
-            raise ValueError("Input doesn't match the echo-train length")
+        if input_shape[-1] < 6:
+            raise ValueError("Insufficient number of parameter maps")
         self.built = True
 
     def call(self,out_maps,te=None,training=None):
