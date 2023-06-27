@@ -162,7 +162,7 @@ def train_G(A, B):
     PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     
-    with tf.GradientTape() as t:
+    with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
         A2B = G_A2B(A, training=True)
 
