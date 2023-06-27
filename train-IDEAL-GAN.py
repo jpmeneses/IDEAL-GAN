@@ -20,6 +20,7 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
+py.arg('--adv_train', type=bool, default=False)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='encod-decod', choices=['multi-decod','encod-decod','U-Net','MEBCRN'])
 py.arg('--n_G_filters', type=int, default=36)
@@ -201,9 +202,11 @@ def train_G(A, B):
         B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
 
         ############## Discriminative Losses ##############
-        # A2B2A_d_logits = D_A(A2B2A, training=False)
-        # A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
-        A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
+        if args.adv_train:
+            A2B2A_d_logits = D_A(A2B2A, training=False)
+            A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        else:
+            A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -212,7 +215,7 @@ def train_G(A, B):
         ################ Regularizers #####################
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + activ_reg #+ A2B2A_g_loss
+        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + activ_reg + A2B2A_g_loss
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
@@ -252,14 +255,14 @@ def train_D(A, A2B2A):
 def train_step(A, B):
     A2B, A2B2A, G_loss_dict = train_G(A, B)
 
-    # cannot autograph `A2B_pool`
-    # A2B2A = A2B2A_pool(A2B2A)
-
-    # for _ in range(5):
-        # D_loss_dict = train_D(A, A2B2A)
-
-    D_aux_val = tf.constant(0.0,dtype=tf.float32)
-    D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
+    if args.adv_train:
+        # cannot autograph `A2B_pool`
+        A2B2A = A2B2A_pool(A2B2A)
+        for _ in range(5):
+            D_loss_dict = train_D(A, A2B2A)
+    else:
+        D_aux_val = tf.constant(0.0,dtype=tf.float32)
+        D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
 
     return G_loss_dict, D_loss_dict
 
