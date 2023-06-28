@@ -131,9 +131,8 @@ def IDEAL_model(out_maps):
     ne = 6
     
     te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
-    te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0)
-    te_complex = tf.complex(0.0,te)
-    te_complex = tf.expand_dims(te_complex,-1) # (nb,ne,1)
+    te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
+    te_complex = tf.complex(0.0,te) # (1,ne)
     
     M = gen_M(te,get_Mpinv=False)
 
@@ -147,14 +146,15 @@ def IDEAL_model(out_maps):
     rho_mtx = tf.transpose(tf.reshape(rho, [n_batch, num_voxel, ns]), perm=[0,2,1])
 
     r2s = (out_maps[:,2,:,:,0]*0.5 + 0.5) * r2_sc 
-    phi = out_maps[:,2,:,:,0] * fm_sc
+    phi = out_maps[:,2,:,:,1] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
-    xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
+    xi_rav = tf.expand_dims(xi_rav,-1) # (nb,nv,1)
 
-    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # (nb,ne,nv)
+    Wp = tf.math.exp(tf.linalg.matmul(xi_rav, +2*np.pi * te_complex)) # (nb,nv,ne)
+    Wp = tf.transpose(Wp, perm=[0,2,1]) # (nb,ne,nv)
 
     # Matrix operations
     Smtx = Wp * tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
@@ -169,31 +169,30 @@ def IDEAL_model(out_maps):
     res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
     
     def grad(upstream): # Must be same shape as out_maps
-        # M shape: (ne,ns) || rho shape: (nb,ns,nv) || xi shape: (nb,1,nv)
         # Water/fat gradient
-        unit_rho = tf.ones_like(rho_mtx,dtype=tf.float32)
-        ds_dp = Wp * tf.linalg.matmul(M,tf.complex(unit_rho,unit_rho)) # (nb,ne,nv)
-        # Reshape ds_dp to multi-echo images
-        ds_dp = tf.reshape(ds_dp,[n_batch,ne,hgt,wdt])
-        # Split into real and imaginary components (nb,ne,hgt,wdt,2)
-        Re_rho = tf.expand_dims(tf.math.real(ds_dp),axis=-1)
-        Im_rho = tf.expand_dims(tf.math.imag(ds_dp),axis=-1)
-        res_ds_dp = tf.concat([Re_rho,Im_rho],axis=-1)
-
+        Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[0,2,1])) # (nb,nv,ne,ne)
+        ds_dp = tf.linalg.matmul(Wp_d,M) * rho_sc ## (nb,nv,ne,ns) I1
+        
         # Xi gradient, considering Taylor approximation
-        te_complex_t = tf.transpose(te_complex,perm=[0,2,1]) # (nb,ne,1) --> (nb,1,ne)
-        unit_xi = tf.ones_like(xi_rav,dtype=tf.float32)
-        dWp = tf.linalg.matmul(2*np.pi*te_complex,tf.complex(unit_xi,unit_xi)) # (nb,ne,nv)
-        ds_dxi = dWp * Smtx # (nb,ne,nv)
-        # Reshape ds_dxi to multi-echo images (nb,ne,hgt,wdt,2) 
-        ds_dxi = tf.reshape(ds_dxi,[n_batch,ne,hgt,wdt])
-        # Split into real and imaginary components
-        Re_xi = tf.expand_dims(tf.math.real(ds_dxi),axis=-1)
-        Im_xi = tf.expand_dims(tf.math.imag(ds_dxi),axis=-1)
-        res_ds_dxi = tf.concat([Re_xi,Im_xi],axis=-1)
-        # res_ds_dxi = tf.ones_like(param_maps,dtype=tf.float32)*1e-12
+        dxi = tf.squeeze(tf.linalg.diag(2*np.pi*te_complex)) # (1,ne) --> (ne,ne)
+        ds_dxi = tf.linalg.matmul(dxi,Smtx) # (nb,ne,nv)
+        ds_dxi = tf.expand_dims(tf.transpose(ds_dxi,perm=[0,2,1]),axis=-1) ## (nb,nv,ne,1) I2
 
-        return upstream * (res_ds_dp + res_ds_dxi)
+        # Concatenate d_s/d_param gradients
+        ds_dq = tf.concat([ds_dp,ds_dxi],axis=-1) # (nb,nv,ne,3)
+        ds_dq = tf.transpose(ds_dq, perm=[0,1,3,2]) * fm_sc ## (nv,nv,3,ne)
+
+        # Re-format upstream 
+        upstream = tf.complex(upstream[:,:,:,:,0],upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
+        upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
+
+        grad_res = tf.linalg.matvec(ds_dq, upstream) # (nb,nv,3)
+        grad_res = tf.reshape(tf.transpose(grad_res,perm=[0,2,1]), [n_batch,ns+1,hgt,wdt]) # (nb,3,hgt,wdt)
+        grad_res_r = tf.math.real(tf.expand_dims(grad_res,axis=-1))
+        grad_res_i = tf.math.imag(tf.expand_dims(grad_res,axis=-1))
+        grad_res = tf.concat([grad_res_r,grad_res_i],axis=-1) # (nb,3,hgt,wdt,2)
+
+        return grad_res
     
     return res_gt, grad
 
