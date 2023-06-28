@@ -127,7 +127,7 @@ def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
 
 @tf.custom_gradient
 def IDEAL_model(out_maps):
-    n_batch,hgt,wdt,_ = out_maps.shape
+    n_batch,_,hgt,wdt,_ = out_maps.shape
     ne = 6
     
     te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
@@ -137,21 +137,17 @@ def IDEAL_model(out_maps):
     
     M = gen_M(te,get_Mpinv=False)
 
-    # Split water/fat images (orig_rho) and param. maps
-    orig_rho = out_maps[:,:,:,:4]
-    param_maps = out_maps[:,:,:,4:]
-    
     # Generate complex water/fat signals
-    real_rho = orig_rho[:,:,:,0::2]
-    imag_rho = orig_rho[:,:,:,1::2]
+    real_rho = tf.transpose(out_maps[:,:2,:,:,0],perm=[0,2,3,1])
+    imag_rho = tf.transpose(out_maps[:,:2,:,:,1],perm=[0,2,3,1])
     rho = tf.complex(real_rho,imag_rho) * rho_sc
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.transpose(tf.reshape(rho, [n_batch, num_voxel, ns]), perm=[0,2,1])
 
-    r2s = param_maps[:,:,:,0] * r2_sc
-    phi = param_maps[:,:,:,1] * fm_sc
+    r2s = (out_maps[:,2,:,:,0]*0.5 + 0.5) * r2_sc 
+    phi = out_maps[:,2,:,:,0] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
