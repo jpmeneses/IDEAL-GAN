@@ -175,7 +175,8 @@ def IDEAL_model(out_maps):
     def grad(upstream): # Must be same shape as out_maps
         # M shape: (ne,ns) || rho shape: (nb,ns,nv) || xi shape: (nb,1,nv)
         # Water/fat gradient
-        ds_dp = Wp * tf.linalg.matmul(M,tf.ones_like(rho_mtx,dtype=tf.float32)) # (nb,ne,nv)
+        unit_rho = tf.ones_like(rho_mtx,dtype=tf.float32)
+        ds_dp = Wp * tf.linalg.matmul(M,tf.complex(unit_rho,unit_rho)) # (nb,ne,nv)
         # Reshape ds_dp to multi-echo images
         ds_dp = tf.reshape(ds_dp,[n_batch,ne,hgt,wdt])
         # Split into real and imaginary components (nb,ne,hgt,wdt,2)
@@ -185,7 +186,8 @@ def IDEAL_model(out_maps):
 
         # Xi gradient, considering Taylor approximation
         te_complex_t = tf.transpose(te_complex,perm=[0,2,1]) # (nb,ne,1) --> (nb,1,ne)
-        dWp = tf.linalg.matmul(2*np.pi*te_complex, tf.ones_like(xi_rav,dtype=tf.float32)) # (nb,ne,nv)
+        unit_xi = tf.ones_like(xi_rav,dtype=tf.float32)
+        dWp = tf.linalg.matmul(2*np.pi*te_complex,tf.complex(unit_xi,unit_xi)) # (nb,ne,nv)
         ds_dxi = dWp * Smtx # (nb,ne,nv)
         # Reshape ds_dxi to multi-echo images (nb,ne,hgt,wdt,2) 
         ds_dxi = tf.reshape(ds_dxi,[n_batch,ne,hgt,wdt])
