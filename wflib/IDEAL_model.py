@@ -192,8 +192,8 @@ def IDEAL_model(out_maps):
         # Reshape ds_dxi to multi-echo images (nb,ne,hgt,wdt,2) 
         ds_dxi = tf.reshape(ds_dxi,[n_batch,ne,hgt,wdt])
         # Split into real and imaginary components
-        Re_xi = tf.math.real(ds_dxi)
-        Im_xi = tf.math.imag(ds_dxi)
+        Re_xi = tf.expand_dims(tf.math.real(ds_dxi),axis=-1)
+        Im_xi = tf.expand_dims(tf.math.imag(ds_dxi),axis=-1)
         res_ds_dxi = tf.concat([Re_xi,Im_xi],axis=-1)
         # res_ds_dxi = tf.ones_like(param_maps,dtype=tf.float32)*1e-12
 
