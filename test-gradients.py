@@ -20,13 +20,19 @@ acqs, out_maps = data.load_hdf5(dataset_dir, dataset_hdf5, 12, end=45, MEBCRN=Tr
 acqs = acqs[:,:,::4,::4,:]
 out_maps = out_maps[:,::4,::4,:]
 
+# Pre-process out maps
+out_rho_w = np.expand_dims(out_maps[:,:,:,:2],axis=1)
+out_rho_f = np.expand_dims(out_maps[:,:,:,2:4],axis=1)
+out_xi = np.expand_dims(out_maps[:,:,:,4:],axis=1)
+out_maps = np.concatenate((out_rho_w,out_rho_f,out_xi),axis=1)
+
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
 # Overall dataset statistics
-len_dataset,_,hgt,wdt,n_ch = np.shape(acqs)
-_,_,_,n_out = np.shape(out_maps)
+len_dataset,ne,hgt,wdt,n_ch = np.shape(acqs)
+_,n_out,_,_,_ = np.shape(out_maps)
 
 print('Dataset size:', len_dataset)
 print('Acquisition Dimensions:', hgt,wdt)
@@ -38,7 +44,7 @@ A_B_dataset = A_B_dataset.batch(1).shuffle(len_dataset)
 enc= dl.encoder(input_shape=(6,hgt,wdt,n_ch),
                 encoded_dims=64,
                 filters=12,
-                ls_reg_weight=1e-5,
+                ls_reg_weight=1e-6,
                 NL_self_attention=False)
 dec= dl.decoder(encoded_dims=64,
                 output_2D_shape=(hgt,wdt),
@@ -48,9 +54,9 @@ G_A2B = keras.Sequential()
 G_A2B.add(enc)
 G_A2B.add(dec)
 
-D_A = dl.PatchGAN(input_shape=(6,hgt,wdt,2), dim=12, self_attention=False)
+D_A = dl.PatchGAN(input_shape=(ne,hgt,wdt,2), dim=12, self_attention=False)
 
-IDEAL_op = wf.IDEAL_Layer(6,MEBCRN=True)
+IDEAL_op = wf.IDEAL_Layer(ne,MEBCRN=True)
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -68,44 +74,14 @@ def train_G(A, B):
     PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     
-    with tf.GradientTape(persistent=True) as t:
+    with tf.GradientTape() as t:
         ##################### A Cycle #####################
         A2B = G_A2B(A, training=True)
-
-        # Split A2B param maps
-        A2B_W,A2B_F,A2B_PM = tf.dynamic_partition(A2B,indices,num_partitions=3)
-        A2B_W = tf.squeeze(tf.reshape(A2B_W,A[:,:1,:,:,:].shape),axis=1)
-        A2B_F = tf.squeeze(tf.reshape(A2B_F,A[:,:1,:,:,:].shape),axis=1)
-        A2B_PM = tf.squeeze(tf.reshape(A2B_PM,A[:,:1,:,:,:].shape),axis=1)
-
-        A2B_FM,A2B_R2 = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
-        
-        # Correct R2 scaling
-        A2B_R2 = 0.5*A2B_R2 + 0.5
-        A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
-        
-        # Reconstructed multi-echo images
         A2B2A = IDEAL_op(A2B)
 
         ##################### B Cycle #####################
         B2A = IDEAL_op(B, training=False)
         B2A2B = G_A2B(B2A, training=True)
-        
-        # Split B2A2B param maps
-        B2A2B_W,B2A2B_F,B2A2B_PM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
-        B2A2B_W = tf.squeeze(tf.reshape(B2A2B_W,A[:,:1,:,:,:].shape),axis=1)
-        B2A2B_F = tf.squeeze(tf.reshape(B2A2B_F,A[:,:1,:,:,:].shape),axis=1)
-        B2A2B_PM = tf.squeeze(tf.reshape(B2A2B_PM,A[:,:1,:,:,:].shape),axis=1)
-
-        B2A2B_FM,B2A2B_R2 = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
-        B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-        B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
-
-        # Correct R2s scaling
-        B2A2B_R2 = 0.5*B2A2B_R2 + 0.5
-        B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
 
         ############## Discriminative Losses ##############
         A2B2A_d_logits = D_A(A2B2A, training=False)
@@ -118,7 +94,7 @@ def train_G(A, B):
         ################ Regularizers #####################
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = A2B2A_g_loss + activ_reg + 1e1*(A2B2A_cycle_loss + B2A2B_cycle_loss)
+        G_loss = activ_reg + 1e0*(A2B2A_cycle_loss + B2A2B_cycle_loss) + A2B2A_g_loss
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
@@ -167,9 +143,7 @@ train_summary_writer = tf.summary.create_file_writer(py.join('output', 'test-gra
 
 # main loop
 for ep in range(10):
-    if ep < ep_cnt:
-        continue
-    for A, B in tqdm.tqdm(A_B_dataset, desc='Samples Loop', total=len_dataset):
+    for A, B in tqdm.tqdm(A_B_dataset, desc='Ep. '+str(ep+1), total=len_dataset):
         # ==============================================================================
         # =                                RANDOM TEs                                  =
         # ==============================================================================
