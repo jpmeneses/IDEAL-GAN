@@ -58,7 +58,7 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx,start=0,end=2000,
     out_xi = np.expand_dims(out_xi,axis=1)
     out_maps = np.concatenate((out_rho_w,out_rho_f,out_xi),axis=1)
     
-    ns,hgt,wdt,_ = out_maps.shape
+    ns,_,hgt,wdt,_ = out_maps.shape
 
     if acqs_data:
         acqs = acqs[idxs_list,:,:,:ech_idx]
