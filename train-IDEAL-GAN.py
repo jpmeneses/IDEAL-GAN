@@ -244,10 +244,10 @@ def train_step(A, B):
 def sample(A, B):
     # A2B2A Cycle
     A2B = G_A2B(A, training=False)
-    A2B2A = IDEAL_op(A2B,MEBCRN=True)
+    A2B2A = IDEAL_op(A2B, training=False)
 
     # B2A2B Cycle
-    B2A = IDEAL_op(B,MEBCRN=True)
+    B2A = IDEAL_op(B, training=False)
     B2A2B = G_A2B(B2A, training=False)
     
     # Discriminative Losses
