@@ -313,6 +313,7 @@ for ep in range(args.epochs):
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
         A = tf.squeeze(A,axis=0)
+        B = tf.squeeze(B,axis=0)
         p = np.random.rand()
         if p <= 0.4:
             # Random 90 deg rotations
@@ -327,6 +328,7 @@ for ep in range(args.epochs):
             A = tf.image.random_flip_up_down(A)
             B = tf.image.random_flip_up_down(B)
         A = tf.expand_dims(A,axis=0)
+        B = tf.expand_dims(B,axis=0)
         # ==============================================================================
 
         # ==============================================================================
