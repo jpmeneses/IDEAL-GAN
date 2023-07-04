@@ -53,6 +53,8 @@ if args.G_model == 'encod-decod':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
+IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
+
 tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 
@@ -63,10 +65,6 @@ def sample(Z,TE=None):
                         2*tf.ones((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
 	PM_idx = tf.concat([tf.zeros((Z.shape[0],hgt,wdt,1),dtype=tf.int32),
 						tf.ones((Z.shape[0],hgt,wdt,1),dtype=tf.int32)],axis=-1)
-	# A2Z_1 = enc(A_1, training=False)
-	# A2Z_2 = enc(A_2, training=False)
-	# A2Z = keras.layers.Lambda(lambda x: 0.6*x[0] + 0.4*x[1])([A2Z_1,A2Z_2])
-	# A2Z = keras.layers.SpatialDropout2D(rate=0.1)(A2Z, training=True)
 	# Z2B2A Cycle
 	Z2B = dec(Z, training=False)
 	# Split A2B param maps
@@ -79,14 +77,13 @@ def sample(Z,TE=None):
 	Z2B_FM = tf.reshape(Z2B_FM,(Z.shape[0],hgt,wdt,1))
 	# Correct R2 scaling
 	Z2B_R2 = 0.5*Z2B_R2 + 0.5
-	Z2B = tf.concat([Z2B_W,Z2B_F,Z2B_R2,Z2B_FM],axis=-1)
 	# Water/fat magnitudes
 	Z2B_WF_real = tf.concat([Z2B_W[:,:,:,:1],Z2B_F[:,:,:,:1]],axis=-1)
 	Z2B_WF_imag = tf.concat([Z2B_W[:,:,:,1:],Z2B_F[:,:,:,1:]],axis=-1)
 	Z2B_WF_abs = tf.abs(tf.complex(Z2B_WF_real,Z2B_WF_imag))
 	Z2B_abs = tf.concat([Z2B_WF_abs,Z2B_R2,Z2B_FM],axis=-1)
 	# Reconstructed multi-echo images
-	Z2B2A = wf.IDEAL_model(Z2B,args.n_echoes,te=TE)
+	Z2B2A = IDEAL_op(Z2B)
 
 	return Z2B_abs, Z2B2A
 
@@ -110,16 +107,16 @@ for k in range(args.n_samples):
 	r2_aux = np.squeeze(Z2B[:,:,:,2])
 	field_aux = np.squeeze(Z2B[:,:,:,3])
 
-	im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,0],Z2B2A[:,:,:,1])))
-	im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,2],Z2B2A[:,:,:,3])))
+	im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
+	im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
 	if args.n_echoes >= 3:
-	    im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,4],Z2B2A[:,:,:,5])))
+	    im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
 	if args.n_echoes >= 4:
-	    im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,6],Z2B2A[:,:,:,7])))
+	    im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
 	if args.n_echoes >= 5:
-	    im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,8],Z2B2A[:,:,:,9])))
+	    im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
 	if args.n_echoes >= 6:
-	    im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,:,:,10],Z2B2A[:,:,:,11])))
+	    im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
 
 	fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
