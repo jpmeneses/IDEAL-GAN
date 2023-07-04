@@ -61,7 +61,8 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 A2B2A_pool = data.ItemPool(args.pool_size)
 
 ech_idx = args.n_echoes * 2
-r2_sc,fm_sc = 200.0,300.0
+fm_sc = 300.0
+r2_sc = 2*np.pi*fm_sc
 
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
@@ -98,7 +99,7 @@ valY    = out_maps_2
 
 # Overall dataset statistics
 len_dataset,_,hgt,wdt,n_ch = np.shape(trainX)
-_,_,_,n_out = np.shape(trainY)
+_,n_out,_,_,_ = np.shape(trainY)
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',args.n_echoes)
@@ -167,42 +168,12 @@ def train_G(A, B):
     with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
         A2B = G_A2B(A, training=True)
-
-        # Split A2B param maps
-        A2B_W,A2B_F,A2B_PM = tf.dynamic_partition(A2B,indices,num_partitions=3)
-        A2B_W = tf.squeeze(tf.reshape(A2B_W,A[:,:1,:,:,:].shape),axis=1)
-        A2B_F = tf.squeeze(tf.reshape(A2B_F,A[:,:1,:,:,:].shape),axis=1)
-        A2B_PM = tf.squeeze(tf.reshape(A2B_PM,A[:,:1,:,:,:].shape),axis=1)
-
-        A2B_FM,A2B_R2 = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
-        
-        # Correct R2 scaling
-        A2B_R2 = 0.5*A2B_R2 + 0.5
-        A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
-        
-        # Reconstructed multi-echo images
         A2B2A = IDEAL_op(A2B, training=False)
 
         ##################### B Cycle #####################
         B2A = IDEAL_op(B, training=False)
         B2A2B = G_A2B(B2A, training=True)
         
-        # Split B2A2B param maps
-        B2A2B_W,B2A2B_F,B2A2B_PM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
-        B2A2B_W = tf.squeeze(tf.reshape(B2A2B_W,A[:,:1,:,:,:].shape),axis=1)
-        B2A2B_F = tf.squeeze(tf.reshape(B2A2B_F,A[:,:1,:,:,:].shape),axis=1)
-        B2A2B_PM = tf.squeeze(tf.reshape(B2A2B_PM,A[:,:1,:,:,:].shape),axis=1)
-
-        B2A2B_FM,B2A2B_R2 = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
-        B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-        B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
-
-        # Correct R2s scaling
-        B2A2B_R2 = 0.5*B2A2B_R2 + 0.5
-        B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
-
         ############## Discriminative Losses ##############
         if args.adv_train:
             A2B2A_d_logits = D_A(A2B2A, training=False)
@@ -271,43 +242,14 @@ def train_step(A, B):
 
 @tf.function
 def sample(A, B):
-    indices =tf.concat([tf.zeros((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
-                        tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32),
-                        2*tf.ones((B.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
-    PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-
     # A2B2A Cycle
     A2B = G_A2B(A, training=False)
-    # Split A2B param maps
-    A2B_W,A2B_F,A2B_PM = tf.dynamic_partition(A2B,indices,num_partitions=3)
-    A2B_W = tf.squeeze(tf.reshape(A2B_W,A[:,:1,:,:,:].shape),axis=1)
-    A2B_F = tf.squeeze(tf.reshape(A2B_F,A[:,:1,:,:,:].shape),axis=1)
-    A2B_PM = tf.squeeze(tf.reshape(A2B_PM,A[:,:1,:,:,:].shape),axis=1)
-    A2B_FM,A2B_R2 = tf.dynamic_partition(A2B_PM,PM_idx,num_partitions=2)
-    A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-    A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
-    # Correct R2 scaling
-    A2B_R2 = 0.5*A2B_R2 + 0.5
-    A2B = tf.concat([A2B_W,A2B_F,A2B_R2,A2B_FM],axis=-1)
-    # Reconstructed multi-echo images
-    A2B2A = wf.IDEAL_model(A2B,args.n_echoes,MEBCRN=True)
+    A2B2A = IDEAL_op(A2B,MEBCRN=True)
 
     # B2A2B Cycle
-    B2A = wf.IDEAL_model(B,args.n_echoes,MEBCRN=True)
+    B2A = IDEAL_op(B,MEBCRN=True)
     B2A2B = G_A2B(B2A, training=False)
-    # Split B2A2B param maps
-    B2A2B_W,B2A2B_F,B2A2B_PM = tf.dynamic_partition(B2A2B,indices,num_partitions=3)
-    B2A2B_W = tf.squeeze(tf.reshape(B2A2B_W,A[:,:1,:,:,:].shape),axis=1)
-    B2A2B_F = tf.squeeze(tf.reshape(B2A2B_F,A[:,:1,:,:,:].shape),axis=1)
-    B2A2B_PM= tf.squeeze(tf.reshape(B2A2B_PM,A[:,:1,:,:,:].shape),axis=1)
-    B2A2B_FM,B2A2B_R2 = tf.dynamic_partition(B2A2B_PM,PM_idx,num_partitions=2)
-    B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-    B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
-    # Correct R2 scaling
-    B2A2B_R2 = 0.5*B2A2B_R2 + 0.5
-    B2A2B = tf.concat([B2A2B_W,B2A2B_F,B2A2B_R2,B2A2B_FM],axis=-1)
-
+    
     # Discriminative Losses
     if args.adv_train:
         A2B2A_d_logits = D_A(A2B2A, training=True)
@@ -466,25 +408,25 @@ for ep in range(args.epochs):
                 fig.delaxes(axs[0,5])
 
             # B2A2B maps in the second row
-            w_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,0],B2A2B[:,:,:,1])))
+            w_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,0,:,:,0],B2A2B[:,0,:,:,1])))
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            f_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,:,:,2],B2A2B[:,:,:,3])))
+            f_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,1,:,:,0],B2A2B[:,1,:,:,1])))
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_aux = np.squeeze(B2A2B[:,:,:,4])
+            r2_aux = np.squeeze(B2A2B[:,2,:,:,1])
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
-                                    interpolation='none', vmin=0, vmax=r2_sc)
+                                    interpolation='none', vmin=0, vmax=fm_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_aux = np.squeeze(B2A2B[:,:,:,5])
+            field_aux = np.squeeze(B2A2B[:,2,:,:,0])
             field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
@@ -493,25 +435,25 @@ for ep in range(args.epochs):
             fig.delaxes(axs[1,5])
 
             # Ground-truth in the third row
-            wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
+            wn_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
             W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_unet, ax=axs[2,1])
             axs[2,1].axis('off')
 
-            fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
+            fn_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
             F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_unet, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            r2n_aux = np.squeeze(B[:,:,:,4])
+            r2n_aux = np.squeeze(B[:,2,:,:,1])
             r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
-                                 interpolation='none', vmin=0, vmax=r2_sc)
+                                 interpolation='none', vmin=0, vmax=fm_sc)
             fig.colorbar(r2_unet, ax=axs[2,3])
             axs[2,3].axis('off')
 
-            fieldn_aux = np.squeeze(B[:,:,:,5])
+            fieldn_aux = np.squeeze(B[:,2,:,:,0])
             field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_unet, ax=axs[2,4])
