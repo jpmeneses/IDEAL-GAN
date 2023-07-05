@@ -149,7 +149,7 @@ d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
-D_lr_scheduler = dl.LinearDecay(4*args.lr, 5 * total_steps, 5 * args.epoch_decay * total_steps / args.epochs)
+D_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
@@ -231,7 +231,7 @@ def train_step(A, B, A_prev=None):
     if args.adv_train:
         # cannot autograph `A2B_pool`
         A2B2A = A2B2A_pool(A2B2A)
-        for _ in range(5):
+        for _ in range(1):
             if A_prev is None:
                 D_loss_dict = train_D(A, A2B2A)
             else:
