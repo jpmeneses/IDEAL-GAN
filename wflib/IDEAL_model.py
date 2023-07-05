@@ -172,7 +172,7 @@ def IDEAL_model(out_maps):
     
     def grad(upstream): # Must be same shape as out_maps
         # Re-format upstream 
-        upstream = tf.complex(upstream[:,:,:,:,0],upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
+        upstream = tf.complex(0.5*upstream[:,:,:,:,0],-0.5*upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
         upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
 
         # Water/fat gradient
@@ -186,9 +186,9 @@ def IDEAL_model(out_maps):
         # grad_p_res = tf.concat([grad_p_r,grad_p_i],axis=-1) # (nb,ns,hgt,wdt,2)
         
         # Xi gradient, considering Taylor approximation
-        Wp_ap = tf.linalg.matmul(xi_rav, +2*np.pi * te_complex) # (nb,nv,ne)
-        Wp_ap = tf.transpose(Wp_ap, perm=[0,2,1]) # (nb,ne,nv)
-        Smtx_ap = Wp_ap * Mp # (nb,ne,nv)
+        # Wp_ap = tf.linalg.matmul(xi_rav, +2*np.pi * te_complex) # (nb,nv,ne)
+        # Wp_ap = tf.transpose(Wp_ap, perm=[0,2,1]) # (nb,ne,nv)
+        # Smtx_ap = Wp_ap * Mp # (nb,ne,nv)
         dxi = tf.squeeze(tf.linalg.diag(2*np.pi*te_complex)) # (1,ne) --> (ne,ne)
         ds_dxi = tf.linalg.matmul(dxi,Smtx) * fm_sc # (nb,ne,nv)
         ds_dxi = tf.expand_dims(tf.transpose(ds_dxi,perm=[0,2,1]),axis=-1) ## (nb,nv,ne,1) I2
@@ -210,8 +210,8 @@ def IDEAL_model(out_maps):
 
         grad_res = tf.linalg.matvec(ds_dq, upstream) # (nb,nv,ns+1)
         grad_res = tf.reshape(tf.transpose(grad_res,perm=[0,2,1]), [n_batch,ns+1,hgt,wdt]) # (nb,ns+1,hgt,wdt)
-        grad_res_r = tf.math.real(tf.expand_dims(grad_res,axis=-1))
-        grad_res_i = tf.math.imag(tf.expand_dims(grad_res,axis=-1))
+        grad_res_r = +2*tf.math.real(tf.expand_dims(grad_res,axis=-1))
+        grad_res_i = -2*tf.math.imag(tf.expand_dims(grad_res,axis=-1))
         grad_res = tf.concat([grad_res_r,grad_res_i],axis=-1) # (nb,ns+1,hgt,wdt,2)
 
         return grad_res
