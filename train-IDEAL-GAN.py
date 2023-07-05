@@ -225,14 +225,17 @@ def train_D(A, A2B2A):
             #'D_A_r2': D_A_r2}
 
 
-def train_step(A, B):
+def train_step(A, B, A_prev=None):
     A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     if args.adv_train:
         # cannot autograph `A2B_pool`
         A2B2A = A2B2A_pool(A2B2A)
         for _ in range(5):
-            D_loss_dict = train_D(A, A2B2A)
+            if A_prev is None:
+                D_loss_dict = train_D(A, A2B2A)
+            else:
+                D_loss_dict = train_D(A_prev, A2B2A)
     else:
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
         D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
@@ -298,6 +301,7 @@ sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
 n_div = np.ceil(total_steps/len(valX))
 
+A_prev = None
 
 # main loop
 for ep in range(args.epochs):
@@ -335,7 +339,8 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        G_loss_dict, D_loss_dict = train_step(A, B)
+        G_loss_dict, D_loss_dict = train_step(A, B, A_prev)
+        A_prev = A
 
         # summary
         with train_summary_writer.as_default():
