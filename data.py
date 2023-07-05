@@ -52,13 +52,15 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx,start=0,end=2000,
     # Pre-process out maps
     r2_resc = (2/3)*(1/(2*np.pi))
     out_maps = out_maps[idxs_list,:,:,:]
-    out_rho_w = np.expand_dims(out_maps[:,:,:,:2],axis=1)
-    out_rho_f = np.expand_dims(out_maps[:,:,:,2:4],axis=1)
-    out_xi = np.concatenate((out_maps[:,:,:,5:],out_maps[:,:,:,4:5]*r2_resc),axis=-1)
-    out_xi = np.expand_dims(out_xi,axis=1)
-    out_maps = np.concatenate((out_rho_w,out_rho_f,out_xi),axis=1)
-    
-    ns,_,hgt,wdt,_ = out_maps.shape
+    if MEBCRN:
+        out_rho_w = np.expand_dims(out_maps[:,:,:,:2],axis=1)
+        out_rho_f = np.expand_dims(out_maps[:,:,:,2:4],axis=1)
+        out_xi = np.concatenate((out_maps[:,:,:,5:],out_maps[:,:,:,4:5]*r2_resc),axis=-1)
+        out_xi = np.expand_dims(out_xi,axis=1)
+        out_maps = np.concatenate((out_rho_w,out_rho_f,out_xi),axis=1)
+        ns,_,hgt,wdt,_ = out_maps.shape
+    else:
+        ns,hgt,wdt,_ = out_maps.shape
 
     if acqs_data:
         acqs = acqs[idxs_list,:,:,:ech_idx]
