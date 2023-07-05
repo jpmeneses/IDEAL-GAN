@@ -158,7 +158,8 @@ def IDEAL_model(out_maps):
     Wp = tf.transpose(Wp, perm=[0,2,1]) # (nb,ne,nv)
 
     # Matrix operations
-    Smtx = Wp * tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
+    Mp = tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
+    Smtx = Wp * Mp # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
     S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
@@ -185,6 +186,9 @@ def IDEAL_model(out_maps):
         # grad_p_res = tf.concat([grad_p_r,grad_p_i],axis=-1) # (nb,ns,hgt,wdt,2)
         
         # Xi gradient, considering Taylor approximation
+        Wp_ap = tf.linalg.matmul(xi_rav, +2*np.pi * te_complex) # (nb,nv,ne)
+        Wp_ap = tf.transpose(Wp_ap, perm=[0,2,1]) # (nb,ne,nv)
+        Smtx_ap = Wp_ap * Mp # (nb,ne,nv)
         dxi = tf.squeeze(tf.linalg.diag(2*np.pi*te_complex)) # (1,ne) --> (ne,ne)
         ds_dxi = tf.linalg.matmul(dxi,Smtx) * fm_sc # (nb,ne,nv)
         ds_dxi = tf.expand_dims(tf.transpose(ds_dxi,perm=[0,2,1]),axis=-1) ## (nb,nv,ne,1) I2
