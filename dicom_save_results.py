@@ -310,7 +310,8 @@ else:
 
 save_dir = py.join(args.experiment_dir, 'out_dicom', args.map)
 py.mkdir(save_dir)
-pre_filename = args.map + '/' + args.map + '_' + method_prefix + '_' + prot_prefix + '_v'
+pre_filename = args.map + '/' + args.map + '_' + prot_prefix + '_v'
+end_filename = '_' + method_prefix
 
 n_slices = [21,24,24,24,22,24,25,24,18,21,24,18,21,24,21,18,16,18,24,21]
 cont = 0
@@ -319,7 +320,7 @@ for idx in range(len(n_slices)):
 	fin = cont + n_slices[idx]
 	cont = cont + n_slices[idx]
 
-	filename = pre_filename + str(idx).zfill(3)
+	filename = pre_filename + str(idx).zfill(3) + end_filename
 
 	# image3d = np.squeeze(out_maps[0:21,:,:,0])
 	image3d = np.squeeze(X[ini:fin,:,:])
