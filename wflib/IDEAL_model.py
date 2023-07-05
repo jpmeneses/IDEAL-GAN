@@ -207,7 +207,7 @@ def IDEAL_model(out_maps):
         grad_res = tf.linalg.matvec(ds_dq, upstream) # (nb,nv,ns+1)
         grad_res = tf.reshape(tf.transpose(grad_res,perm=[0,2,1]), [n_batch,ns+1,hgt,wdt]) # (nb,ns+1,hgt,wdt)
         grad_res_r = tf.math.real(tf.expand_dims(grad_res,axis=-1))
-        grad_res_i = -tf.math.imag(tf.expand_dims(grad_res,axis=-1))
+        grad_res_i = tf.math.imag(tf.expand_dims(grad_res,axis=-1))
         grad_res = tf.concat([grad_res_r,grad_res_i],axis=-1) # (nb,ns+1,hgt,wdt,2)
 
         return grad_res
