@@ -17,15 +17,15 @@ import data
 dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
 dataset_hdf5 = 'INTA_GC_192_complex_2D.hdf5'
 acqs, out_maps = data.load_hdf5(dataset_dir, dataset_hdf5, 12, end=45, MEBCRN=True)
-acqs = acqs[:,:,::4,::4,:]
-out_maps = out_maps[:,::4,::4,:]
-out_maps = np.concatenate((out_maps[:,:,:,:4],out_maps[:,:,:,5:],out_maps[:,:,:,4:5]*(2/3)*(1/(2*np.pi))),axis=-1)
+# acqs = acqs[:,:,::4,::4,:]
+# out_maps = out_maps[:,::4,::4,:]
+# out_maps = np.concatenate((out_maps[:,:,:,:4],out_maps[:,:,:,5:],out_maps[:,:,:,4:5]*(2/3)*(1/(2*np.pi))),axis=-1)
 
 # Pre-process out maps
-out_rho_w = np.expand_dims(out_maps[:,:,:,:2],axis=1)
-out_rho_f = np.expand_dims(out_maps[:,:,:,2:4],axis=1)
-out_xi = np.expand_dims(out_maps[:,:,:,4:],axis=1)
-out_maps = np.concatenate((out_rho_w,out_rho_f,out_xi),axis=1)
+# out_rho_w = np.expand_dims(out_maps[:,:,:,:2],axis=1)
+# out_rho_f = np.expand_dims(out_maps[:,:,:,2:4],axis=1)
+# out_xi = np.expand_dims(out_maps[:,:,:,4:],axis=1)
+# out_maps = np.concatenate((out_rho_w,out_rho_f,out_xi),axis=1)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
