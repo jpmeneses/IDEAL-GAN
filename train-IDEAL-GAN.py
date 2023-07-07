@@ -203,7 +203,7 @@ def train_G(A, B):
 
 @tf.function
 def train_D(A):
-    Z = tf.random.normal(D_Z.input_shape)
+    Z = tf.random.normal((A.shape[0],D_Z.input_shape[1],D_Z.input_shape[2],args.encoded_size),dtype=tf.float32)
     with tf.GradientTape() as t:
         Z_d_logits = D_Z(Z, training=True)
         A2Z_d_logits = D_Z(A2Z, training=True)
