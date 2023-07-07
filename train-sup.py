@@ -143,13 +143,13 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 if args.G_model == 'multi-decod':
     if args.out_vars == 'WF-PM':
         G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
-                                filters=args.n_filters,
+                                filters=args.n_G_filters,
                                 WF_self_attention=args.D1_SelfAttention,
                                 R2_self_attention=args.D2_SelfAttention,
                                 FM_self_attention=args.D3_SelfAttention)
     else:
         G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
-                                filters=args.n_filters,
+                                filters=args.n_G_filters,
                                 R2_self_attention=args.D1_SelfAttention,
                                 FM_self_attention=args.D2_SelfAttention)
 
@@ -158,11 +158,10 @@ elif args.G_model == 'U-Net':
         n_out = 4
     else:
         n_out = 2
-    G_A2B = custom_unet(input_shape=(hgt,wdt,d_ech),
-                        num_classes=n_out,
-                        dropout=0,
-                        use_attention=args.D1_SelfAttention,
-                        filters=args.n_filters)
+    G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+                    n_out=n_out,
+                    filters=args.n_G_filters,
+                    self_attention=args.D1_SelfAttention)
     if not(args.out_vars == 'WF'):
         trainY[:,:,:,-1]    = 0.5*trainY[:,:,:,-1] + 0.5
         valY[:,:,:,-1]      = 0.5*valY[:,:,:,-1] + 0.5
