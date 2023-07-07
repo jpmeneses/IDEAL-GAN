@@ -81,6 +81,21 @@ def _residual_block(x, norm):
     return keras.layers.add([x, h])
 
 
+def CriticZ(input_shape,
+            n_downsamplings=3,
+            dim=64,
+            kernel=3,
+            self_attention=True,
+            ):
+    h = inputs = keras.Input(shape=input_shape)
+    for n in range(n_downsamplings):
+        if self_attention:
+            h = SelfAttention(ch=h.shape[-1])(h)
+        h = keras.layers.Conv2D(dim, kernel, padding='same', strides=2, activation=tf.nn.leaky_relu, kernel_initializer='he_normal')(h)
+        dim //= 4
+    return keras.Model(inputs=inputs, outputs=h)
+
+
 def PatchGAN(input_shape,
             dim=64,
             lstm_dim=36,
