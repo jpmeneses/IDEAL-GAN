@@ -22,7 +22,7 @@ os.environ['TF_ENABLE_GPU_GARBAGE_COLLECTION'] = 'false'
 py.arg('--experiment_dir',default='output/WF-sep')
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--te_input', type=bool, default=False)
-py.arg('--multi_TE', type=bool, default=False)
+py.arg('--multi_TE', type=bool, default=True)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
 py.arg('--batch_size', type=int, default=1)
@@ -176,7 +176,7 @@ def sample(A, B, TE=None):
       A2B_FM = (A2B_FM - 0.5) * 2
       A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
       A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    A2B_WF = wf.get_rho(A,A2B_PM)
+    A2B_WF = wf.get_rho(A,A2B_PM,te=TE)
     A2B_WF_real = A2B_WF[:,:,:,0::2]
     A2B_WF_imag = A2B_WF[:,:,:,1::2]
     A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
