@@ -248,7 +248,7 @@ def train_step(A, B):
 def sample(A, B):
     # A2B2A Cycle
     A2Z = enc(A, training=False)
-    A2Z2B = dec(A2Z, training=False)
+    A2B = dec(A2Z, training=False)
     A2B2A = IDEAL_op(A2Z2B, training=False)
 
     # B2A2B Cycle
