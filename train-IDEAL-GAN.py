@@ -225,8 +225,8 @@ def train_D(A):
     return {'D_loss': Z_d_loss + A2Z_d_loss,
             'Z_d_loss': Z_d_loss,
             'A2Z_d_loss': A2Z_d_loss,
-            'D_Z_r1': D_Z_r1,
-            'D_Z_r2': D_Z_r2}
+            'D_Z_r1': D_Z_r1,}
+            # 'D_Z_r2': D_Z_r2}
 
 
 def train_step(A, B):
