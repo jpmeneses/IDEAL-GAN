@@ -216,9 +216,9 @@ def train_D(A):
 
         D_Z_r1 = gan.R1_regularization(functools.partial(D_Z, training=True), Z)
 
-        D_Z_r2 = gan.R1_regularization(functools.partial(D_Z, training=True), A2Z.sample())
+        # D_Z_r2 = gan.R1_regularization(functools.partial(D_Z, training=True), A2Z.sample())
 
-        D_loss = (Z_d_loss + A2Z_d_loss) + (D_Z_r1 * args.R1_reg_weight) + (D_Z_r2 * args.R2_reg_weight)
+        D_loss = (Z_d_loss + A2Z_d_loss) + (D_Z_r1 * args.R1_reg_weight) #+ (D_Z_r2 * args.R2_reg_weight)
 
     D_grad = t.gradient(D_loss, D_Z.trainable_variables)
     D_optimizer.apply_gradients(zip(D_grad, D_Z.trainable_variables))
