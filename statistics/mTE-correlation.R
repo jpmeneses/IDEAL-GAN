@@ -12,9 +12,9 @@ library(gridExtra)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/Sup-007/"
+model = "/Sup-100/"
 map = "PDFF"
-epoch = "200"
+epoch = "100"
 
 dir = paste("C:/Users/jpmen/Documents/IDEAL-GAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
