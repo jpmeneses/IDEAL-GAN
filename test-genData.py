@@ -30,7 +30,8 @@ args.__dict__.update(test_args.__dict__)
 # ==============================================================================
 
 ech_idx = args.n_echoes * 2
-r2_sc,fm_sc = 200.0,300.0
+fm_sc = 300.0
+r2_sc = 2*np.pi*fm_sc
 hgt,wdt,n_ch = 192,192,2
 
 
@@ -63,8 +64,6 @@ def sample(Z,TE=None):
 	indices =tf.concat([tf.zeros((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32),
 						tf.ones((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32),
                         2*tf.ones((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
-	PM_idx = tf.concat([tf.zeros((Z.shape[0],hgt,wdt,1),dtype=tf.int32),
-						tf.ones((Z.shape[0],hgt,wdt,1),dtype=tf.int32)],axis=-1)
 	# Z2B2A Cycle
 	Z2B = dec(Z, training=False)
 	# Split A2B param maps
@@ -72,16 +71,11 @@ def sample(Z,TE=None):
 	Z2B_W = tf.squeeze(tf.reshape(Z2B_W,(Z.shape[0],1,hgt,wdt,2)),axis=1)
 	Z2B_F = tf.squeeze(tf.reshape(Z2B_F,(Z.shape[0],1,hgt,wdt,2)),axis=1)
 	Z2B_PM= tf.squeeze(tf.reshape(Z2B_PM,(Z.shape[0],1,hgt,wdt,2)),axis=1)
-	Z2B_FM,Z2B_R2 = tf.dynamic_partition(Z2B_PM,PM_idx,num_partitions=2)
-	Z2B_R2 = tf.reshape(Z2B_R2,(Z.shape[0],hgt,wdt,1))
-	Z2B_FM = tf.reshape(Z2B_FM,(Z.shape[0],hgt,wdt,1))
-	# Correct R2 scaling
-	Z2B_R2 = 0.5*Z2B_R2 + 0.5
 	# Water/fat magnitudes
 	Z2B_WF_real = tf.concat([Z2B_W[:,:,:,:1],Z2B_F[:,:,:,:1]],axis=-1)
 	Z2B_WF_imag = tf.concat([Z2B_W[:,:,:,1:],Z2B_F[:,:,:,1:]],axis=-1)
 	Z2B_WF_abs = tf.abs(tf.complex(Z2B_WF_real,Z2B_WF_imag))
-	Z2B_abs = tf.concat([Z2B_WF_abs,Z2B_R2,Z2B_FM],axis=-1)
+	Z2B_abs = tf.concat([Z2B_WF_abs,Z2B_PM],axis=-1)
 	# Reconstructed multi-echo images
 	Z2B2A = IDEAL_op(Z2B)
 
@@ -170,7 +164,7 @@ for k in range(args.n_samples):
 	axs[1,2].axis('off')
 
 	r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
-                            interpolation='none', vmin=0, vmax=r2_sc)
+                            interpolation='none', vmin=0, vmax=fm_sc)
 	fig.colorbar(r2_ok, ax=axs[1,3])
 	axs[1,3].axis('off')
 
