@@ -591,7 +591,7 @@ def encoder(
 def decoder(
     encoded_dims,
     output_2D_shape,
-    n_species=3,
+    n_species=2,
     filters=36,
     num_layers=4,
     num_res_blocks=2,
@@ -612,12 +612,12 @@ def decoder(
 
     wf_init = keras.initializers.VarianceScaling(scale=5e-1,mode='fan_in',distribution='uniform')
     pm_init = keras.initializers.VarianceScaling(scale=1e-6,mode='fan_out',distribution='uniform')
-    inits = [wf_init for i in range(n_species-1)]
+    inits = [wf_init for i in range(n_species)]
     inits.append(pm_init)
-    out_inits = [output_initializer for i in range(n_species-1)]
+    out_inits = [output_initializer for i in range(n_species)]
     out_inits.append(pm_init)
-    x_list = [x for i in range(n_species)]
-    for sp in range(n_species):
+    x_list = [x for i in range(n_species+1)]
+    for sp in range(n_species+1):
         filt_iter = filt_ini
         x_list[sp] = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer=inits[sp])(x_list[sp])
         x_list[sp] = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer=inits[sp])(x_list[sp])
