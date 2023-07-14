@@ -224,7 +224,7 @@ def train_G(A, B):
         if args.out_vars == 'WF':
             # Compute model's output
             A2B_WF_abs = G_A2B(A, training=True)
-            A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+            A2B_WF_abs = tf.where(B[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
 
             # Compute zero-valued param maps
             A2B_PM = tf.zeros_like(A2B_WF_abs)
@@ -261,7 +261,7 @@ def train_G(A, B):
         elif args.out_vars == 'PM':
             # Compute model's output
             A2B_PM = G_A2B(A, training=True)
-            A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
+            A2B_PM = tf.where(B[:,:,:,:2]!=0.0,A2B_PM,0.0)
 
             # Split A2B param maps
             A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
@@ -271,7 +271,7 @@ def train_G(A, B):
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
                 A2B_FM = (A2B_FM - 0.5) * 2
-                A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+                A2B_FM = tf.where(B[:,:,:,:1]!=0.0,A2B_FM,0.0)
                 A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
 
             # Compute water/fat
@@ -304,7 +304,7 @@ def train_G(A, B):
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
                 A2B_FM = (A2B_FM - 0.5) * 2
-                A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
+                A2B_FM = tf.where(B[:,:,:,:1]!=0.0,A2B_FM,0.0)
                 A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
 
             # Compute loss
@@ -371,7 +371,7 @@ def sample(A, B):
     # Estimate A2B
     if args.out_vars == 'WF':
         A2B_WF_abs = G_A2B(A, training=True)
-        A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+        A2B_WF_abs = tf.where(B[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
         A2B_PM = tf.zeros_like(B_PM)
         # Split A2B param maps
         A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
