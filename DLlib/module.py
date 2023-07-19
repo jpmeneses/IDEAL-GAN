@@ -570,7 +570,7 @@ def encoder(
         x = SelfAttention(ch=filters)(x)
         x = _residual_block(x, norm=norm)
     
-    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal",activity_regularizer=tf.keras.regularizers.L2(1.0))(x)
     # _,ls_hgt,ls_wdt,ls_dims = x.shape
 
     # x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
