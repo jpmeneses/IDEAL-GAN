@@ -571,21 +571,21 @@ def encoder(
         x = _residual_block(x, norm=norm)
     
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
-    _,ls_hgt,ls_wdt,ls_dims = x.shape
+    # _,ls_hgt,ls_wdt,ls_dims = x.shape
 
-    x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
-    x_mean = keras.layers.Flatten()(x_mean)
+    # x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+    # x_mean = keras.layers.Flatten()(x_mean)
 
-    x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
-    x_std = keras.layers.Flatten()(x_std)
+    # x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
+    # x_std = keras.layers.Flatten()(x_std)
     
-    x = keras.layers.concatenate([x_mean,x_std],axis=-1)
+    # x = keras.layers.concatenate([x_mean,x_std],axis=-1)
     
-    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,encoded_dims)), scale=1))
-    output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
-                activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
+    # prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,encoded_dims)), scale=1))
+    # output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
+    #             activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
 
-    return keras.Model(inputs=inputs1, outputs=output)
+    return keras.Model(inputs=inputs1, outputs=x)
 
 
 def decoder(
