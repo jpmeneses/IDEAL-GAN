@@ -193,10 +193,10 @@ def sample(A, B, TE=None):
         A2B_var = None
     elif args.out_vars == 'PM':
         if args.te_input:
-            A2B_PM = G_A2B([A,TE], training=True)
+            A2B_PM = G_A2B([A,TE], training=False)
         else:
-            A2B_PM = G_A2B(A, training=True)
-        A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
+            A2B_PM = G_A2B(A, training=False)
+        A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
         A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
         A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
         A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
@@ -204,7 +204,7 @@ def sample(A, B, TE=None):
             A2B_FM = (A2B_FM - 0.5) * 2
             A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-        A2B_WF = wf.get_rho(A,A2B_PM)
+        A2B_WF = wf.get_rho(A,A2B_PM,TE)
         A2B_WF_real = A2B_WF[:,:,:,0::2]
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
@@ -246,7 +246,7 @@ def sample(A, B, TE=None):
             A2B_P, A2B2A = fa.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
             A2B_WF = A2B_P[:,:,:,0:4]
         else:
-            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,te=TE,complex_data=(args.G_model=='complex'))
         A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
 
         # Magnitude of water/fat images
@@ -317,7 +317,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
 
         r2_unet=axs[1,1].imshow(r2n_aux*r2_sc, cmap='copper',
                                 interpolation='none', vmin=0, vmax=r2_sc)
-        fig.colorbar(r2_unet, ax=axs[1,1])
+        fig.colorbar(r2_unet, ax=axs[1,1]).ax.tick_params(labelsize=15)
         axs[1,1].axis('off')
 
         field_unet =axs[1,2].imshow(fieldn_aux*fm_sc, cmap='twilight',

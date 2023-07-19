@@ -148,7 +148,7 @@ def sample(A, B, TE=None):
       A2B_PM = G_A2B([A,TE], training=False)
     else:
       A2B_PM = G_A2B(A, training=False)
-    A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
+    A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
     A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
     A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
     A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
@@ -156,7 +156,7 @@ def sample(A, B, TE=None):
       A2B_FM = (A2B_FM - 0.5) * 2
       A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
       A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    A2B_WF = wf.get_rho(A,A2B_PM)
+    A2B_WF = wf.get_rho(A,A2B_PM,TE)
     A2B_WF_real = A2B_WF[:,:,:,0::2]
     A2B_WF_imag = A2B_WF[:,:,:,1::2]
     A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))

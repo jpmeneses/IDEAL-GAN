@@ -109,7 +109,7 @@ A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,testY))
 A_B_dataset_test.batch(1)
 
 # model
-if args.G_model == 'encod-decod':
+if args.G_model == 'encod-decod' or args.G_model == 'multi-decod':
     G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
                             filters=args.n_G_filters,
                             te_input=args.te_input,
@@ -137,7 +137,7 @@ tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).re
 def sample_A2B(A,TE=None):
     indx_PM =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
-    if TE is not(None):
+    if args.te_input:
         A2B_PM = G_A2B([A,(TE-1e-3)/(11.5*1e-3)], training=False)
     else:
         A2B_PM = G_A2B(A, training=False)
@@ -150,7 +150,7 @@ def sample_A2B(A,TE=None):
         A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
     # A2B Mask
     A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0)
-    A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM)
+    A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,te=TE)
     A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
     return A2B, A2B2A
 
@@ -160,7 +160,7 @@ def sample_B2A(B,TE=None):
     indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
                         tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     B2A = wf.IDEAL_model(B,echoes,te=TE)
-    if TE is not(None):
+    if args.te_input:
         B2A2B_PM = G_A2B([B2A,(TE-1e-3)/(11.5*1e-3)], training=False)
     else:
         B2A2B_PM = G_A2B(B2A, training=False)
