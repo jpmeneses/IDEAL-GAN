@@ -141,10 +141,11 @@ if args.G_model == 'encod-decod':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-# D_A = dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.NL_SelfAttention))
-D_Z = dl.CriticZ(input_shape=dec.input_shape[1:], dim=args.n_D_filters, self_attention=args.NL_SelfAttention)
+D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.NL_SelfAttention))
+# D_Z = dl.CriticZ(input_shape=dec.input_shape[1:], dim=args.n_D_filters, self_attention=args.NL_SelfAttention)
 
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
+LWF_op = wf.LWF_Layer(ne,MEBCRN=True)
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -168,9 +169,9 @@ def train_G(A, B):
     
     with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
-        A2Z = enc(A, training=True)
-        A2Z2B = dec(A2Z, training=True)
-        A2B2A = IDEAL_op(A2Z2B, training=False)
+        A2B = G_A2B(A, training=True)
+        A2B2A = IDEAL_op(A2B, training=False)
+        A2B2A_L = LWF_op(A2B, training=False)
 
         ##################### B Cycle #####################
         B2A = IDEAL_op(B, training=False)
@@ -178,10 +179,10 @@ def train_G(A, B):
         
         ############## Discriminative Losses ##############
         if args.adv_train:
-            A2Z_d_logits = D_Z(A2Z, training=False)
-            A2Z_g_loss = g_loss_fn(A2Z_d_logits)
+            A2B2A_d_logits = D_A(A2B2A_L, training=False)
+            A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         else:
-            A2Z_g_loss = tf.constant(0.0,dtype=tf.float32)
+            A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -190,53 +191,52 @@ def train_G(A, B):
         ################ Regularizers #####################
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + A2Z_g_loss #+ activ_reg
+        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + A2B2A_g_loss + activ_reg
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
-    return {'A2Z_g_loss': A2Z_g_loss,
-            'A2B2A_cycle_loss': A2B2A_cycle_loss,
-            'B2A2B_cycle_loss': B2A2B_cycle_loss,
-            'LS_reg': activ_reg}
+    return A2B2A_L,{'A2B2A_g_loss': A2B2A_g_loss,
+                    'A2B2A_cycle_loss': A2B2A_cycle_loss,
+                    'B2A2B_cycle_loss': B2A2B_cycle_loss,
+                    'LS_reg': activ_reg}
 
 
 @tf.function
-def train_D(A):
-    Z = tf.random.normal((A.shape[0],D_Z.input_shape[1],D_Z.input_shape[2],args.encoded_size),dtype=tf.float32)
+def train_D(A, A2B2A):
+    A = tf.reshape(A,(-1,hgt,wdt,2))
     with tf.GradientTape() as t:
-        A2Z = enc(A, training=False)
-        Z_d_logits = D_Z(Z, training=True)
-        A2Z_d_logits = D_Z(A2Z, training=True)
+        A_d_logits = D_A(A, training=True)
+        A2B2A_d_logits = D_A(A2B2A, training=True)
         
-        Z_d_loss, A2Z_d_loss = d_loss_fn(Z_d_logits, A2Z_d_logits)
-        tf.debugging.check_numerics(A2Z_d_loss, message='A2Z numerical error')
+        A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
+        tf.debugging.check_numerics(A2Z_d_loss, message='A2B2A numerical error')
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
-        D_Z_r1 = gan.R1_regularization(functools.partial(D_Z, training=True), Z)
+        D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
 
         # D_Z_r2 = gan.R1_regularization(functools.partial(D_Z, training=True), A2Z.sample())
 
-        D_loss = (Z_d_loss + A2Z_d_loss) + (D_Z_r1 * args.R1_reg_weight) #+ (D_Z_r2 * args.R2_reg_weight)
+        D_loss = (A_d_loss + A2B2A_d_loss) + (D_A_r1 * args.R1_reg_weight) #+ (D_Z_r2 * args.R2_reg_weight)
 
-    D_grad = t.gradient(D_loss, D_Z.trainable_variables)
-    D_optimizer.apply_gradients(zip(D_grad, D_Z.trainable_variables))
-    return {'D_loss': Z_d_loss + A2Z_d_loss,
-            'Z_d_loss': Z_d_loss,
-            'A2Z_d_loss': A2Z_d_loss,
-            'D_Z_r1': D_Z_r1,}
+    D_grad = t.gradient(D_loss, D_A.trainable_variables)
+    D_optimizer.apply_gradients(zip(D_grad, D_A.trainable_variables))
+    return {'D_loss': A_d_loss + A2B2A_d_loss,
+            'A_d_loss': A_d_loss,
+            'A2B2A_d_loss': A2B2A_d_loss,
+            'D_A_r1': D_A_r1,}
             # 'D_Z_r2': D_Z_r2}
 
 
 def train_step(A, B):
-    G_loss_dict = train_G(A, B)
+    A2B2A, G_loss_dict = train_G(A, B)
 
     if args.adv_train:
         # cannot autograph `A2B_pool`
-        # A2B2A = A2B2A_pool(A2B2A)
+        A2B2A = A2B2A_pool(A2B2A)
         for _ in range(1):
-            D_loss_dict = train_D(A)
+            D_loss_dict = train_D(A, A2B2A)
     else:
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
         D_loss_dict = {'D_loss': D_aux_val, 'Z_d_loss': D_aux_val, 'A2Z_d_loss': D_aux_val}
@@ -247,8 +247,7 @@ def train_step(A, B):
 @tf.function
 def sample(A, B):
     # A2B2A Cycle
-    A2Z = enc(A, training=False)
-    A2B = dec(A2Z, training=False)
+    A2B = G_A2B(A, training=False)
     A2B2A = IDEAL_op(A2B, training=False)
 
     # B2A2B Cycle
@@ -257,15 +256,16 @@ def sample(A, B):
     
     # Discriminative Losses
     if args.adv_train:
-        A2Z_d_logits = D_Z(A2Z, training=False)
-        val_A2Z_g_loss = g_loss_fn(A2Z_d_logits)
+        A2B2A = tf.reshape(A2B2A,(-1,hgt,wdt,2))
+        A2B2A_d_logits = D_A(A2B2A, training=False)
+        val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     else:
-        val_A2Z_g_loss = tf.constant(0.0,dtype=tf.float32)
+        val_A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
     
     # Validation losses
     val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, B2A2B)
-    return A2B, B2A, A2B2A, B2A2B, {'A2Z_g_loss': val_A2Z_g_loss,
+    return A2B, B2A, A2B2A, B2A2B, {'A2B2A_g_loss': val_A2B2A_g_loss,
                                     'A2B2A_cycle_loss': val_A2B2A_loss,
                                     'B2A2B_cycle_loss': val_B2A2B_loss}
 
@@ -282,7 +282,7 @@ ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
 checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
-                                D_Z=D_Z,
+                                D_A=D_A,
                                 G_optimizer=G_optimizer,
                                 D_optimizer=D_optimizer,
                                 ep_cnt=ep_cnt),
