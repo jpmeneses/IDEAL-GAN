@@ -210,7 +210,7 @@ def train_D(A, A2B2A):
         A2B2A_d_logits = D_A(A2B2A, training=True)
         
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
-        tf.debugging.check_numerics(A2Z_d_loss, message='A2B2A numerical error')
+        tf.debugging.check_numerics(A2B2A_d_loss, message='A2B2A numerical error')
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
@@ -239,7 +239,7 @@ def train_step(A, B):
             D_loss_dict = train_D(A, A2B2A)
     else:
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
-        D_loss_dict = {'D_loss': D_aux_val, 'Z_d_loss': D_aux_val, 'A2Z_d_loss': D_aux_val}
+        D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
 
     return G_loss_dict, D_loss_dict
 
