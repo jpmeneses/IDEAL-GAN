@@ -22,8 +22,14 @@ def _get_norm_layer(norm):
         return keras.layers.LayerNormalization
 
 
-def _upsample(filters, kernel_size, strides, padding):
-    return keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+def _upsample(filters, kernel_size, strides, padding, method='Conv2DTranspose'):
+    if method == 'Conv2DTranspose':
+        op = keras.layers.Conv2DTranspose(filters, kernel_size, strides=strides, padding=padding)
+    elif method == "Interpol_Conv":
+        op = keras.Sequential()
+        op.add(keras.layers.UpSampling2D(size=(2,2),interpolation='nearest'))
+        op.add(keras.layers.Conv2D(filters, kernel_size, strides=1, padding=padding))
+    return op
 
 
 def _conv2d_block(
@@ -79,6 +85,28 @@ def _residual_block(x, norm):
     h = Norm()(h)
 
     return keras.layers.add([x, h])
+
+
+class FourierLayer(tf.keras.layers.Layer):
+    def __init__(self):
+        super(FourierLayer, self).__init__()
+
+    def call(self, x, training=None):
+        n_batch,ne,hgt,wdt,_ = x.shape
+
+        # Generate complex x
+        real_x = x[:,:2,:,:,0]
+        imag_x = x[:,:2,:,:,1]
+        x_complex = tf.complex(real_x,imag_x)
+
+        x_fourier = tf.signal.fft2d(x_complex)
+        
+        # Split into real and imaginary channels
+        Re_gt = tf.math.real(tf.expand_dims(x_fourier,-1))
+        Im_gt = tf.math.imag(tf.expand_dims(x_fourier,-1))
+        res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+
+        return res_gt
 
 
 def CriticZ(input_shape,
@@ -568,7 +596,7 @@ def encoder(
         x = SelfAttention(ch=filters)(x)
         x = _residual_block(x, norm=norm)
     
-    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal",activity_regularizer=tf.keras.regularizers.L2(1.0))(x)
+    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
     _,ls_hgt,ls_wdt,ls_dims = x.shape
 
     x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
@@ -625,7 +653,7 @@ def decoder(
             x_list[sp] = _residual_block(x_list[sp], norm=norm)
         for cont in range(num_layers):
             filt_iter //= 2  # decreasing number of filters with each layer
-            x_list[sp] = _upsample(filt_iter, (2, 2), strides=(2, 2), padding="same")(x_list[sp])
+            x_list[sp] = _upsample(filt_iter, (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(x_list[sp])
             for n_res in range(num_res_blocks):
                 x_list[sp] = _residual_block(x_list[sp], norm=norm)
 
