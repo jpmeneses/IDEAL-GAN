@@ -145,7 +145,7 @@ D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=args.n_D_filters, self_attention=
 # D_Z = dl.CriticZ(input_shape=dec.input_shape[1:], dim=args.n_D_filters, self_attention=args.NL_SelfAttention)
 
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
-LWF_op = wf.LWF_Layer(ne,MEBCRN=True)
+LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
