@@ -98,11 +98,9 @@ def CriticZ(input_shape,
 
 def PatchGAN(input_shape,
             dim=64,
-            lstm_dim=36,
             n_downsamplings=3,
             in_kernel=4,
             n_kernel=4,
-            lstm_kernel=3,
             self_attention=True,
             norm='instance_norm'):
     dim_ = dim
@@ -110,7 +108,7 @@ def PatchGAN(input_shape,
 
     # 0
     h = inputs = keras.Input(shape=input_shape)
-    h = keras.layers.ConvLSTM2D(lstm_dim, lstm_kernel, padding='same', activation=tf.nn.leaky_relu, kernel_initializer='he_normal')(h)
+    # h = keras.layers.ConvLSTM2D(lstm_dim, lstm_kernel, padding='same', activation=tf.nn.leaky_relu, kernel_initializer='he_normal')(h)
 
     # 1
     conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, in_kernel, strides=2, padding='same', kernel_initializer='he_normal'))
@@ -571,21 +569,21 @@ def encoder(
         x = _residual_block(x, norm=norm)
     
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal",activity_regularizer=tf.keras.regularizers.L2(1.0))(x)
-    # _,ls_hgt,ls_wdt,ls_dims = x.shape
+    _,ls_hgt,ls_wdt,ls_dims = x.shape
 
-    # x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
-    # x_mean = keras.layers.Flatten()(x_mean)
+    x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+    x_mean = keras.layers.Flatten()(x_mean)
 
-    # x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
-    # x_std = keras.layers.Flatten()(x_std)
+    x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
+    x_std = keras.layers.Flatten()(x_std)
     
-    # x = keras.layers.concatenate([x_mean,x_std],axis=-1)
+    x = keras.layers.concatenate([x_mean,x_std],axis=-1)
     
-    # prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,encoded_dims)), scale=1))
-    # output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
-    #             activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
+    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,encoded_dims)), scale=1))
+    output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
+                activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
 
-    return keras.Model(inputs=inputs1, outputs=x)
+    return keras.Model(inputs=inputs1, outputs=output)
 
 
 def decoder(
