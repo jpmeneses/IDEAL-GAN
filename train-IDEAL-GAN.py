@@ -42,6 +42,7 @@ py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--cycle_loss_weight', type=float, default=10.0)
 py.arg('--B2A2B_weight', type=float, default=1.0)
 py.arg('--ls_reg_weight', type=float, default=1.0)
+py.arg('--Fourier_reg_weight', type=float, default=1e-3)
 py.arg('--NL_SelfAttention',type=bool, default=False)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
 args = py.args()
@@ -146,6 +147,7 @@ D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=args.n_D_filters, self_attention=
 
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
+F_op = dl.FourierLayer()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -174,8 +176,12 @@ def train_G(A, B):
         A2B2A_L = LWF_op(A2B, training=False)
 
         ##################### B Cycle #####################
-        B2A = IDEAL_op(B, training=False)
-        B2A2B = G_A2B(B2A, training=True)
+        # B2A = IDEAL_op(B, training=False)
+        # B2A2B = G_A2B(B2A, training=True)
+
+        ############# Fourier Regularization ##############
+        A_f = F_op(A, training=False)
+        A2B2A_f = F_op(A2B2A, training=False)
         
         ############## Discriminative Losses ##############
         if args.adv_train:
@@ -186,12 +192,15 @@ def train_G(A, B):
         
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B2A2B_cycle_loss = cycle_loss_fn(B, B2A2B)
+        B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
+        A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + A2B2A_g_loss + activ_reg
+        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + A2B2A_g_loss
+        G_loss += activ_reg
+        G_loss += A2B2A_f_cycle_loss * args.Fourier_reg_weight
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
@@ -251,8 +260,8 @@ def sample(A, B):
     A2B2A = IDEAL_op(A2B, training=False)
 
     # B2A2B Cycle
-    B2A = IDEAL_op(B, training=False)
-    B2A2B = G_A2B(B2A, training=False)
+    # B2A = IDEAL_op(B, training=False)
+    # B2A2B = G_A2B(B2A, training=False)
     
     # Discriminative Losses
     if args.adv_train:
@@ -264,14 +273,14 @@ def sample(A, B):
     
     # Validation losses
     val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
-    val_B2A2B_loss = cycle_loss_fn(B, B2A2B)
-    return A2B, B2A, A2B2A, B2A2B, {'A2B2A_g_loss': val_A2B2A_g_loss,
-                                    'A2B2A_cycle_loss': val_A2B2A_loss,
-                                    'B2A2B_cycle_loss': val_B2A2B_loss}
+    val_B2A2B_loss = cycle_loss_fn(B, A2B)
+    return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
+                        'A2B2A_cycle_loss': val_A2B2A_loss,
+                        'B2A2B_cycle_loss': val_B2A2B_loss}
 
 def validation_step(A, B):
-    A2B, B2A, A2B2A, B2A2B, val_loss_dict = sample(A, B)
-    return A2B, B2A, A2B2A, B2A2B, val_loss_dict
+    A2B, A2B2A, val_loss_dict = sample(A, B)
+    return A2B, A2B2A, val_loss_dict
 
 # ==============================================================================
 # =                                    run                                     =
@@ -355,7 +364,7 @@ for ep in range(args.epochs):
             A, B = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
-            A2B, B2A, A2B2A, B2A2B, val_loss_dict = validation_step(A, B)
+            A2B, A2B2A, val_loss_dict = validation_step(A, B)
 
             # summary
             with val_summary_writer.as_default():
@@ -364,16 +373,16 @@ for ep in range(args.epochs):
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,0,:,:,0],B2A[:,0,:,:,1])))
-            im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,1,:,:,0],B2A[:,1,:,:,1])))
+            im_ech1 = np.squeeze(np.abs(tf.complex(A[:,0,:,:,0],A[:,0,:,:,1])))
+            im_ech2 = np.squeeze(np.abs(tf.complex(A[:,1,:,:,0],A[:,1,:,:,1])))
             if args.n_echoes >= 3:
-                im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,2,:,:,0],B2A[:,2,:,:,1])))
+                im_ech3 = np.squeeze(np.abs(tf.complex(A[:,2,:,:,0],A[:,2,:,:,1])))
             if args.n_echoes >= 4:
-                im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,3,:,:,0],B2A[:,3,:,:,1])))
+                im_ech4 = np.squeeze(np.abs(tf.complex(A[:,3,:,:,0],A[:,3,:,:,1])))
             if args.n_echoes >= 5:
-                im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,4,:,:,0],B2A[:,4,:,:,1])))
+                im_ech5 = np.squeeze(np.abs(tf.complex(A[:,4,:,:,0],A[:,4,:,:,1])))
             if args.n_echoes >= 6:
-                im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,5,:,:,0],B2A[:,5,:,:,1])))
+                im_ech6 = np.squeeze(np.abs(tf.complex(A[:,5,:,:,0],A[:,5,:,:,1])))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
@@ -413,26 +422,26 @@ for ep in range(args.epochs):
             else:
                 fig.delaxes(axs[0,5])
 
-            # B2A2B maps in the second row
-            w_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,0,:,:,0],B2A2B[:,0,:,:,1])))
+            # A2B maps in the second row
+            w_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            f_aux = np.squeeze(np.abs(tf.complex(B2A2B[:,1,:,:,0],B2A2B[:,1,:,:,1])))
+            f_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_aux = np.squeeze(B2A2B[:,2,:,:,1])
+            r2_aux = np.squeeze(A2B[:,2,:,:,1])
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
                                     interpolation='none', vmin=0, vmax=fm_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_aux = np.squeeze(B2A2B[:,2,:,:,0])
+            field_aux = np.squeeze(A2B[:,2,:,:,0])
             field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
