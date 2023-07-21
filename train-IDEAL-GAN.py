@@ -208,6 +208,7 @@ def train_G(A, B):
     return A2B2A_L,{'A2B2A_g_loss': A2B2A_g_loss,
                     'A2B2A_cycle_loss': A2B2A_cycle_loss,
                     'B2A2B_cycle_loss': B2A2B_cycle_loss,
+                    'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
                     'LS_reg': activ_reg}
 
 
