@@ -279,10 +279,11 @@ def sample(A, B):
     # Validation losses
     val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, A2B)
+    val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
                         'B2A2B_cycle_loss': val_B2A2B_loss,
-                        'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,}
+                        'A2B2A_f_cycle_loss': val_A2B2A_f_loss,}
 
 def validation_step(A, B):
     A2B, A2B2A, val_loss_dict = sample(A, B)
