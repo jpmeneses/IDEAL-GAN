@@ -263,6 +263,10 @@ def sample(A, B):
     # B2A2B Cycle
     # B2A = IDEAL_op(B, training=False)
     # B2A2B = G_A2B(B2A, training=False)
+
+    # Fourier regularization
+    A_f = F_op(A, training=False)
+    A2B2A_f = F_op(A2B2A, training=False)
     
     # Discriminative Losses
     if args.adv_train:
@@ -277,7 +281,8 @@ def sample(A, B):
     val_B2A2B_loss = cycle_loss_fn(B, A2B)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
-                        'B2A2B_cycle_loss': val_B2A2B_loss}
+                        'B2A2B_cycle_loss': val_B2A2B_loss,
+                        'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,}
 
 def validation_step(A, B):
     A2B, A2B2A, val_loss_dict = sample(A, B)
