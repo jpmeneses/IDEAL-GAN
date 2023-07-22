@@ -54,6 +54,7 @@ D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=12, self_attention=False)
 
 IDEAL_op = wf.IDEAL_Layer(ne,MEBCRN=True)
 LWF_op = wf.LWF_Layer(ne,MEBCRN=True)
+F_op = dl.FourierLayer()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -72,29 +73,35 @@ def train_G(A, B):
         A2B2A_L = LWF_op(A2B)
 
         ##################### B Cycle #####################
-        B2A = IDEAL_op(B, training=False)
-        B2A2B = G_A2B(B2A, training=True)
+        # B2A = IDEAL_op(B, training=False)
+        # B2A2B = G_A2B(B2A, training=True)
 
         ############## Discriminative Losses ##############
         A2B2A_d_logits = D_A(A2B2A_L, training=False)
         A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
 
+        ############# Fourier Regularization ##############
+        A_f = F_op(A, training=False)
+        A2B2A_f = F_op(A2B2A, training=False)
+
         ############ Cycle-Consistency Losses #############
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B2A2B_cycle_loss = cycle_loss_fn(B, B2A2B)
+        B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
+        A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
         activ_reg = tf.add_n(G_A2B.losses)
         
-        G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + B2A2B_cycle_loss)*1e1 + activ_reg
+        G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + B2A2B_cycle_loss)*1e1 + activ_reg + A2B2A_f_cycle_loss*1e-3
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
-    return A2B,B2A,A2B2A_L,{'A2B2A_g_loss': A2B2A_g_loss,
-                            'A2B2A_cycle_loss': A2B2A_cycle_loss,
-                            'B2A2B_cycle_loss': B2A2B_cycle_loss,
-                            'LS_reg': activ_reg}
+    return A2B,A2B2A_L,{'A2B2A_g_loss': A2B2A_g_loss,
+                        'A2B2A_cycle_loss': A2B2A_cycle_loss,
+                        'B2A2B_cycle_loss': B2A2B_cycle_loss,
+                        'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
+                        'LS_reg': activ_reg}
 
 
 @tf.function
@@ -119,7 +126,7 @@ def train_D(A, A2B2A):
 
 
 def train_step(A, B):
-    A2B, B2A, A2B2A, G_loss_dict = train_G(A, B)
+    A2B, A2B2A, G_loss_dict = train_G(A, B)
 
     # cannot autograph `A2B_pool`
     A2B2A = A2B2A_pool(A2B2A)
@@ -130,7 +137,7 @@ def train_step(A, B):
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
         D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
 
-    return A2B, B2A, G_loss_dict, D_loss_dict
+    return A2B, A2B2A, G_loss_dict, D_loss_dict
 
 
 # epoch counter
@@ -142,7 +149,7 @@ sample_dir = py.join('output', 'test-grad', 'samples_training')
 py.mkdir(sample_dir)
 
 # main loop
-n_div = 86
+n_div = len_dataset
 A_prev = None
 for ep in range(20):
     for A, B in tqdm.tqdm(A_B_dataset, desc='Ep. '+str(ep+1), total=len_dataset):
@@ -150,7 +157,7 @@ for ep in range(20):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        A2B, B2A, G_loss_dict, D_loss_dict = train_step(A, B)
+        A2B, A2B2A, G_loss_dict, D_loss_dict = train_step(A, B)
         
         # summary
         with train_summary_writer.as_default():
@@ -158,16 +165,16 @@ for ep in range(20):
             tl.summary(D_loss_dict, step=G_optimizer.iterations, name='D_losses')
 
         # sample
-        if G_optimizer.iterations.numpy() % n_div == 0:
+        if (G_optimizer.iterations.numpy()+10) % n_div == 0:
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of MR images at each echo
-            im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,0,:,:,0],B2A[:,0,:,:,1])))
-            im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,1,:,:,0],B2A[:,1,:,:,1])))
-            im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,2,:,:,0],B2A[:,2,:,:,1])))
-            im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,3,:,:,0],B2A[:,3,:,:,1])))
-            im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,4,:,:,0],B2A[:,4,:,:,1])))
-            im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,5,:,:,0],B2A[:,5,:,:,1])))
+            im_ech1 = np.squeeze(np.abs(tf.complex(A2B2A[0,:,:,0],A2B2A[0,:,:,1])))
+            im_ech2 = np.squeeze(np.abs(tf.complex(A2B2A[1,:,:,0],A2B2A[1,:,:,1])))
+            im_ech3 = np.squeeze(np.abs(tf.complex(A2B2A[2,:,:,0],A2B2A[2,:,:,1])))
+            im_ech4 = np.squeeze(np.abs(tf.complex(A2B2A[3,:,:,0],A2B2A[3,:,:,1])))
+            im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[4,:,:,0],A2B2A[4,:,:,1])))
+            im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[5,:,:,0],A2B2A[5,:,:,1])))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
