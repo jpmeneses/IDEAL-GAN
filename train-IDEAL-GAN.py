@@ -209,7 +209,7 @@ def train_G(A, B):
                     'A2B2A_cycle_loss': A2B2A_cycle_loss,
                     'B2A2B_cycle_loss': B2A2B_cycle_loss,
                     'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
-                    'LS_reg': activ_reg}
+                    'LS_reg': activ_reg/args.ls_reg_weight}
 
 
 @tf.function
