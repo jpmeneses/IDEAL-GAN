@@ -98,8 +98,8 @@ for k in range(args.n_samples):
 
 	w_aux = np.squeeze(Z2B[:,:,:,0])
 	f_aux = np.squeeze(Z2B[:,:,:,1])
-	r2_aux = np.squeeze(Z2B[:,:,:,2])
-	field_aux = np.squeeze(Z2B[:,:,:,3])
+	r2_aux = np.squeeze(Z2B[:,:,:,3])
+	field_aux = np.squeeze(Z2B[:,:,:,2])
 
 	im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
 	im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
