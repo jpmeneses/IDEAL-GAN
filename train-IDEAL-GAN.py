@@ -34,6 +34,7 @@ py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpo
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
+py.arg('--critic_train_steps', type=int, default=1)
 py.arg('--adversarial_loss_mode', default='wgan', choices=['gan', 'hinge_v1', 'hinge_v2', 'lsgan', 'wgan'])
 py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
 py.arg('--gradient_penalty_weight', type=float, default=10.0)
@@ -245,7 +246,7 @@ def train_step(A, B):
     if args.adv_train:
         # cannot autograph `A2B_pool`
         A2B2A = A2B2A_pool(A2B2A)
-        for _ in range(1):
+        for _ in range(args.critic_train_steps):
             D_loss_dict = train_D(A, A2B2A)
     else:
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
