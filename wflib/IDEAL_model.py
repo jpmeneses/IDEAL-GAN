@@ -209,6 +209,7 @@ class IDEAL_Layer(tf.keras.layers.Layer):
         return IDEAL_model(out_maps)
 
 
+@tf.custom_gradient
 def LWF_model(out_maps):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     ne = 6
