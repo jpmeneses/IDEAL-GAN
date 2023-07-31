@@ -639,8 +639,8 @@ def decoder(
     # wf_init = keras.initializers.VarianceScaling(scale=5e-1,mode='fan_in',distribution='uniform')
     # pm_init = keras.initializers.VarianceScaling(scale=1e-6,mode='fan_out',distribution='uniform')
     filt_iter = filt_ini
-    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer=inits[sp])(x)
-    x = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer=inits[sp])(x)
+    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    x = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
     if NL_self_attention:
         x = _residual_block(x, norm=norm)
         x = SelfAttention(ch=filt_ini)(x)
