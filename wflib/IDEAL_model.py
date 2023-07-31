@@ -209,66 +209,6 @@ class IDEAL_Layer(tf.keras.layers.Layer):
         return IDEAL_model(out_maps)
 
 
-@tf.custom_gradient
-def LWF_model(out_maps):
-    n_batch,_,hgt,wdt,_ = out_maps.shape
-    ne = 6
-    
-    te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
-    te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
-    te_complex = tf.complex(0.0,te) # (1,ne)
-    
-    M = gen_M(te,get_Mpinv=False) # (ne,ns)
-    M = tf.squeeze(M,axis=0)
-
-    # Generate complex water/fat signals
-    real_rho = tf.transpose(out_maps[:,:2,:,:,0],perm=[0,2,3,1])
-    imag_rho = tf.transpose(out_maps[:,:2,:,:,1],perm=[0,2,3,1])
-    rho = tf.complex(real_rho,imag_rho) * rho_sc
-
-    voxel_shape = tf.convert_to_tensor((hgt,wdt))
-    num_voxel = tf.math.reduce_prod(voxel_shape)
-    rho_mtx = tf.transpose(tf.reshape(rho, [n_batch, num_voxel, ns]), perm=[0,2,1]) # (nb,ns,nv)
-
-    # Matrix operations
-    Smtx = tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
-
-    # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(Smtx,[n_batch*ne,hgt,wdt]) # (nb*ne,hgt,wdt)
-    S_hat = tf.expand_dims(S_hat,-1)
-    
-    # Split into real and imaginary channels
-    Re_gt = tf.math.real(S_hat)
-    Im_gt = tf.math.imag(S_hat)
-    res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
-
-    def grad(upstream): # Must be same shape as out_maps
-        # Re-format upstream 
-        upstream = tf.complex(0.5*upstream[:,:,:,:,0],-0.5*upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
-        upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
-
-        # Water/fat gradient
-        Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[0,2,1])) # (nb,nv,ne,ne)
-        ds_dp = tf.linalg.matmul(Wp_d,M) * rho_sc ## (nb,nv,ne,ns) I1
-        
-        # Xi gradient, considering Taylor approximation
-        ds_dxi = tf.zeros_like(ds_dp[:,:,:,:1], dtype=tf.complex64) ## (nb,nv,ne,1) I2
-
-        # Concatenate d_s/d_param gradients
-        ds_dq = tf.concat([ds_dp,ds_dxi],axis=-1) # (nb,nv,ne,ns+1)
-        ds_dq = tf.transpose(ds_dq, perm=[0,1,3,2]) ## (nb,nv,ns+1,ne)
-
-        grad_res = tf.linalg.matvec(ds_dq, upstream) # (nb,nv,ns+1)
-        grad_res = tf.reshape(tf.transpose(grad_res,perm=[0,2,1]), [n_batch,ns+1,hgt,wdt]) # (nb,ns+1,hgt,wdt)
-        grad_res_r = +2*tf.math.real(tf.expand_dims(grad_res,axis=-1))
-        grad_res_i = -2*tf.math.imag(tf.expand_dims(grad_res,axis=-1))
-        grad_res = tf.concat([grad_res_r,grad_res_i],axis=-1) # (nb,ns+1,hgt,wdt,2)
-
-        return grad_res
-
-    return res_gt, grad
-
-
 class LWF_Layer(tf.keras.layers.Layer):
     def __init__(self,n_ech,MEBCRN=False):
         super(LWF_Layer, self).__init__()
@@ -276,7 +216,38 @@ class LWF_Layer(tf.keras.layers.Layer):
         self.MEBCRN = MEBCRN
 
     def call(self,out_maps,te=None,training=None):
-        return LWF_model(out_maps)
+        n_batch,_,hgt,wdt,_ = out_maps.shape
+        ne = 6
+        
+        te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
+        te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
+        te_complex = tf.complex(0.0,te) # (1,ne)
+        
+        M = gen_M(te,get_Mpinv=False) # (ne,ns)
+        M = tf.squeeze(M,axis=0)
+
+        # Generate complex water/fat signals
+        real_rho = tf.transpose(out_maps[:,:,:,:,0],perm=[0,2,3,1])
+        imag_rho = tf.transpose(out_maps[:,:,:,:,1],perm=[0,2,3,1])
+        rho = tf.complex(real_rho,imag_rho) * rho_sc
+
+        voxel_shape = tf.convert_to_tensor((hgt,wdt))
+        num_voxel = tf.math.reduce_prod(voxel_shape)
+        rho_mtx = tf.transpose(tf.reshape(rho, [n_batch, num_voxel, ns]), perm=[0,2,1]) # (nb,ns,nv)
+
+        # Matrix operations
+        Smtx = tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
+
+        # Reshape to original acquisition dimensions
+        S_hat = tf.reshape(Smtx,[n_batch*ne,hgt,wdt]) # (nb*ne,hgt,wdt)
+        S_hat = tf.expand_dims(S_hat,-1)
+        
+        # Split into real and imaginary channels
+        Re_gt = tf.math.real(S_hat)
+        Im_gt = tf.math.imag(S_hat)
+        res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+
+        return res_gt
 
 
 @tf.function
