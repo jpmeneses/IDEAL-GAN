@@ -134,13 +134,21 @@ if args.G_model == 'encod-decod':
                     ls_reg_weight=args.ls_reg_weight,
                     NL_self_attention=args.NL_SelfAttention
                     )
-    dec= dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
-                    filters=args.n_G_filters,
-                    NL_self_attention=args.NL_SelfAttention)
-    G_A2B = keras.Sequential()
-    G_A2B.add(enc)
-    G_A2B.add(dec)
+    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        filters=args.n_G_filters,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        filters=args.n_G_filters,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        filters=args.n_G_filters,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
@@ -165,17 +173,17 @@ D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(A, B):
-    indices =tf.concat([tf.zeros((A.shape[0],1,hgt,wdt,2),dtype=tf.int32),
-                        tf.ones((A.shape[0],1,hgt,wdt,2),dtype=tf.int32),
-                        2*tf.ones((A.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
-    PM_idx = tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-    
     with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
-        A2B = G_A2B(A, training=True)
+        A2Z = enc(A, training=True)
+        A2Z2B_w = dec_w(A2Z, training=True)
+        A2Z2B_f = dec_f(A2Z, training=True)
+        A2Z2B_xi= dec_xi(A2Z, training=True)
+        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
-        A2B2A_L = LWF_op(A2B, training=False)
+
+        A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
+        A2B2A_L = LWF_op(A2B_L, training=False)
 
         ##################### B Cycle #####################
         # B2A = IDEAL_op(B, training=False)
@@ -198,14 +206,14 @@ def train_G(A, B):
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
-        activ_reg = tf.add_n(G_A2B.losses)
+        activ_reg = tf.add_n(enc.losses)
         
         G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + A2B2A_g_loss
         G_loss += activ_reg
         G_loss += A2B2A_f_cycle_loss * args.Fourier_reg_weight
         
-    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
+    G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
 
     return A2B2A_L,{'A2B2A_g_loss': A2B2A_g_loss,
                     'A2B2A_cycle_loss': A2B2A_cycle_loss,
@@ -259,7 +267,11 @@ def train_step(A, B):
 @tf.function
 def sample(A, B):
     # A2B2A Cycle
-    A2B = G_A2B(A, training=False)
+    A2Z = enc(A, training=False)
+    A2Z2B_w = dec_w(A2Z, training=True)
+    A2Z2B_f = dec_f(A2Z, training=True)
+    A2Z2B_xi= dec_xi(A2Z, training=True)
+    A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     A2B2A = IDEAL_op(A2B, training=False)
 
     # B2A2B Cycle
@@ -299,7 +311,10 @@ def validation_step(A, B):
 ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
-checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
+checkpoint = tl.Checkpoint(dict(enc=enc,
+                                dec_w=dec_w,
+                                dec_f=dec_f,
+                                dec_xi=dec_xi,
                                 D_A=D_A,
                                 G_optimizer=G_optimizer,
                                 D_optimizer=D_optimizer,
