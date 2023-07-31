@@ -636,32 +636,24 @@ def decoder(
     
     x = inputs1 = keras.Input(input_shape)
 
-    wf_init = keras.initializers.VarianceScaling(scale=5e-1,mode='fan_in',distribution='uniform')
-    pm_init = keras.initializers.VarianceScaling(scale=1e-6,mode='fan_out',distribution='uniform')
-    inits = [wf_init for i in range(n_species)]
-    inits.append(pm_init)
-    out_inits = [output_initializer for i in range(n_species)]
-    out_inits.append(pm_init)
-    x_list = [x for i in range(n_species+1)]
-    for sp in range(n_species+1):
-        filt_iter = filt_ini
-        x_list[sp] = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer=inits[sp])(x_list[sp])
-        x_list[sp] = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer=inits[sp])(x_list[sp])
-        if NL_self_attention:
-            x_list[sp] = _residual_block(x_list[sp], norm=norm)
-            x_list[sp] = SelfAttention(ch=filt_ini)(x_list[sp])
-            x_list[sp] = _residual_block(x_list[sp], norm=norm)
-        for cont in range(num_layers):
-            filt_iter //= 2  # decreasing number of filters with each layer
-            x_list[sp] = _upsample(filt_iter, (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(x_list[sp])
-            for n_res in range(num_res_blocks):
-                x_list[sp] = _residual_block(x_list[sp], norm=norm)
+    # wf_init = keras.initializers.VarianceScaling(scale=5e-1,mode='fan_in',distribution='uniform')
+    # pm_init = keras.initializers.VarianceScaling(scale=1e-6,mode='fan_out',distribution='uniform')
+    filt_iter = filt_ini
+    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer=inits[sp])(x)
+    x = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer=inits[sp])(x)
+    if NL_self_attention:
+        x = _residual_block(x, norm=norm)
+        x = SelfAttention(ch=filt_ini)(x)
+        x = _residual_block(x, norm=norm)
+    for cont in range(num_layers):
+        filt_iter //= 2  # decreasing number of filters with each layer
+        x = _upsample(filt_iter, (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(x)
+        for n_res in range(num_res_blocks):
+            x = _residual_block(x, norm=norm)
 
-        x_list[sp] = keras.layers.Lambda(lambda x: tf.expand_dims(x,axis=1))(x_list[sp])
-        x_list[sp] = Norm()(x_list[sp])
-        x_list[sp] = keras.layers.Conv2D(2,3,padding="same",activation=output_activation,kernel_initializer=out_inits[sp])(x_list[sp])
-
-    output = keras.layers.concatenate(x_list,axis=1)
+    x = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
+    x = Norm()(x)
+    output = keras.layers.Conv2D(2,3,padding="same",activation=output_activation,kernel_initializer=output_initializer)(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
