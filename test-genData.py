@@ -44,38 +44,40 @@ if args.G_model == 'encod-decod':
     				encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     NL_self_attention=args.NL_SelfAttention)
-    dec= dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
-                    filters=args.n_G_filters,
-                    NL_self_attention=args.NL_SelfAttention)
-    G_A2B = tf.keras.Sequential()
-    G_A2B.add(enc)
-    G_A2B.add(dec)
+    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        filters=args.n_G_filters,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        filters=args.n_G_filters,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        filters=args.n_G_filters,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
 
-tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 
 @tf.function
 def sample(Z,TE=None):
-	indices =tf.concat([tf.zeros((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32),
-						tf.ones((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32),
-                        2*tf.ones((Z.shape[0],1,hgt,wdt,2),dtype=tf.int32)],axis=1)
 	# Z2B2A Cycle
-	Z2B = dec(Z, training=False)
-	# Split A2B param maps
-	Z2B_W,Z2B_F,Z2B_PM = tf.dynamic_partition(Z2B,indices,num_partitions=3)
-	Z2B_W = tf.squeeze(tf.reshape(Z2B_W,(Z.shape[0],1,hgt,wdt,2)),axis=1)
-	Z2B_F = tf.squeeze(tf.reshape(Z2B_F,(Z.shape[0],1,hgt,wdt,2)),axis=1)
-	Z2B_PM= tf.squeeze(tf.reshape(Z2B_PM,(Z.shape[0],1,hgt,wdt,2)),axis=1)
+	Z2B_w = dec_w(Z, training=False)
+	Z2B_f = dec_f(Z, training=False)
+	Z2B_xi= dec_xi(Z, training=False)
 	# Water/fat magnitudes
-	Z2B_WF_real = tf.concat([Z2B_W[:,:,:,:1],Z2B_F[:,:,:,:1]],axis=-1)
-	Z2B_WF_imag = tf.concat([Z2B_W[:,:,:,1:],Z2B_F[:,:,:,1:]],axis=-1)
+	Z2B_WF_real = tf.concat([Z2B_w[:,0,:,:,:1],Z2B_f[:,0,:,:,:1]],axis=-1)
+	Z2B_WF_imag = tf.concat([Z2B_w[:,0,:,:,1:],Z2B_f[:,0,:,:,1:]],axis=-1)
 	Z2B_WF_abs = tf.abs(tf.complex(Z2B_WF_real,Z2B_WF_imag))
-	Z2B_abs = tf.concat([Z2B_WF_abs,Z2B_PM],axis=-1)
+	Z2B_abs = tf.concat([Z2B_WF_abs,tf.squeeze(Z2B_PM,axis=1)],axis=-1)
 	# Reconstructed multi-echo images
 	Z2B2A = IDEAL_op(Z2B)
 
