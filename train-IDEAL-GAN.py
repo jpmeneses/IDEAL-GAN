@@ -177,13 +177,16 @@ def train_G(A, B):
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
         A2Z2B_w = dec_w(A2Z, training=True)
+        tf.debugging.check_numerics(A2B2A_w, message='A2B (water) numerical error')
         A2Z2B_f = dec_f(A2Z, training=True)
+        tf.debugging.check_numerics(A2B2A_f, message='A2B (fat) numerical error')
         A2Z2B_xi= dec_xi(A2Z, training=True)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
 
         A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
         A2B2A_L = LWF_op(A2B_L, training=False)
+        tf.debugging.check_numerics(A2B2A_L, message='Linear A2B2A numerical error')
 
         ##################### B Cycle #####################
         # B2A = IDEAL_op(B, training=False)
@@ -228,9 +231,10 @@ def train_D(A, A2B2A):
     with tf.GradientTape() as t:
         A_d_logits = D_A(A, training=True)
         A2B2A_d_logits = D_A(A2B2A, training=True)
+        tf.debugging.check_numerics(A2B2A_d_logits, message='A2B2A numerical error')
         
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
-        tf.debugging.check_numerics(A2B2A_d_loss, message='A2B2A numerical error')
+        tf.debugging.check_numerics(A2B2A_d_loss, message='A2B2A D-loss numerical error')
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
