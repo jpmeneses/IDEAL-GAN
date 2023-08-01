@@ -177,9 +177,9 @@ def train_G(A, B):
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
         A2Z2B_w = dec_w(A2Z, training=True)
-        tf.debugging.check_numerics(A2B2A_w, message='A2B (water) numerical error')
+        tf.debugging.check_numerics(A2Z2B_w, message='A2B (water) numerical error')
         A2Z2B_f = dec_f(A2Z, training=True)
-        tf.debugging.check_numerics(A2B2A_f, message='A2B (fat) numerical error')
+        tf.debugging.check_numerics(A2Z2B_f, message='A2B (fat) numerical error')
         A2Z2B_xi= dec_xi(A2Z, training=True)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
