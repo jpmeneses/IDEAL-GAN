@@ -185,7 +185,8 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 sample_dir = py.join(output_dir, 'samples_ldm_training')
 py.mkdir(sample_dir)
 
-r2_sc, fm_sc = 200.0, 300.0
+fm_sc = 300.0
+r2_sc = 2*np.pi*fm_sc
 
 # main loop
 for ep in range(args.epochs_ldm):
@@ -243,16 +244,16 @@ for ep in range(args.epochs_ldm):
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
     # Magnitude of recon MR images at each echo
-    im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[0,:,:,0],Z2B2A[0,:,:,1])))
-    im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[1,:,:,0],Z2B2A[1,:,:,1])))
+    im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
+    im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
     if args.n_echoes >= 3:
-        im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[2,:,:,0],Z2B2A[2,:,:,1])))
+        im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
     if args.n_echoes >= 4:
-        im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[3,:,:,0],Z2B2A[3,:,:,1])))
+        im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
     if args.n_echoes >= 5:
-        im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[4,:,:,0],Z2B2A[4,:,:,1])))
+        im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
     if args.n_echoes >= 6:
-        im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[5,:,:,0],Z2B2A[5,:,:,1])))
+        im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
     
     # Acquisitions in the first row
     acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
