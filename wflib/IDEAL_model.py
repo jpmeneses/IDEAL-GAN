@@ -18,6 +18,20 @@ r2_sc = 200.0   # HR:150 / GC:200
 fm_sc = 300.0   # HR:300 / GC:400
 rho_sc = 1.4
 
+def gen_TEvar(n_ech,orig=False):
+    if orig:
+        TE_ini_var = 1.3 * 1e-3
+        d_TE_var = 2.1 * 1e-3
+    else:
+        TE_ini_var = (1.0 + 1.5*np.random.uniform()) * 1e-3
+        d_TE_var = (1.5 + 1.0*np.random.uniform()) * 1e-3
+    stp_te = TE_ini_var + d_TE_var * (n_ech-1) + 1e-4
+    te_var_np = np.arange(start=TE_ini_var,stop=stp_te,step=d_TE_var)
+    te_var = tf.convert_to_tensor(te_var_np,dtype=tf.float32)
+    te_var = tf.expand_dims(te_var,0)
+    # te_var = tf.tile(te_var,[bs,1])
+    return te_var
+
 
 @tf.function
 def gen_M(te,get_Mpinv=True,get_P0=False):
@@ -219,8 +233,8 @@ class LWF_Layer(tf.keras.layers.Layer):
         n_batch,_,hgt,wdt,_ = out_maps.shape
         ne = 6
         
-        te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
-        te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
+        if te is None:
+            te = gen_TEvar(ne)
         te_complex = tf.complex(0.0,te) # (1,ne)
         
         M = gen_M(te,get_Mpinv=False) # (ne,ns)
