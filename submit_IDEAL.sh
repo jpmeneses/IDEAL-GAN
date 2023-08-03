@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-ldm.py --experiment_dir 'GAN-100' --epoch_ldm_ckpt 5 --data_augmentation True
+python train-ldm.py --experiment_dir 'GAN-100' --epoch_ldm_ckpt 5 --data_augmentation False
