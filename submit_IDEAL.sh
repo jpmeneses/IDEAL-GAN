@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=v100-sup
-#SBATCH --output=out_sup_100.txt
+#SBATCH --output=out_GAN_100.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
