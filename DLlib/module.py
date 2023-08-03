@@ -598,7 +598,6 @@ def encoder(
     
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
     _,ls_hgt,ls_wdt,ls_dims = x.shape
-    x_zero = keras.layers.Lambda(lambda z: z * 0.0)(x)
 
     x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
     x_mean = keras.layers.Flatten()(x_mean)
@@ -608,7 +607,7 @@ def encoder(
     
     x = keras.layers.concatenate([x_mean,x_std],axis=-1)
     
-    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=x_zero, scale=1))
+    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,ls_dims)), scale=1))
     output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
                 activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
 
