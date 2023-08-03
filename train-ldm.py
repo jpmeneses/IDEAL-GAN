@@ -125,7 +125,7 @@ alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
 # initialize the model in the memory of our GPU
 hgt_ls = dec_w.input_shape[1]
 wdt_ls = dec_w.input_shape[2]
-test_images = np.ones([1, hgt_ls, wdt_ls, args.encoded_size])
+test_images = tf.ones((1, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
 test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
 k = unet(test_images, test_timestamps)
 
@@ -200,8 +200,8 @@ for ep in range(args.epochs_ldm):
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
-        for i in range(A.shape[0]):
-            if args.data_augmentation:
+        if args.data_augmentation:
+            for i in range(A.shape[0]):
                 A_i = A[i,:,:,:,:]
                 p = np.random.rand()
                 if p <= 0.4:
@@ -219,8 +219,8 @@ for ep in range(args.epochs_ldm):
                     A_da = tf.expand_dims(A_i,axis=0)
                 else:
                     A_da = tf.concat([A_da, tf.expand_dims(A_i, axis=0)],axis=0)
-            else:
-                A_da = A
+        else:
+            A_da = A
         # ==============================================================================
 
         # ==============================================================================
