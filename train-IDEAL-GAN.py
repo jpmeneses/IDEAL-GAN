@@ -61,7 +61,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # =                                    data                                    =
 # ==============================================================================
 
-A2B_pool = data.ItemPool(args.pool_size)
+A2B2A_pool = data.ItemPool(args.pool_size)
 
 ech_idx = args.n_echoes * 2
 fm_sc = 300.0
@@ -181,7 +181,10 @@ def train_G(A, B):
         A2Z2B_xi= dec_xi(A2Z, training=True)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
+
         A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
+        A2B2A_L = LWF_op(A2B_L, training=False)
+        tf.debugging.check_numerics(A2B2A_L, message='Linear A2B2A numerical error')
 
         ##################### B Cycle #####################
         # B2A = IDEAL_op(B, training=False)
@@ -194,6 +197,7 @@ def train_G(A, B):
         ############## Discriminative Losses ##############
         if args.adv_train:
             A2B2A_d_logits = D_A(A2B2A_L, training=False)
+            tf.debugging.check_numerics(A2B2A_d_logits, message='Train_G: A2B2A D-logits numerical error')
             A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         else:
             A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
@@ -213,7 +217,7 @@ def train_G(A, B):
     G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
 
-    return A2B_L,  {'A2B2A_g_loss': A2B2A_g_loss,
+    return A2B2A_L,{'A2B2A_g_loss': A2B2A_g_loss,
                     'A2B2A_cycle_loss': A2B2A_cycle_loss,
                     'B2A2B_cycle_loss': B2A2B_cycle_loss,
                     'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
@@ -221,12 +225,9 @@ def train_G(A, B):
 
 
 @tf.function
-def train_D(A, A2B):
+def train_D(A, A2B2A):
     A = tf.reshape(A,(-1,hgt,wdt,2))
     with tf.GradientTape() as t:
-        A2B2A = LWF_op(A2B, training=False)
-        tf.debugging.check_numerics(A2B2A, message='Linear A2B2A numerical error')
-
         A_d_logits = D_A(A, training=True)
         tf.debugging.check_numerics(A_d_logits, message='A D-logits numerical error')
         A2B2A_d_logits = D_A(A2B2A, training=True)
@@ -253,13 +254,13 @@ def train_D(A, A2B):
 
 
 def train_step(A, B):
-    A2B, G_loss_dict = train_G(A, B)
+    A2B2A, G_loss_dict = train_G(A, B)
 
     if args.adv_train:
         # cannot autograph `A2B_pool`
-        A2B = A2B_pool(A2B)
+        A2B2A = A2B2A_pool(A2B2A)
         for _ in range(args.critic_train_steps):
-            D_loss_dict = train_D(A, A2B)
+            D_loss_dict = train_D(A, A2B2A)
     else:
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
         D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
@@ -276,6 +277,8 @@ def sample(A, B):
     A2Z2B_xi= dec_xi(A2Z, training=True)
     A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     A2B2A = IDEAL_op(A2B, training=False)
+    A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
+    A2B2A_L = LWF_op(A2B_L, training=False)
 
     # B2A2B Cycle
     # B2A = IDEAL_op(B, training=False)
@@ -297,7 +300,7 @@ def sample(A, B):
     val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, A2B)
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
-    return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
+    return A2B,A2B2A_L,{'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
                         'B2A2B_cycle_loss': val_B2A2B_loss,
                         'A2B2A_f_cycle_loss': val_A2B2A_f_loss,}
@@ -400,16 +403,16 @@ for ep in range(args.epochs):
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            im_ech1 = np.squeeze(np.abs(tf.complex(A[:,0,:,:,0],A[:,0,:,:,1])))
-            im_ech2 = np.squeeze(np.abs(tf.complex(A[:,1,:,:,0],A[:,1,:,:,1])))
+            im_ech1 = np.squeeze(np.abs(tf.complex(A2B2A[0,:,:,0],A2B2A[0,:,:,1])))
+            im_ech2 = np.squeeze(np.abs(tf.complex(A2B2A[1,:,:,0],A2B2A[1,:,:,1])))
             if args.n_echoes >= 3:
-                im_ech3 = np.squeeze(np.abs(tf.complex(A[:,2,:,:,0],A[:,2,:,:,1])))
+                im_ech3 = np.squeeze(np.abs(tf.complex(A2B2A[2,:,:,0],A2B2A[2,:,:,1])))
             if args.n_echoes >= 4:
-                im_ech4 = np.squeeze(np.abs(tf.complex(A[:,3,:,:,0],A[:,3,:,:,1])))
+                im_ech4 = np.squeeze(np.abs(tf.complex(A2B2A[3,:,:,0],A2B2A[3,:,:,1])))
             if args.n_echoes >= 5:
-                im_ech5 = np.squeeze(np.abs(tf.complex(A[:,4,:,:,0],A[:,4,:,:,1])))
+                im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[4,:,:,0],A2B2A[4,:,:,1])))
             if args.n_echoes >= 6:
-                im_ech6 = np.squeeze(np.abs(tf.complex(A[:,5,:,:,0],A[:,5,:,:,1])))
+                im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[5,:,:,0],A2B2A[5,:,:,1])))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
