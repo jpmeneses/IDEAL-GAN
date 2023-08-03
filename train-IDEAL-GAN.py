@@ -44,7 +44,7 @@ py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--cycle_loss_weight', type=float, default=10.0)
 py.arg('--B2A2B_weight', type=float, default=1.0)
 py.arg('--ls_reg_weight', type=float, default=1.0)
-py.arg('--Fourier_reg_weight', type=float, default=1e-3)
+py.arg('--Fourier_reg_weight', type=float, default=1e-5)
 py.arg('--NL_SelfAttention',type=bool, default=False)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
 args = py.args()
@@ -182,9 +182,12 @@ def train_G(A, B):
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
 
-        A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
-        A2B2A_L = LWF_op(A2B_L, training=False)
-        tf.debugging.check_numerics(A2B2A_L, message='Linear A2B2A numerical error')
+        if args.adv_train:
+            A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
+            A2B2A_L = LWF_op(A2B_L, training=False)
+            tf.debugging.check_numerics(A2B2A_L, message='Linear A2B2A numerical error')
+        else:
+            A2B2A_L = A2B2A
 
         ##################### B Cycle #####################
         # B2A = IDEAL_op(B, training=False)
