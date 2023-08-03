@@ -24,6 +24,7 @@ py.arg('--adv_train', type=bool, default=False)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='encod-decod', choices=['multi-decod','encod-decod','U-Net','MEBCRN'])
 py.arg('--n_G_filters', type=int, default=36)
+py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_D_filters', type=int, default=64)
 py.arg('--encoded_size', type=int, default=256)
 py.arg('--frac_labels', type=bool, default=False)
@@ -131,22 +132,26 @@ if args.G_model == 'encod-decod':
     enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
                     encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
                     ls_reg_weight=args.ls_reg_weight,
                     NL_self_attention=args.NL_SelfAttention
                     )
     dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
+                        num_layers=args.n_downsamplings,
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
+                        num_layers=args.n_downsamplings,
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
+                        num_layers=args.n_downsamplings,
                         NL_self_attention=args.NL_SelfAttention
                         )
 else:
