@@ -598,7 +598,7 @@ def encoder(
     
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
     _,ls_hgt,ls_wdt,ls_dims = x.shape
-    x_zero = keras.layers.Lambda(lambda z: tf.zeros_like(z, dtype=tf.float32))(x)
+    x_zero = keras.layers.Lambda(lambda z: z * 0.0)(x)
 
     x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
     x_mean = keras.layers.Flatten()(x_mean)
