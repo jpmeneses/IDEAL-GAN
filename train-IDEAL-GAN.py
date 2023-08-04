@@ -178,6 +178,7 @@ D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(A, B):
+    tf.debugging.check_numerics(A, message='Training input A numerical error')
     with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
@@ -235,6 +236,7 @@ def train_G(A, B):
 @tf.function
 def train_D(A, A2B2A):
     A = tf.reshape(A,(-1,hgt,wdt,2))
+    tf.debugging.check_numerics(A, message='Training reshaped A numerical error')
     with tf.GradientTape() as t:
         A_d_logits = D_A(A, training=True)
         tf.debugging.check_numerics(A_d_logits, message='A D-logits numerical error')
@@ -360,6 +362,7 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
+        tf.debugging.check_numerics(A, message='Dataset-extracted A numerical error')
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
@@ -380,6 +383,7 @@ for ep in range(args.epochs):
             B = tf.image.random_flip_up_down(B)
         A = tf.expand_dims(A,axis=0)
         B = tf.expand_dims(B,axis=0)
+        tf.debugging.check_numerics(A, message='Augmented A numerical error')
         # ==============================================================================
 
         # ==============================================================================
