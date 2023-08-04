@@ -202,33 +202,25 @@ for ep in range(args.epochs_ldm):
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
         if args.data_augmentation:
-            for i in range(A.shape[0]):
-                A_i = A[i,:,:,:,:]
-                p = np.random.rand()
-                if p <= 0.4:
-                    # Random 90 deg rotations
-                    A_i = tf.image.rot90(A_i,k=np.random.randint(3))
+            A = tf.squeeze(A,axis=0)
+            p = np.random.rand()
+            if p <= 0.4:
+                # Random 90 deg rotations
+                A = tf.image.rot90(A,k=np.random.randint(3))
 
-                    # Random horizontal reflections
-                    A_i = tf.image.random_flip_left_right(A_i)
+                # Random horizontal reflections
+                A = tf.image.random_flip_left_right(A)
 
-                    # Random vertical reflections
-                    A_i = tf.image.random_flip_up_down(A_i)
-                
-                A_i = tf.expand_dims(A_i,axis=0)
-                if i <= 0:
-                    A_da = tf.expand_dims(A_i,axis=0)
-                else:
-                    A_da = tf.concat([A_da, tf.expand_dims(A_i, axis=0)],axis=0)
-        else:
-            A_da = A
+                # Random vertical reflections
+                A = tf.image.random_flip_up_down(A)
+            A = tf.expand_dims(A,axis=0)
         # ==============================================================================
 
         # ==============================================================================
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        loss_dict = train_step(A_da)
+        loss_dict = train_step(A)
 
         # summary
         with train_summary_writer.as_default():
