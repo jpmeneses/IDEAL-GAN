@@ -16,11 +16,11 @@ import wflib as wf
 py.arg('--experiment_dir', default='GAN-100')
 py.arg('--n_timesteps', type=int, default=200)
 py.arg('--n_ldm_filters', type=int, default=64)
-py.arg('--batch_size', type=int, default=8)
+py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs_ldm', type=int, default=100)
 py.arg('--epoch_ldm_ckpt', type=int, default=10)  # num. of epochs to save a checkpoint
 py.arg('--data_augmentation', type=bool, default=False)
-py.arg('--lr', type=float, default=0.0001)
+py.arg('--lr', type=float, default=0.00005)
 ldm_args = py.args()
 
 output_dir = py.join('output',ldm_args.experiment_dir)
