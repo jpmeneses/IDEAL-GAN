@@ -43,20 +43,24 @@ if args.G_model == 'encod-decod':
     enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
     				encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
                     NL_self_attention=args.NL_SelfAttention)
     dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
+                        num_layers=args.n_downsamplings,
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
+                        num_layers=args.n_downsamplings,
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
+                        num_layers=args.n_downsamplings,
                         NL_self_attention=args.NL_SelfAttention
                         )
 else:
@@ -73,11 +77,12 @@ def sample(Z,TE=None):
 	Z2B_w = dec_w(Z, training=False)
 	Z2B_f = dec_f(Z, training=False)
 	Z2B_xi= dec_xi(Z, training=False)
+	Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
 	# Water/fat magnitudes
 	Z2B_WF_real = tf.concat([Z2B_w[:,0,:,:,:1],Z2B_f[:,0,:,:,:1]],axis=-1)
 	Z2B_WF_imag = tf.concat([Z2B_w[:,0,:,:,1:],Z2B_f[:,0,:,:,1:]],axis=-1)
 	Z2B_WF_abs = tf.abs(tf.complex(Z2B_WF_real,Z2B_WF_imag))
-	Z2B_abs = tf.concat([Z2B_WF_abs,tf.squeeze(Z2B_PM,axis=1)],axis=-1)
+	Z2B_abs = tf.concat([Z2B_WF_abs,tf.squeeze(Z2B_xi,axis=1)],axis=-1)
 	# Reconstructed multi-echo images
 	Z2B2A = IDEAL_op(Z2B)
 
@@ -87,12 +92,11 @@ def sample(Z,TE=None):
 save_dir = py.join(args.experiment_dir, 'samples_testing', 'Z2B')
 py.mkdir(save_dir)
 
-num_layers = 4
-hls = hgt//(2**(num_layers))
-wls = wdt//(2**(num_layers))
+hls = hgt//(2**(args.n_downsamplings))
+wls = wdt//(2**(args.n_downsamplings))
 z_shape = (1,hls,wls,args.encoded_size)
 
-TE = wf.gen_TEvar(1,args.n_samples,orig=False)
+TE = wf.gen_TEvar(args.n_echoes,orig=False)
 
 for k in range(args.n_samples):
 	Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
@@ -177,7 +181,7 @@ for k in range(args.n_samples):
 	fig.delaxes(axs[1,0])
 	fig.delaxes(axs[1,5])
 
-	fig.suptitle('TE1/dTE: '+str([TE[k,0].numpy(),np.mean(np.diff(TE[k,:]))]), fontsize=16)
+	fig.suptitle('TE1/dTE: '+str([TE[0,0].numpy(),np.mean(np.diff(TE[0,:]))]), fontsize=16)
 
 	# plt.show()
 	plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
