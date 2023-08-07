@@ -104,7 +104,7 @@ else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 # create our unet model
-unet = dl.denoise_Unet(dim=args.n_ldm_filters, channels=args.encoded_size)
+unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
 
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
 
