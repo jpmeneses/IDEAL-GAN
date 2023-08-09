@@ -79,6 +79,7 @@ if args.G_model == 'encod-decod':
                     encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
                     ls_reg_weight=args.ls_reg_weight,
                     NL_self_attention=args.NL_SelfAttention
                     )
@@ -86,18 +87,21 @@ if args.G_model == 'encod-decod':
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
                         num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
                         num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
                         num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
                         NL_self_attention=args.NL_SelfAttention
                         )
 else:
