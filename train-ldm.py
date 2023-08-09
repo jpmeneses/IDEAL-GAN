@@ -144,6 +144,8 @@ def train_step(A):
 
     with tf.GradientTape() as t:
         A2Z = enc(A, training=False)
+        A2Z_var = tf.math.reduce_variance(A2Z)
+        A2Z = tf.math.divide_no_nan(A2Z,A2Z_var)
         Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
         pred_noise = unet(Z_n, timestep_values)
         
@@ -155,11 +157,14 @@ def train_step(A):
     return {'Loss': loss_value}
 
 def validation_step(Z):
+    Z_var = tf.math.reduce_variance(Z)
+    Z = tf.math.divide_no_nan(Z,Z_var)
     for i in range(args.n_timesteps-1):
         t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
         pred_noise = unet(Z, t)
         Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
+    Z = tf.math.multiply_no_nan(Z,Z_var)
     Z2B_w = dec_w(Z, training=False)
     Z2B_f = dec_f(Z, training=False)
     Z2B_xi= dec_xi(Z, training=False)
