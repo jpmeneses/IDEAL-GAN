@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v105-DDPM
-#SBATCH --output=out_DDPM_105.txt
+#SBATCH --job-name=v107-GAN
+#SBATCH --output=out_GAN_107.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-ldm.py --experiment_dir 'GAN-105' --n_timesteps 100 --epoch_ldm_ckpt 5 --data_augmentation True
+python train-IDEAL-GAN.py --dataset 'GAN-107' --adv_train False --n_G_filters 36 --n_downsamplings 2 --n_res_blocks 4 --encoded_size 6 --epochs 100 --epoch_decay 100 --epoch_ckpt 10 --cycle_loss_weight 1e1 --ls_reg_weight 2e-6 --Fourier_reg_weight 0.0 --NL_SelfAttention True
