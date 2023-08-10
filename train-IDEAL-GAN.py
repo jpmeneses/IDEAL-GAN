@@ -371,8 +371,8 @@ for ep in range(args.epochs):
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
-        A = tf.squeeze(A,axis=0)
-        B = tf.squeeze(B,axis=0)
+        A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[args.batch_size,hgt,wdt,args.n_echoes*n_ch])
+        B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[args.batch_size,hgt,wdt,n_out*n_ch])
         p = np.random.rand()
         if p <= 0.4:
             # Random 90 deg rotations
@@ -386,8 +386,8 @@ for ep in range(args.epochs):
             # Random vertical reflections
             A = tf.image.random_flip_up_down(A)
             B = tf.image.random_flip_up_down(B)
-        A = tf.expand_dims(A,axis=0)
-        B = tf.expand_dims(B,axis=0)
+        A = tf.transpose(tf.reshape(A,[args.batch_size,hgt,wdt,args.n_echoes,n_ch]),[0,3,1,2,4])
+        B = tf.transpose(tf.reshape(B,[args.batch_size,hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
         tf.debugging.check_numerics(A, message='Augmented A numerical error')
         # ==============================================================================
 
