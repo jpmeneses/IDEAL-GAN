@@ -129,7 +129,7 @@ alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
 # initialize the model in the memory of our GPU
 hgt_ls = dec_w.input_shape[1]
 wdt_ls = dec_w.input_shape[2]
-test_images = tf.ones((1, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
+test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
 test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
 k = unet(test_images, test_timestamps)
 
@@ -211,9 +211,10 @@ for ep in range(args.epochs_ldm):
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
         if args.data_augmentation:
-            A = tf.squeeze(A,axis=0)
             p = np.random.rand()
             if p <= 0.4:
+                A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[args.batch_size,hgt,wdt,args.n_echoes*n_ch])
+
                 # Random 90 deg rotations
                 A = tf.image.rot90(A,k=np.random.randint(3))
 
@@ -222,14 +223,15 @@ for ep in range(args.epochs_ldm):
 
                 # Random vertical reflections
                 A = tf.image.random_flip_up_down(A)
-            A = tf.expand_dims(A,axis=0)
+
+                A = tf.transpose(tf.reshape(A,[args.batch_size,hgt,wdt,args.n_echoes,n_ch]),[0,3,1,2,4])
         # ==============================================================================
 
         # ==============================================================================
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        loss_dict = train_step(A)
+        loss_dict = train_step(A_da)
 
         # summary
         with train_summary_writer.as_default():
