@@ -213,7 +213,7 @@ for ep in range(args.epochs_ldm):
         if args.data_augmentation:
             p = np.random.rand()
             if p <= 0.4:
-                A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[args.batch_size,hgt,wdt,args.n_echoes*n_ch])
+                A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,args.n_echoes*n_ch])
 
                 # Random 90 deg rotations
                 A = tf.image.rot90(A,k=np.random.randint(3))
@@ -224,7 +224,7 @@ for ep in range(args.epochs_ldm):
                 # Random vertical reflections
                 A = tf.image.random_flip_up_down(A)
 
-                A = tf.transpose(tf.reshape(A,[args.batch_size,hgt,wdt,args.n_echoes,n_ch]),[0,3,1,2,4])
+                A = tf.transpose(tf.reshape(A,[A.shape[0],hgt,wdt,args.n_echoes,n_ch]),[0,3,1,2,4])
         # ==============================================================================
 
         # ==============================================================================
