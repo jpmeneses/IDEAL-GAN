@@ -574,6 +574,7 @@ def encoder(
     num_layers=4,
     num_res_blocks=2,
     dropout=0.0,
+    kl_reg = True,
     ls_reg_weight=1.0,
     NL_self_attention=True,
     norm='instance_norm'):
@@ -608,8 +609,11 @@ def encoder(
     x = keras.layers.concatenate([x_mean,x_std],axis=-1)
     
     prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,ls_dims)), scale=1))
-    output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
-                activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
+    if kl_reg:
+        output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
+                    activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
+    else:
+        output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims])(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
