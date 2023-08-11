@@ -231,7 +231,7 @@ for ep in range(args.epochs_ldm):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        loss_dict = train_step(A_da)
+        loss_dict = train_step(A)
 
         # summary
         with train_summary_writer.as_default():
