@@ -154,14 +154,15 @@ def train_step(A):
     gradients = t.gradient(loss_value, unet.trainable_variables)
     opt.apply_gradients(zip(gradients, unet.trainable_variables))
 
-    return {'Loss': loss_value, 'A2Z_var': A2Z_var}
+    return A2Z_var, {'Loss': loss_value, 'A2Z_var': A2Z_var}
 
-def validation_step(Z):
+def validation_step(Z,Z_var):
     for i in range(args.n_timesteps-1):
         t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
         pred_noise = unet(Z, t)
         Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
+    Z = tf.math.multiply_no_nan(Z,Z_var)
     Z2B_w = dec_w(Z, training=False)
     Z2B_f = dec_f(Z, training=False)
     Z2B_xi= dec_xi(Z, training=False)
@@ -228,7 +229,7 @@ for ep in range(args.epochs_ldm):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        loss_dict = train_step(A)
+        Z_var, loss_dict = train_step(A)
 
         # summary
         with train_summary_writer.as_default():
@@ -239,7 +240,7 @@ for ep in range(args.epochs_ldm):
 
     # Validation inference
     Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
-    Z2B, Z2B2A = validation_step(Z)
+    Z2B, Z2B2A = validation_step(Z, Z_var)
 
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
