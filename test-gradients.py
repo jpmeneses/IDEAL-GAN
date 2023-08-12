@@ -41,16 +41,30 @@ enc= dl.encoder(input_shape=(6,hgt,wdt,n_ch),
                 filters=12,
                 ls_reg_weight=1e-5,
                 NL_self_attention=False)
-dec= dl.decoder(encoded_dims=64,
-                output_2D_shape=(hgt,wdt),
-                filters=12,
-                NL_self_attention=False)
-G_A2B = keras.Sequential()
-G_A2B.add(enc)
-G_A2B.add(dec)
+dec_w  = dl.decoder(encoded_dims=64,
+                    output_2D_shape=(hgt,wdt),
+                    filters=12,
+                    NL_self_attention=False)
+dec_f  = dl.decoder(encoded_dims=64,
+                    output_2D_shape=(hgt,wdt),
+                    filters=12,
+                    NL_self_attention=False)
+dec_xi = dl.decoder(encoded_dims=64,
+                    output_2D_shape=(hgt,wdt),
+                    filters=12,
+                    NL_self_attention=False)
+
 
 D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=12, self_attention=False)
 # D_Z = dl.CriticZ((hgt//(2**(4)),wdt//(2**(4)),64)) # //(2**(4))
+
+vgg = keras.applications.vgg19.VGG19()
+metric_vgg = keras.Model(inputs=vgg.inputs, outputs=vgg.layers[5].output)
+
+metric_model = keras.Sequential()
+metric_model.add(keras.layers.ZeroPadding2D(padding=(88,88)))
+metric_model.add(metric_vgg)
+b = metric_model(tf.random.normal((1,hgt,wdt,3),dtype=tf.float32))
 
 IDEAL_op = wf.IDEAL_Layer(ne,MEBCRN=True)
 LWF_op = wf.LWF_Layer(ne,MEBCRN=True)
@@ -68,36 +82,53 @@ A2B2A_pool = data.ItemPool(10)
 def train_G(A, B):
     with tf.GradientTape(persistent=True) as t:
         ##################### A Cycle #####################
-        A2B = G_A2B(A, training=True)
-        A2B2A = IDEAL_op(A2B)
-        A2B2A_L = LWF_op(A2B)
+        A2Z = enc(A, training=True)
+        A2Z2B_w = dec_w(A2Z, training=True)
+        A2Z2B_f = dec_f(A2Z, training=True)
+        A2Z2B_xi= dec_xi(A2Z, training=True)
+        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
+        A2B2A = IDEAL_op(A2B, training=False)
+
+        # A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
+        # A2B2A_L = LWF_op(A2B_L)
 
         ##################### B Cycle #####################
         # B2A = IDEAL_op(B, training=False)
         # B2A2B = G_A2B(B2A, training=True)
 
         ############## Discriminative Losses ##############
-        A2B2A_d_logits = D_A(A2B2A_L, training=False)
-        A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        # A2B2A_d_logits = D_A(A2B2A_L, training=False)
+        # A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
+        A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
 
         ############# Fourier Regularization ##############
         A_f = F_op(A, training=False)
         A2B2A_f = F_op(A2B2A, training=False)
 
         ############ Cycle-Consistency Losses #############
-        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        A2Y = tf.reshape(tf.transpose(A,perm=[0,4,2,3,1]),[A.shape[0]*n_ch,hgt,wdt,ne])
+        A2Y = tf.transpose(tf.reshape(A2Y,[A2Y.shape[0],hgt,wdt,ne//2,2]),perm=[0,4,1,2,3])
+        A2Y = tf.reshape(A2Y,[A2Y.shape[0]*2,hgt,wdt,ne//2])
+        A2Y_m = metric_model(A2Y, training=False)
+        
+        A2B2A2Y = tf.reshape(tf.transpose(A2B2A,perm=[0,4,2,3,1]),[A2B2A.shape[0]*n_ch,hgt,wdt,ne])
+        A2B2A2Y = tf.transpose(tf.reshape(A2B2A2Y,[A2B2A2Y.shape[0],hgt,wdt,ne//2,2]),perm=[0,4,1,2,3])
+        A2B2A2Y = tf.reshape(A2B2A2Y,[A2B2A2Y.shape[0]*2,hgt,wdt,ne//2])
+        A2B2A2Y_m = metric_model(A2B2A2Y, training=False)
+        
+        A2B2A_cycle_loss = cycle_loss_fn(A2Y_m, A2B2A2Y_m)
         B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
-        activ_reg = tf.add_n(G_A2B.losses)
+        activ_reg = tf.add_n(enc.losses)
         
         G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + B2A2B_cycle_loss)*1e1 + activ_reg + A2B2A_f_cycle_loss*1e-3
         
-    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
+    G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
 
-    return A2B,A2B2A_L,{'A2B2A_g_loss': A2B2A_g_loss,
+    return A2B,A2B2A,{'A2B2A_g_loss': A2B2A_g_loss,
                         'A2B2A_cycle_loss': A2B2A_cycle_loss,
                         'B2A2B_cycle_loss': B2A2B_cycle_loss,
                         'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
@@ -130,8 +161,8 @@ def train_step(A, B):
 
     # cannot autograph `A2B_pool`
     A2B2A = A2B2A_pool(A2B2A)
-    if ep >= 0:
-        for _ in range(1):
+    if False: #ep >= 0:
+        for _ in range(0):
             D_loss_dict = train_D(A, A2B2A)
     else:
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
