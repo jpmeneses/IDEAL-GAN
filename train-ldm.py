@@ -154,17 +154,14 @@ def train_step(A):
     gradients = t.gradient(loss_value, unet.trainable_variables)
     opt.apply_gradients(zip(gradients, unet.trainable_variables))
 
-    return {'Loss': loss_value}
+    return {'Loss': loss_value, 'A2Z_var': A2Z_var}
 
 def validation_step(Z):
-    Z_var = tf.math.reduce_variance(Z)
-    Z = tf.math.divide_no_nan(Z,Z_var)
     for i in range(args.n_timesteps-1):
         t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
         pred_noise = unet(Z, t)
         Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
-    Z = tf.math.multiply_no_nan(Z,Z_var)
     Z2B_w = dec_w(Z, training=False)
     Z2B_f = dec_f(Z, training=False)
     Z2B_xi= dec_xi(Z, training=False)
