@@ -187,6 +187,8 @@ def train_G(A, B):
     with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
+        A2Z_var = tf.math.reduce_variance(A2Z)
+        A2Z = tf.math.divide_no_nan(A2Z,A2Z_var)
         A2Z2B_w = dec_w(A2Z, training=True)
         A2Z2B_f = dec_f(A2Z, training=True)
         A2Z2B_xi= dec_xi(A2Z, training=True)
@@ -287,6 +289,8 @@ def train_step(A, B):
 def sample(A, B):
     # A2B2A Cycle
     A2Z = enc(A, training=False)
+    A2Z_var = tf.math.reduce_variance(A2Z)
+    A2Z = tf.math.divide_no_nan(A2Z,A2Z_var)
     A2Z2B_w = dec_w(A2Z, training=True)
     A2Z2B_f = dec_f(A2Z, training=True)
     A2Z2B_xi= dec_xi(A2Z, training=True)
