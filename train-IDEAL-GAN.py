@@ -43,6 +43,7 @@ py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wg
 py.arg('--gradient_penalty_weight', type=float, default=10.0)
 py.arg('--R1_reg_weight', type=float, default=0.2)
 py.arg('--R2_reg_weight', type=float, default=0.2)
+py.arg('--perceptual_loss', type=bool, default=True)
 py.arg('--cycle_loss_weight', type=float, default=10.0)
 py.arg('--B2A2B_weight', type=float, default=1.0)
 py.arg('--ls_reg_weight', type=float, default=1.0)
@@ -165,6 +166,16 @@ else:
 D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.NL_SelfAttention))
 # D_Z = dl.CriticZ(input_shape=dec.input_shape[1:], dim=args.n_D_filters, self_attention=args.NL_SelfAttention)
 
+vgg = keras.applications.vgg19.VGG19()
+metric_vgg = keras.Model(inputs=vgg.inputs, outputs=vgg.layers[7].output)
+
+metric_model = keras.Sequential()
+metric_model.add(keras.layers.Lambda(lambda x: tf.reshape(x,[x.shape[0]*x.shape[1],x.shape[2],x.shape[3],x.shape[4]])))
+metric_model.add(keras.layers.Lambda(lambda x: tf.concat([x,tf.zeros_like(x[:,:,:,:1])],axis=-1)))
+metric_model.add(keras.layers.ZeroPadding2D(padding=(16,16)))
+metric_model.add(metric_vgg)
+b = metric_model(tf.random.normal((1,args.n_echoes,hgt,wdt,2),dtype=tf.float32))
+
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
@@ -219,7 +230,12 @@ def train_G(A, B):
             A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
         
         ############ Cycle-Consistency Losses #############
-        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        if args.perceptual_loss:
+            A2Y = metric_model(A, training=False)
+            A2B2A2Y = metric_model(A2B2A, training=False)
+            A2B2A_cycle_loss = cycle_loss_fn(A2Y, A2B2A2Y)
+        else:
+            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
@@ -316,6 +332,8 @@ def sample(A, B):
         val_A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
     
     # Validation losses
+    if args.perceptual_loss:
+
     val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, A2B)
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
