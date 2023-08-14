@@ -63,6 +63,7 @@ metric_vgg = keras.Model(inputs=vgg.inputs, outputs=vgg.layers[5].output)
 
 metric_model = keras.Sequential()
 metric_model.add(keras.layers.ZeroPadding2D(padding=(88,88)))
+metric_model.add(keras.layers.Lambda(lambda x: tf.concat([x,tf.zeros_like(x[:,:,:,:1])],axis=-1)))
 metric_model.add(metric_vgg)
 b = metric_model(tf.random.normal((1,hgt,wdt,3),dtype=tf.float32))
 
