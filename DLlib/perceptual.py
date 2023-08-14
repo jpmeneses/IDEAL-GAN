@@ -3,7 +3,7 @@ import tensorflow.keras as keras
 
 vgg = keras.applications.vgg19.VGG19()
 
-def metric_model(input_shape, layers=[1,2,4,5,7], pad=(16,16)):
+def metric_model(input_shape, layers=[2,5,8,13,18], pad=(16,16)):
 	inputs = keras.Input(input_shape)
 	output = list()
 	for l in layers:
