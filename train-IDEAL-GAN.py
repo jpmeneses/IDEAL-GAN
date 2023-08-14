@@ -336,7 +336,7 @@ def sample(A, B):
     if args.perceptual_loss:
         A2Y = metric_model(A, training=False)
         A2B2A2Y = metric_model(A2B2A, training=False)
-        A2B2A_cycle_loss = cosine_loss(A2Y, A2B2A2Y)
+        val_A2B2A_loss = cosine_loss(A2Y, A2B2A2Y)
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, A2B)
