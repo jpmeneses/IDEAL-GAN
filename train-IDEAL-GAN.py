@@ -182,6 +182,7 @@ F_op = dl.FourierLayer()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 cycle_loss_fn = tf.losses.MeanSquaredError()
+cosine_loss = tf.losses.CosineSimilarity()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 D_lr_scheduler = dl.LinearDecay(args.lr*args.D_lr_factor, total_steps, args.epoch_decay * total_steps / args.epochs)
@@ -233,7 +234,7 @@ def train_G(A, B):
         if args.perceptual_loss:
             A2Y = metric_model(A, training=False)
             A2B2A2Y = metric_model(A2B2A, training=False)
-            A2B2A_cycle_loss = cycle_loss_fn(A2Y, A2B2A2Y)
+            A2B2A_cycle_loss = cosine_loss(A2Y, A2B2A2Y)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
@@ -333,8 +334,11 @@ def sample(A, B):
     
     # Validation losses
     if args.perceptual_loss:
-
-    val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
+        A2Y = metric_model(A, training=False)
+        A2B2A2Y = metric_model(A2B2A, training=False)
+        A2B2A_cycle_loss = cosine_loss(A2Y, A2B2A2Y)
+    else:
+        val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, A2B)
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B,A2B2A_L,{'A2B2A_g_loss': val_A2B2A_g_loss,
