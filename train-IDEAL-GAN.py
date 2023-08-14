@@ -166,15 +166,7 @@ else:
 D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.NL_SelfAttention))
 # D_Z = dl.CriticZ(input_shape=dec.input_shape[1:], dim=args.n_D_filters, self_attention=args.NL_SelfAttention)
 
-vgg = keras.applications.vgg19.VGG19()
-metric_vgg = keras.Model(inputs=vgg.inputs, outputs=vgg.layers[7].output)
-
-metric_model = keras.Sequential()
-metric_model.add(keras.layers.Lambda(lambda x: tf.reshape(x,[x.shape[0]*x.shape[1],x.shape[2],x.shape[3],x.shape[4]])))
-metric_model.add(keras.layers.Lambda(lambda x: tf.concat([x,tf.zeros_like(x[:,:,:,:1])],axis=-1)))
-metric_model.add(keras.layers.ZeroPadding2D(padding=(16,16)))
-metric_model.add(metric_vgg)
-b = metric_model(tf.random.normal((1,args.n_echoes,hgt,wdt,2),dtype=tf.float32))
+metric_model = dl.metric_model(input_shape=(args.n_echoes,hgt,wdt,n_ch))
 
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
@@ -234,7 +226,9 @@ def train_G(A, B):
         if args.perceptual_loss:
             A2Y = metric_model(A, training=False)
             A2B2A2Y = metric_model(A2B2A, training=False)
-            A2B2A_cycle_loss = cosine_loss(A2Y, A2B2A2Y)
+            A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])
+            for l in range(1,len(A2Y)):
+                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
@@ -336,7 +330,9 @@ def sample(A, B):
     if args.perceptual_loss:
         A2Y = metric_model(A, training=False)
         A2B2A2Y = metric_model(A2B2A, training=False)
-        val_A2B2A_loss = cosine_loss(A2Y, A2B2A2Y)
+        val_A2B2A_loss = cosine_loss(A2Y[0], A2B2A2Y[0])
+        for l in range(1,len(A2Y)):
+            val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, A2B)
