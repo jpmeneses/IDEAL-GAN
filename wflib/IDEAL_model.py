@@ -253,7 +253,7 @@ class LWF_Layer(tf.keras.layers.Layer):
         Smtx = tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
 
         # Reshape to original acquisition dimensions
-        S_hat = tf.reshape(Smtx,[n_batch*ne,hgt,wdt]) # (nb*ne,hgt,wdt)
+        S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt]) # (nb*ne,hgt,wdt)
         S_hat = tf.expand_dims(S_hat,-1)
         
         # Split into real and imaginary channels
