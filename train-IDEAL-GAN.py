@@ -228,7 +228,7 @@ def train_G(A, B):
             A2B2A2Y = metric_model(A2B2A, training=False)
             A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])
             for l in range(1,len(A2Y)):
-                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])
+                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
@@ -332,7 +332,7 @@ def sample(A, B):
         A2B2A2Y = metric_model(A2B2A, training=False)
         val_A2B2A_loss = cosine_loss(A2Y[0], A2B2A2Y[0])
         for l in range(1,len(A2Y)):
-            val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])
+            val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B, A2B)
