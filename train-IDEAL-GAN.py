@@ -163,8 +163,10 @@ if args.G_model == 'encod-decod':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=args.n_D_filters, self_attention=(args.NL_SelfAttention))
-# D_Z = dl.CriticZ(input_shape=dec.input_shape[1:], dim=args.n_D_filters, self_attention=args.NL_SelfAttention)
+D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), 
+                multi_echo=True,
+                dim=args.n_D_filters,
+                self_attention=(args.NL_SelfAttention))
 
 metric_model = dl.metric_model(input_shape=(args.n_echoes,hgt,wdt,n_ch))
 
@@ -253,8 +255,6 @@ def train_G(A, B):
 
 @tf.function
 def train_D(A, A2B2A):
-    A = tf.reshape(A,(-1,hgt,wdt,2))
-    tf.debugging.check_numerics(A, message='Training reshaped A numerical error')
     with tf.GradientTape() as t:
         A_d_logits = D_A(A, training=True)
         tf.debugging.check_numerics(A_d_logits, message='A D-logits numerical error')
