@@ -226,7 +226,7 @@ def train_G(A, B):
         if args.perceptual_loss:
             A2Y = metric_model(A, training=False)
             A2B2A2Y = metric_model(A2B2A, training=False)
-            A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])
+            A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
             for l in range(1,len(A2Y)):
                 A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
         else:
@@ -330,7 +330,7 @@ def sample(A, B):
     if args.perceptual_loss:
         A2Y = metric_model(A, training=False)
         A2B2A2Y = metric_model(A2B2A, training=False)
-        val_A2B2A_loss = cosine_loss(A2Y[0], A2B2A2Y[0])
+        val_A2B2A_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
         for l in range(1,len(A2Y)):
             val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
     else:
