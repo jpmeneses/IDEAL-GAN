@@ -181,7 +181,7 @@ cosine_loss = tf.losses.CosineSimilarity()
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 D_lr_scheduler = dl.LinearDecay(args.lr*args.D_lr_factor, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
-D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2, clipvalue=1.0)
 
 # ==============================================================================
 # =                                 train step                                 =
