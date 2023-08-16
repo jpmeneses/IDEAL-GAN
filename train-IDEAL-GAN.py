@@ -320,7 +320,6 @@ def sample(A, B):
     
     # Discriminative Losses
     if args.adv_train:
-        A2B2A = tf.reshape(A2B2A,(-1,hgt,wdt,2))
         A2B2A_d_logits = D_A(A2B2A, training=False)
         val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     else:
