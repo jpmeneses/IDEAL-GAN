@@ -288,6 +288,8 @@ def train_step(A, B):
         # cannot autograph `A2B_pool`
         A2B2A = A2B2A_pool(A2B2A)
         for _ in range(args.critic_train_steps):
+            tf.debugging.check_numerics(A, message='Before D-step: A numerical error')
+            tf.debugging.check_numerics(A2B2A, message='Before D-step: A2B2A numerical error')
             D_loss_dict = train_D(A, A2B2A)
     else:
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
