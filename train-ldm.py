@@ -2,12 +2,12 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-import data
+import tf2lib as tl
 import DLlib as dl
 import DMlib as dm
 import pylib as py
-import tf2lib as tl
 import wflib as wf
+import data
 
 # ==============================================================================
 # =                                   param                                    =
