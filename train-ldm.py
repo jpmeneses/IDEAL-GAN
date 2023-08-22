@@ -250,7 +250,7 @@ for ep in range(args.epochs_ldm):
 
     # Validation inference
     Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
-    Z2B, Z2B2A = validation_step(Z)
+    Z2B, Z2B2A = validation_step(Z, Z_var)
 
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
