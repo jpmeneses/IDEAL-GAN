@@ -145,6 +145,7 @@ def train_step(A, Z_var):
     with tf.GradientTape() as t:
         A2Z = enc(A, training=False)
         A2Z = tf.math.divide_no_nan(A2Z,Z_var)
+        A2Z_var = tf.math.reduce_variance(A2Z) # For monitoring only
         Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
         pred_noise = unet(Z_n, timestep_values)
         
