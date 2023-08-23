@@ -138,14 +138,14 @@ loss_fn = tf.losses.MeanSquaredError()
 # create our optimizer, we will use adam with a Learning rate of 1e-4
 opt = tf.keras.optimizers.Adam(learning_rate=args.lr)
 
-def train_step(A, Z_var):
+def train_step(A, Z_std):
     rng, tsrng = np.random.randint(0, 100000, size=(2,))
     timestep_values = dm.generate_timestamp(tsrng, A.shape[0], args.n_timesteps)
 
     with tf.GradientTape() as t:
         A2Z = enc(A, training=False)
-        A2Z = tf.math.divide_no_nan(A2Z,Z_var)
-        A2Z_var = tf.math.reduce_variance(A2Z) # For monitoring only
+        A2Z = tf.math.divide_no_nan(A2Z,Z_std)
+        A2Z_std = tf.math.reduce_std(A2Z) # For monitoring only
         Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
         pred_noise = unet(Z_n, timestep_values)
         
@@ -154,15 +154,15 @@ def train_step(A, Z_var):
     gradients = t.gradient(loss_value, unet.trainable_variables)
     opt.apply_gradients(zip(gradients, unet.trainable_variables))
 
-    return {'Loss': loss_value, 'A2Z_var': A2Z_var}
+    return {'Loss': loss_value, 'A2Z_std': A2Z_std}
 
-def validation_step(Z, Z_var):
+def validation_step(Z, Z_std):
     for i in range(args.n_timesteps-1):
         t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
         pred_noise = unet(Z, t)
         Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
-    Z = tf.math.multiply_no_nan(Z,Z_var)
+    Z = tf.math.multiply_no_nan(Z,Z_std)
     Z2B_w = dec_w(Z, training=False)
     Z2B_f = dec_f(Z, training=False)
     Z2B_xi= dec_xi(Z, training=False)
@@ -175,14 +175,14 @@ def validation_step(Z, Z_var):
 ep_cnt_ldm = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # LS scaling factor
-z_sd_flag = False
-Z_var = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+z_std_flag = False
+z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
 
 # checkpoint
 checkpoint_ldm = tl.Checkpoint(dict(unet=unet,
                                     optimizer=opt,
                                     ep_cnt=ep_cnt_ldm,
-                                    z_var=Z_var),
+                                    z_std=z_std),
                                py.join(output_dir, 'checkpoints_ldm'),
                                max_to_keep=5)
 try:  # restore checkpoint including the epoch counter
@@ -234,12 +234,12 @@ for ep in range(args.epochs_ldm):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        if not(z_sd_flag):
+        if not(z_std_flag):
             A2Z = enc(A, training=False)
-            Z_var.assign_add(tf.math.reduce_variance(A2Z))
-            z_sd_flag = True
+            z_std.assign_add(tf.math.reduce_std(A2Z))
+            z_std_flag = True
 
-        loss_dict = train_step(A, Z_var)
+        loss_dict = train_step(A, z_std)
 
         # summary
         with train_summary_writer.as_default():
@@ -250,7 +250,7 @@ for ep in range(args.epochs_ldm):
 
     # Validation inference
     Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
-    Z2B, Z2B2A = validation_step(Z, Z_var)
+    Z2B, Z2B2A = validation_step(Z, z_std)
 
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
