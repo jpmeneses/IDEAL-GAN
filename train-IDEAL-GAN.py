@@ -37,6 +37,7 @@ py.arg('--lr', type=float, default=0.0002)
 py.arg('--D_lr_factor', type=int, default=1)
 py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
+py.arg('--data_aug_p', type=float, default=0.4)
 py.arg('--critic_train_steps', type=int, default=1)
 py.arg('--adversarial_loss_mode', default='wgan', choices=['gan', 'hinge_v1', 'hinge_v2', 'lsgan', 'wgan'])
 py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
@@ -393,7 +394,7 @@ for ep in range(args.epochs):
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
         p = np.random.rand()
-        if p <= 0.4:
+        if p <= args.data_aug_p:
             A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,args.n_echoes*n_ch])
             B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
 
