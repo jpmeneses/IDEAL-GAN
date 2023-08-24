@@ -192,7 +192,6 @@ D_optimizer = keras.optimizers.Adam(learning_rate=D_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(A, B):
-    tf.debugging.check_numerics(A, message='Training input A numerical error')
     with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
@@ -205,7 +204,6 @@ def train_G(A, B):
         if args.adv_train:
             A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
             A2B2A_L = LWF_op(A2B_L, training=False)
-            tf.debugging.check_numerics(A2B2A_L, message='Linear A2B2A numerical error')
         else:
             A2B2A_L = A2B2A
 
@@ -220,7 +218,6 @@ def train_G(A, B):
         ############## Discriminative Losses ##############
         if args.adv_train:
             A2B2A_d_logits = D_A(A2B2A_L, training=False)
-            tf.debugging.check_numerics(A2B2A_d_logits, message='Train_G: A2B2A D-logits numerical error')
             A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         else:
             A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
@@ -258,12 +255,9 @@ def train_G(A, B):
 def train_D(A, A2B2A):
     with tf.GradientTape() as t:
         A_d_logits = D_A(A, training=True)
-        tf.debugging.check_numerics(A_d_logits, message='A D-logits numerical error')
         A2B2A_d_logits = D_A(A2B2A, training=True)
-        tf.debugging.check_numerics(A2B2A_d_logits, message='A2B2A D-logits numerical error')
         
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
-        tf.debugging.check_numerics(A2B2A_d_loss, message='A2B2A D-loss numerical error')
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
@@ -289,8 +283,6 @@ def train_step(A, B):
         # cannot autograph `A2B_pool`
         A2B2A = A2B2A_pool(A2B2A)
         for _ in range(args.critic_train_steps):
-            tf.debugging.check_numerics(A, message='Before D-step: A numerical error')
-            tf.debugging.check_numerics(A2B2A, message='Before D-step: A2B2A numerical error')
             D_loss_dict = train_D(A, A2B2A)
     else:
         D_aux_val = tf.constant(0.0,dtype=tf.float32)
@@ -389,7 +381,6 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
-        tf.debugging.check_numerics(A, message='Dataset-extracted A numerical error')
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
