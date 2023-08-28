@@ -100,9 +100,6 @@ def sample(Z,TE=None):
 
 	return Z2B_abs, Z2B2A
 
-# run
-save_dir = py.join(args.experiment_dir, 'samples_testing', 'Z2B')
-py.mkdir(save_dir)
 
 hls = hgt//(2**(args.n_downsamplings))
 wls = wdt//(2**(args.n_downsamplings))
