@@ -90,7 +90,7 @@ tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experi
 def encode(A):
 	# Z2B2A Cycle
 	A2Z = enc(A, training=True)
-	return Z2B_abs, Z2B2A
+	return A2Z
 
 
 @tf.function
