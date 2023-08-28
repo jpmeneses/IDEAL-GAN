@@ -128,7 +128,7 @@ for A in A_dataset_val:
 synth_features = tf.stack(synth_features)
 real_features = tf.stack(real_features)
 
-fid = dl.FIDMetric()
+fid = dl.FID()
 fid_res = fid(synth_features, real_features)
 
 print(f"FID Score: {fid_res.item():.4f}")
