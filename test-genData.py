@@ -4,12 +4,12 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-import DLlib as dl
-import pylib as py
 import tensorflow as tf
 import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
+import DLlib as dl
+import pylib as py
 import wflib as wf
 import data
 
@@ -44,23 +44,27 @@ if args.G_model == 'encod-decod':
     				encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
                     NL_self_attention=args.NL_SelfAttention)
     dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
                         num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
                         num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
                         num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
                         NL_self_attention=args.NL_SelfAttention
                         )
 else:

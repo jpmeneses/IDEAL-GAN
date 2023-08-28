@@ -2,12 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tqdm
 
-import DLlib as dl
-import pylib as py
 import tensorflow as tf
 import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
+import DLlib as dl
+import pylib as py
 import wflib as wf
 import data
 
@@ -58,14 +58,14 @@ dec_xi = dl.decoder(encoded_dims=64,
 D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=12, self_attention=False)
 # D_Z = dl.CriticZ((hgt//(2**(4)),wdt//(2**(4)),64)) # //(2**(4))
 
-vgg = keras.applications.vgg19.VGG19()
-metric_vgg = keras.Model(inputs=vgg.inputs, outputs=vgg.layers[5].output)
+# vgg = keras.applications.vgg19.VGG19()
+# metric_vgg = keras.Model(inputs=vgg.inputs, outputs=vgg.layers[3].output)
 
-metric_model = keras.Sequential()
-metric_model.add(keras.layers.ZeroPadding2D(padding=(88,88)))
-metric_model.add(keras.layers.Lambda(lambda x: tf.concat([x,tf.zeros_like(x[:,:,:,:1])],axis=-1)))
-metric_model.add(metric_vgg)
-b = metric_model(tf.random.normal((1,hgt,wdt,3),dtype=tf.float32))
+# metric_model = keras.Sequential()
+# metric_model.add(keras.layers.Lambda(lambda x: tf.concat([x,tf.zeros_like(x[:,:,:,:1])],axis=-1)))
+# metric_model.add(keras.layers.ZeroPadding2D(padding=(88,88)))
+# metric_model.add(metric_vgg)
+# b = metric_model(tf.random.normal((1,hgt,wdt,3),dtype=tf.float32))
 
 IDEAL_op = wf.IDEAL_Layer(ne,MEBCRN=True)
 LWF_op = wf.LWF_Layer(ne,MEBCRN=True)
@@ -73,6 +73,7 @@ F_op = dl.FourierLayer()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
+cosine_loss = tf.losses.CosineSimilarity()
 
 G_optimizer = keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5, beta_2=0.9)
 D_optimizer = keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5, beta_2=0.9)
@@ -107,17 +108,13 @@ def train_G(A, B):
         A2B2A_f = F_op(A2B2A, training=False)
 
         ############ Cycle-Consistency Losses #############
-        A2Y = tf.reshape(tf.transpose(A,perm=[0,4,2,3,1]),[A.shape[0]*n_ch,hgt,wdt,ne])
-        A2Y = tf.transpose(tf.reshape(A2Y,[A2Y.shape[0],hgt,wdt,ne//2,2]),perm=[0,4,1,2,3])
-        A2Y = tf.reshape(A2Y,[A2Y.shape[0]*2,hgt,wdt,ne//2])
-        A2Y_m = metric_model(A2Y, training=False)
+        # A2Y = tf.reshape(Aa,[A.shape[0]*ne,hgt,wdt,n_ch])
+        # A2Y_m = metric_model(A2Y, training=False)
         
-        A2B2A2Y = tf.reshape(tf.transpose(A2B2A,perm=[0,4,2,3,1]),[A2B2A.shape[0]*n_ch,hgt,wdt,ne])
-        A2B2A2Y = tf.transpose(tf.reshape(A2B2A2Y,[A2B2A2Y.shape[0],hgt,wdt,ne//2,2]),perm=[0,4,1,2,3])
-        A2B2A2Y = tf.reshape(A2B2A2Y,[A2B2A2Y.shape[0]*2,hgt,wdt,ne//2])
-        A2B2A2Y_m = metric_model(A2B2A2Y, training=False)
+        # A2B2A2Y = tf.reshape(A2B2A,[A2B2A.shape[0]*ne,hgt,wdt,n_ch])
+        # A2B2A2Y_m = metric_model(A2B2A2Y, training=False)
         
-        A2B2A_cycle_loss = cycle_loss_fn(A2Y_m, A2B2A2Y_m)
+        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
@@ -190,6 +187,7 @@ for ep in range(20):
         # ==============================================================================
         
         A2B, A2B2A, G_loss_dict, D_loss_dict = train_step(A, B)
+        A2B2A = tf.reshape(A,[-1,hgt,wdt,n_ch])
         
         # summary
         with train_summary_writer.as_default():
