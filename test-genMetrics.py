@@ -125,8 +125,8 @@ for A in A_dataset_val:
     synth_features.append(synth_eval_feats)
 
 	
-synth_features = tf.stack(synth_features)
-real_features = tf.stack(real_features)
+synth_features = tf.concat(synth_features,axis=0)
+real_features = tf.concat(real_features,axis=0)
 
 fid = dl.FID()
 fid_res = fid(synth_features, real_features)
