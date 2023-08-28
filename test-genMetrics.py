@@ -144,7 +144,7 @@ for A in A_dataset_val:
     for idx_a, idx_b in idx_pairs:
     	for ech in range(ne):
     		# ms_ssim_scores.append(ms_ssim(Z2B2A[idx_a][ech], Z2B2A[idx_b][ech]))
-    		ssim_scores.append(ssim(Z2B2A[idx_a][ech], Z2B2A[idx_b][ech], data_range=2, channel_axis=2))
+    		ssim_scores.append(ssim(Z2B2A[idx_a][ech], Z2B2A[idx_b][ech], data_range=2, multichannel=True))
 
     # Auto-encode real image
     A2Z = encode(A)
