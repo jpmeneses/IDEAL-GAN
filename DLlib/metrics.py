@@ -62,21 +62,15 @@ def get_features(input_shape, layers=[2,5,8,13,18], pad=(16,16)):
 def compute_frechet_distance(mu_x, sigma_x, mu_y, sigma_y, epsilon = 1e-6):
     """The Frechet distance between multivariate normal distributions."""
     diff = mu_x - mu_y
-
-    covmean = tf.linalg.sqrtm(tf.linalg.matmul(sigma_x,sigma_y))
+    aux_covmean = tf.linalg.matmul(sigma_x,sigma_y)
 
     # Product might be almost singular
     if not tf.math.reduce_any(tf.math.is_inf(covmean)):
         print(f"FID calculation produces singular product; adding {epsilon} to diagonal of covariance estimates")
         offset = tf.eye(sigma_x.shape[0], dtype=tf.double) * epsilon # CHECK INDEX
-        covmean = tf.linalg.sqrtm(tf.linalg.matmul(sigma_x + offset, sigma_y + offset))
+        covmean = tf.linalg.matmul(sigma_x + offset, sigma_y + offset)
 
-    # Numerical error might give slight imaginary component
-    # if torch.is_complex(covmean):
-    #     if not torch.allclose(torch.diagonal(covmean).imag, torch.tensor(0, dtype=torch.double), atol=1e-3):
-    #         raise ValueError(f"Imaginary component {torch.max(torch.abs(covmean.imag))} too high.")
-    #     covmean = covmean.real
-
+    covmean = tf.math.real(tf.linalg.sqrtm(tf.complex(aux_covmean,0.0)))
     tr_covmean = tf.linalg.trace(covmean)
     return tf.tensordot(diff, diff) + tf.linalg.trace(sigma_x) + tf.linalg.trace(sigma_y) - 2 * tr_covmean
 
@@ -87,9 +81,6 @@ class FID(keras.metrics.Metric):
         self.frechet_dist = self.add_weight(name='FID_dist', initializer='zeros')
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        y_true = tf.cast(y_true, tf.double)
-        y_pred = tf.cast(y_pred, tf.double)
-
         mu_y_pred = tf.reduce_mean(y_pred, axis=0)
         sigma_y_pred = tfp.stats.covariance(y_pred)
         mu_y_true = tf.reduce_mean(y_true, axis=0)
