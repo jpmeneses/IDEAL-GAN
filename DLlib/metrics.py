@@ -67,7 +67,7 @@ def compute_frechet_distance(mu_x, sigma_x, mu_y, sigma_y, epsilon = 1e-6):
     # Product might be almost singular
     if not tf.math.reduce_any(tf.math.is_inf(aux_covmean)):
         print(f"FID calculation produces singular product; adding {epsilon} to diagonal of covariance estimates")
-        offset = tf.eye(sigma_x.shape[0], dtype=tf.double) * epsilon # CHECK INDEX
+        offset = tf.eye(sigma_x.shape[0], dtype=tf.float32) * epsilon # CHECK INDEX
         aux_covmean = tf.linalg.matmul(sigma_x + offset, sigma_y + offset)
 
     covmean = tf.math.real(tf.linalg.sqrtm(tf.complex(aux_covmean,0.0)))
