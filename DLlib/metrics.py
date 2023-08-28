@@ -72,7 +72,7 @@ def compute_frechet_distance(mu_x, sigma_x, mu_y, sigma_y, epsilon = 1e-6):
 
     covmean = tf.math.real(tf.linalg.sqrtm(tf.complex(aux_covmean,0.0)))
     tr_covmean = tf.linalg.trace(covmean)
-    return tf.tensordot(diff, diff) + tf.linalg.trace(sigma_x) + tf.linalg.trace(sigma_y) - 2 * tr_covmean
+    return tf.reduce_sum(tf.multiply(diff,diff)) + tf.linalg.trace(sigma_x) + tf.linalg.trace(sigma_y) - 2 * tr_covmean
 
 
 class FID(keras.metrics.Metric):
