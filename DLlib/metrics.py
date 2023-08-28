@@ -95,7 +95,7 @@ class FID(keras.metrics.Metric):
         mu_y_true = tf.reduce_mean(y_true, axis=0)
         sigma_y_true = tfp.stats.covariance(y_true)
 
-        self.frechet_dist.assign_add(compute_frechet_distance(mu_y_pred, sigma_y_pred, mu_y, sigma_y))
+        self.frechet_dist.assign_add(compute_frechet_distance(mu_y_pred, sigma_y_pred, mu_y_true, sigma_y_true))
 
     def result(self):
         return self.frechet_dist
