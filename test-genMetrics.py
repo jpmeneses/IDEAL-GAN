@@ -131,4 +131,4 @@ real_features = tf.stack(real_features)
 fid = dl.FID()
 fid_res = fid(synth_features, real_features)
 
-print(f"FID Score: {fid_res.item():.4f}")
+print(f"FID Score: {fid_res.numpy():.4f}")
