@@ -169,7 +169,7 @@ D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2),
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
 
-metric_model = dl.metric_model(input_shape=(args.n_echoes,hgt,wdt,n_ch))
+metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
 
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
