@@ -53,6 +53,7 @@ if args.G_model == 'encod-decod':
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
+                    kl_reg=False,
                     NL_self_attention=args.NL_SelfAttention)
     dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
