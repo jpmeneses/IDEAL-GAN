@@ -84,6 +84,7 @@ def compute_frechet_distance(mu_x, sigma_x, mu_y, sigma_y, epsilon = 1e-6):
 class FID(keras.metrics.Metric):
     def __init__(self, name='FID_metric', **kwargs):
         super(FID, self).__init__(name=name, **kwargs)
+        self.frechet_dist = self.add_weight(name='FID_dist', initializer='zeros')
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(y_true, tf.double)
