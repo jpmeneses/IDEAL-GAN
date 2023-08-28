@@ -1,8 +1,10 @@
 import functools
+import itertools
 
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+from skimage.metrics import structural_similarity as ssim
 
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -84,6 +86,13 @@ tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experi
 
 
 @tf.function
+def encode(A):
+	# Z2B2A Cycle
+	A2Z = enc(A, training=True)
+	return Z2B_abs, Z2B2A
+
+
+@tf.function
 def sample(Z,TE=None):
 	# Z2B2A Cycle
 	Z2B_w = dec_w(Z, training=False)
@@ -107,6 +116,15 @@ wls = wdt//(2**(args.n_downsamplings))
 synth_features = []
 real_features = []
 
+mmd_scores = []
+
+ms_ssim_scores = []
+ssim_scores = []
+
+fid = dl.FID()
+mmd = dl.MMD()
+# ms_ssim = dl.MS_SSIM()
+
 for A in A_dataset_val:
     # Generate some synthetic images using the defined model
     z_shape = (A.shape[0],hls,wls,args.encoded_size)
@@ -121,11 +139,32 @@ for A in A_dataset_val:
     synth_eval_feats = get_features(Z2B2A)
     synth_features.append(synth_eval_feats)
 
+    # SSIM metrics for pairs of synthetic data within batch
+    idx_pairs = list(combinations(range(A.shape[0]), 2))
+    for idx_a, idx_b in idx_pairs:
+    	for ech in range(ne):
+    		# ms_ssim_scores.append(ms_ssim(Z2B2A[idx_a][ech], Z2B2A[idx_b][ech]))
+    		ssim_scores.append(ssim(Z2B2A[idx_a][ech], Z2B2A[idx_b][ech], channel_axis=2))
+
+    # Auto-encode real image
+    A2Z = encode(A)
+    A2Z2B, A2B2A = sample(A2Z)
+
+    # Compute MMD
+    mmd_scores.append(mmd(A, A2B2A))
+
 	
 synth_features = tf.concat(synth_features,axis=0)
 real_features = tf.concat(real_features,axis=0)
 
-fid = dl.FID()
 fid_res = fid(synth_features, real_features)
-
 print(f"FID Score: {fid_res.numpy():.4f}")
+
+mmd_scores = tf.concat(mmd_scores,axis=0)
+print(f"MMD Score: {tf.reduce_mean(mmd_scores).numpy():.4f} +- {tf.math.reduce_std(mmd_scores).numpy():.4f}")
+
+# ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
+# print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
+
+ssim_scores = tf.concat(ssim_scores,axis=0)
+print(f"SSIM Score: {tf.reduce_mean(ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ssim_scores).numpy():.4f}")

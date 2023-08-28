@@ -90,3 +90,89 @@ class FID(keras.metrics.Metric):
 
     def result(self):
         return self.frechet_dist
+
+
+class MMD(keras.metrics.Metric):
+    def __init__(self, beta=1.0, gamma=2.0, name='MMD_metric', **kwargs):
+        super(MMD, self).__init__(name=name, **kwargs)
+        self.MMD_dist = self.add_weight(name='MMD_dist', initializer='zeros')
+        self.beta = beta
+        self.gamma = gamma
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = tf.reshape(y_true, [y_true.shape[0],-1])
+        y_pred = tf.reshape(y_pred, [y_pred.shape[0],-1])
+
+        y_true_y_true = tf.linalg.matmul(y_true, y_true, transpose_b=True)
+        y_pred_y_pred = tf.linalg.matmul(y_pred, y_pred, transpose_b=True)
+        y_pred_y_true = tf.linalg.matmul(y_pred, y_true, transpose_b=True)
+
+        y_true_y_true = y_true_y_true / y_true_y_true.shape[1]
+        y_pred_y_pred = y_pred_y_pred / y_pred_y_pred.shape[1]
+        y_pred_y_true = y_pred_y_true / y_pred_y_true.shape[1]
+
+        self.mmd_dist = self.beta*(tf.reduce_mean(y_true_y_true) + tf.reduce_mean(y_pred_y_pred)) 
+        self.mmd_dist -= self.gamma * tf.reduce_mean(y_pred_y_true)
+
+    def result(self):
+        self.mmd_dist
+
+
+# class MS_SSIM(keras.metrics.Metric):
+#     def __init__(self, spatial_dims, data_range=1.0, kernel_size=11, kernel_sigma=1.5, 
+#                     k1=0.01, k2=0.03, weights=(0.0448,0.2856,0.3001,0.2363,0.1333), name='MS_SSIM_metric', **kwargs):
+#         self.MS_SSIM_dist = self.add_weight(name='MS_SSIM_dist', initializer='zeros')
+
+#         self.spatial_dims = spatial_dims
+#         self.data_range = data_range
+
+#         self.kernel_size = kernel_size
+#         self.kernel_sigma = kernel_sigma
+
+#         self.k1 = k1
+#         self.k2 = k2
+#         self.weights = weights
+
+#     def update_state(self, y_true, y_pred, sample_weight=None):
+#         # check if image have enough size for the number of downsamplings and the size of the kernel
+#         weights_div = max(1, (len(self.weights) - 1)) ** 2
+#         y_pred_spatial_dims = y_pred.shape[:-1]
+#         for i in range(len(y_pred_spatial_dims)):
+#             if y_pred_spatial_dims[i] // weights_div <= self.kernel_size[i] - 1:
+#                 raise ValueError(
+#                     f"For a given number of `weights` parameters {len(self.weights)} and kernel size "
+#                     f"{self.kernel_size[i]}, the image height must be larger than "
+#                     f"{(self.kernel_size[i] - 1) * weights_div}."
+#                 )
+
+#         weights = torch.tensor(self.weights, device=y_pred.device, dtype=torch.float)
+
+#         multiscale_list = []
+#         for _ in range(len(weights)):
+#             ssim, cs = compute_ssim_and_cs(
+#                 y_pred=y_pred,
+#                 y=y,
+#                 spatial_dims=self.spatial_dims,
+#                 data_range=self.data_range,
+#                 kernel_type=self.kernel_type,
+#                 kernel_size=self.kernel_size,
+#                 kernel_sigma=self.kernel_sigma,
+#                 k1=self.k1,
+#                 k2=self.k2,
+#             )
+
+#             cs_per_batch = cs.view(cs.shape[0], -1).mean(1)
+
+#             multiscale_list.append(torch.relu(cs_per_batch))
+#             y_pred = avg_pool(y_pred, kernel_size=2)
+#             y = avg_pool(y, kernel_size=2)
+
+#         ssim = ssim.view(ssim.shape[0], -1).mean(1)
+#         multiscale_list[-1] = torch.relu(ssim)
+#         multiscale_list = torch.stack(multiscale_list)
+
+#         ms_ssim_value_full_image = torch.prod(multiscale_list ** weights.view(-1, 1), dim=0)
+
+#         ms_ssim_per_batch: torch.Tensor = ms_ssim_value_full_image.view(ms_ssim_value_full_image.shape[0], -1).mean(
+#             1, keepdim=True
+#         )
