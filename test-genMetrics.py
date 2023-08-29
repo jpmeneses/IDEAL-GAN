@@ -35,9 +35,9 @@ ech_idx = args.n_echoes * 2
 fm_sc = 300.0
 r2_sc = 2*np.pi*fm_sc
 
-dataset_dir = '../datasets/'
+dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, ech_idx, MEBCRN=True)
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, ech_idx, end=20, MEBCRN=True)
 
 len_dataset,ne,hgt,wdt,n_ch = valX.shape
 A_dataset_val = tf.data.Dataset.from_tensor_slices(valX)
@@ -85,9 +85,7 @@ IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
 
 tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
 
-
 def encode(A):
-	# Z2B2A Cycle
 	A2Z = enc(A, training=True)
 	return A2Z
 
@@ -143,7 +141,7 @@ for A in A_dataset_val:
     for idx_a, idx_b in idx_pairs:
     	for ech in range(ne):
     		# ms_ssim_scores.append(ms_ssim(Z2B2A[idx_a][ech], Z2B2A[idx_b][ech]))
-    		ssim_scores.append(ssim(Z2B2A[idx_a][ech].numpy(), Z2B2A[idx_b][ech].numpy(), data_range=2, multichannel=True))
+    		ssim_scores.append(ssim(Z2B2A[idx_a][ech].numpy(), Z2B2A[idx_b][ech].numpy(), multichannel=True))
 
     # Auto-encode real image
     A2Z = encode(A)
@@ -165,5 +163,5 @@ print(f"MMD Score: {tf.reduce_mean(mmd_scores).numpy():.4f} +- {tf.math.reduce_s
 # ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
 # print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
 
-ssim_scores = tf.concat(ssim_scores,axis=0)
-print(f"SSIM Score: {tf.reduce_mean(ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ssim_scores).numpy():.4f}")
+# ssim_scores = tf.concat(ssim_scores,axis=0)
+print(f"SSIM Score: {np.mean(ssim_scores):.4f} +- {np.std(ssim_scores):.4f}")
