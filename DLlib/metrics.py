@@ -100,6 +100,9 @@ class MMD(keras.metrics.Metric):
         self.gamma = gamma
 
     def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred = tf.cast(y_pred, tf.float32)
+        
         y_true = tf.reshape(y_true, [y_true.shape[0],-1])
         y_pred = tf.reshape(y_pred, [y_pred.shape[0],-1])
 
