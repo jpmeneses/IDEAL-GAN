@@ -110,9 +110,9 @@ class MMD(keras.metrics.Metric):
         y_pred_y_pred = tf.linalg.matmul(y_pred, y_pred, transpose_b=True)
         y_pred_y_true = tf.linalg.matmul(y_pred, y_true, transpose_b=True)
 
-        y_true_y_true = y_true_y_true / y_true_y_true.shape[1]
-        y_pred_y_pred = y_pred_y_pred / y_pred_y_pred.shape[1]
-        y_pred_y_true = y_pred_y_true / y_pred_y_true.shape[1]
+        y_true_y_true = y_true_y_true / y_true.shape[1]
+        y_pred_y_pred = y_pred_y_pred / y_true.shape[1]
+        y_pred_y_true = y_pred_y_true / y_true.shape[1]
 
         self.mmd_dist.assign_add(self.beta*(tf.reduce_mean(y_true_y_true) + tf.reduce_mean(y_pred_y_pred)) - self.gamma * tf.reduce_mean(y_pred_y_true))
 
