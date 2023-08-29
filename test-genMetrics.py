@@ -35,7 +35,7 @@ ech_idx = args.n_echoes * 2
 fm_sc = 300.0
 r2_sc = 2*np.pi*fm_sc
 
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
+dataset_dir = '../datasets/'
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
 valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, ech_idx, end=20, MEBCRN=True)
 
