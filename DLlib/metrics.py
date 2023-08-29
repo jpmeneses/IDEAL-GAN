@@ -95,14 +95,14 @@ class FID(keras.metrics.Metric):
 class MMD(keras.metrics.Metric):
     def __init__(self, beta=1.0, gamma=2.0, name='MMD_metric', **kwargs):
         super(MMD, self).__init__(name=name, **kwargs)
-        self.MMD_dist = self.add_weight(name='MMD_dist', initializer='zeros')
+        self.mmd_dist = self.add_weight(name='MMD_dist', initializer='zeros')
         self.beta = beta
         self.gamma = gamma
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true = tf.cast(y_true, tf.float32)
         y_pred = tf.cast(y_pred, tf.float32)
-        
+
         y_true = tf.reshape(y_true, [y_true.shape[0],-1])
         y_pred = tf.reshape(y_pred, [y_pred.shape[0],-1])
 
@@ -114,11 +114,10 @@ class MMD(keras.metrics.Metric):
         y_pred_y_pred = y_pred_y_pred / y_pred_y_pred.shape[1]
         y_pred_y_true = y_pred_y_true / y_pred_y_true.shape[1]
 
-        self.mmd_dist = self.beta*(tf.reduce_mean(y_true_y_true) + tf.reduce_mean(y_pred_y_pred)) 
-        self.mmd_dist -= self.gamma * tf.reduce_mean(y_pred_y_true)
+        self.mmd_dist.assign_add(self.beta*(tf.reduce_mean(y_true_y_true) + tf.reduce_mean(y_pred_y_pred)) - self.gamma * tf.reduce_mean(y_pred_y_true))
 
     def result(self):
-        self.mmd_dist
+        return self.mmd_dist
 
 
 # class MS_SSIM(keras.metrics.Metric):
