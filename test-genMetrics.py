@@ -86,14 +86,12 @@ IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
 tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 
-@tf.function
 def encode(A):
 	# Z2B2A Cycle
 	A2Z = enc(A, training=True)
 	return A2Z
 
 
-@tf.function
 def sample(Z,TE=None):
 	# Z2B2A Cycle
 	Z2B_w = dec_w(Z, training=False)
