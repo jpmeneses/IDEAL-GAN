@@ -200,6 +200,15 @@ py.mkdir(sample_dir)
 fm_sc = 300.0
 r2_sc = 2*np.pi*fm_sc
 
+# Calculate scaling factor (for unitary std dev)
+z_std_list = []
+for A in A_dataset:
+    A2Z = enc(A, training=False)
+    z_std_list.append(tf.math.reduce_std(A2Z,axis=(1,2,3)))
+z_std_list = tf.concat(z_std_list,axis=0)
+z_std.assign_add(tf.math.sqrt(tf.reduce_sum(tf.square(z_std_list))))
+        
+
 # main loop
 for ep in range(args.epochs_ldm):
     if ep < ep_cnt_ldm:
@@ -234,11 +243,6 @@ for ep in range(args.epochs_ldm):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        if not(z_std_flag):
-            A2Z = enc(A, training=False)
-            z_std.assign_add(tf.math.reduce_std(A2Z))
-            z_std_flag = True
-
         loss_dict = train_step(A, z_std)
 
         # summary
