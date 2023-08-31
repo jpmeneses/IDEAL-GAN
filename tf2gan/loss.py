@@ -132,6 +132,7 @@ def VarMeanSquaredError(A, A2B2A, var_map):
     if var_map.shape[-1] > 1:
         var_map = tf.reduce_mean(var_map,axis=-1,keepdims=True)
     std_map = tf.math.sqrt(var_map)
+    tf.debugging.assert_type(std_map, tf_type=tf.float32, message='Complex values obtained after sqrt op')
     msd = tf.reduce_mean(tf.math.square(A-A2B2A),axis=-1,keepdims=True)
     STDw_msd = tf.math.divide_no_nan(msd,std_map)
     log_std = tf.where(std_map!=0.0,tf.math.log(std_map),0.0)

@@ -243,7 +243,7 @@ def train_G(A, B):
         A2B_WF_real = A2B_WF[:,:,:,0::2]
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
-        A2B2A = tf.cast(A2B2A,dtype=tf.float32)
+        tf.debugging.assert_type(A2B2A, tf_type=tf.float32, message='Complex-valued A2B2A reconstruction')
 
         # Variance map mask
         if args.UQ:
@@ -259,6 +259,7 @@ def train_G(A, B):
                 A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        tf.debugging.assert_type(A2B2A_cycle_loss, tf_type=tf.float32, message='Complex-valued loss')
 
         ########### Splitted R2s and FM Losses ############
         WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -270,7 +271,7 @@ def train_G(A, B):
         FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
         reg_term = FM_TV + FM_L1
         
-        G_loss = A2B2A_cycle_loss #+ reg_term
+        G_loss = A2B2A_cycle_loss + reg_term
         
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
