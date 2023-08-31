@@ -208,7 +208,7 @@ def train_G(A, B):
         # Magnitude of water/fat images
         B_WF_real = B_WF[:,:,:,0::2]
         B_WF_imag = B_WF[:,:,:,1::2]
-        B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
+        B_WF_abs = tf.math.sqrt(tf.square(B_WF_real)+tf.square(B_WF_imag))
 
         ##################### A Cycle #####################
         if args.UQ:
@@ -221,7 +221,7 @@ def train_G(A, B):
             if not(args.G_model == 'complex'):
                 A_real = A[:,:,:,0::2]
                 A_imag = A[:,:,:,1::2]
-                A_abs = tf.abs(tf.complex(A_real,A_imag))
+                A_abs = tf.math.sqrt(tf.square(A_real)+tf.square(A_imag))
         
             # Compute R2s map from only-mag images
             if args.UQ:
