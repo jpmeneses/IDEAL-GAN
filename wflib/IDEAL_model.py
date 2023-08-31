@@ -58,7 +58,7 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
         return M
 
 
-@tf.function
+
 def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
     n_batch,hgt,wdt,d_ech = acqs.shape
     if complex_data:
