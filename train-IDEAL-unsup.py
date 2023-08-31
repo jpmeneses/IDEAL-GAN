@@ -520,7 +520,7 @@ def sample(A, B):
         if args.out_vars == 'FM':
             val_A2B2A_R2_loss = 0
             val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
-        if args.out_vars == 'R2s':
+        elif args.out_vars == 'R2s':
             val_A2B2A_R2_loss = cycle_loss_fn(A_abs, A2B2A_abs)
             val_A2B2A_FM_loss = 0
         else:
