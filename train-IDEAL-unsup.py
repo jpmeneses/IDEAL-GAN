@@ -6,12 +6,12 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-import DLlib as dl
-import pylib as py
 import tensorflow as tf
 import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
+import DLlib as dl
+import pylib as py
 
 import falib as fa
 import wflib as wf
