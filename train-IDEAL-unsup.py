@@ -500,6 +500,8 @@ def sample(A, B):
         A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_FM_var,0.0)
         A2B_R2_var = tf.where(A[:,:,:,:1]!=0.0,A2B_R2_var,0.0)
         A2B_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
+    else:
+        A2B_var = None
 
     ########### Splitted R2s and FM Losses ############
     WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
