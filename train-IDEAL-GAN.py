@@ -201,11 +201,11 @@ def train_G(A, B):
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
 
-        if args.adv_train:
-            A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
-            A2B2A_L = LWF_op(A2B_L, training=False)
-        else:
-            A2B2A_L = A2B2A
+        # if args.adv_train:
+        #     A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
+        #     A2B2A_L = LWF_op(A2B_L, training=False)
+        # else:
+        A2B2A_L = A2B2A
 
         ##################### B Cycle #####################
         # B2A = IDEAL_op(B, training=False)
