@@ -71,6 +71,7 @@ def acq_to_acq(acqs, param_maps, te=None):
     M, M_pinv = gen_M(te) # M shape: (ne,ns)
 
     # Generate complex signal
+    acqs = tf.cast(acqs, tf.complex64)
     S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
