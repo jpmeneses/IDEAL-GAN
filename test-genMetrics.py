@@ -4,7 +4,6 @@ import itertools
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage.metrics import structural_similarity as ssim
 
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -120,7 +119,6 @@ ssim_scores = []
 
 fid = dl.FID()
 mmd = dl.MMD()
-# ms_ssim = dl.MS_SSIM()
 
 for A in A_dataset_val:
     # Generate some synthetic images using the defined model
