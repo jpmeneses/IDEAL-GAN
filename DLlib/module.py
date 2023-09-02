@@ -178,6 +178,7 @@ def UNet(
     input_shape,
     n_out=1,
     bayesian=False,
+    ME_layer=False,
     te_input=False,
     te_shape=(6,),
     filters=72,
@@ -191,6 +192,11 @@ def UNet(
     x = inputs1 = keras.Input(input_shape)
     if te_input:
         te = inputs2 = keras.Input(te_shape)
+
+    if ME_layer:
+        x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    elif len(input_shape) > 3:
+        x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[-3],x.shape[-2],x.shape[-1]]))(x)
 
     down_layers = []
     for l in range(num_layers):
@@ -248,6 +254,10 @@ def UNet(
                         loc=t[...,:n_out],
                         scale=tf.math.sqrt(t[...,n_out:])),
                     )(x_prob)
+    if ME_layer:
+        output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
+        out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
+        out_prob = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_prob)
 
     if te_input and bayesian:
         return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_var])
