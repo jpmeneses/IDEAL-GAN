@@ -64,9 +64,10 @@ def acq_to_acq(acqs, param_maps, te=None):
     if te is None:
         stop_te = (ne*12/6)*1e-3
         te = np.arange(start=1.3e-3,stop=stop_te,step=2.1e-3)
-        te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),-1) # (ne,1)
+        te = tf.convert_to_tensor(te,dtype=tf.float32) # (ne,1)
     
-    te_complex = tf.complex(0.0,te) # (ne,1)
+    te_complex = tf.expand_dims(tf.complex(0.0,te),-1) # (ne,1)
+    te = tf.expand_dims(te,-1) # (1,ne)
     M, M_pinv = gen_M(te) # M shape: (ne,ns)
 
     # Generate complex signal
