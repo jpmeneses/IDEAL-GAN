@@ -58,85 +58,54 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
         return M
 
 
-
-def acq_to_acq(acqs,param_maps,te=None,complex_data=False):
-    n_batch,hgt,wdt,d_ech = acqs.shape
-    if complex_data:
-        n_ech = d_ech
-    else:
-        n_ech = d_ech//2
+def acq_to_acq(acqs, param_maps, te=None):
+    n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
-        stop_te = (n_ech*12/6)*1e-3
+        stop_te = (ne*12/6)*1e-3
         te = np.arange(start=1.3e-3,stop=stop_te,step=2.1e-3)
-        te = tf.convert_to_tensor(te,dtype=tf.float32)
-        te = tf.expand_dims(te,0)
-        te = tf.tile(te,[n_batch,1])
+        te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),-1) # (ne,1)
     
-    ne = te.shape[1]
-    M, M_pinv = gen_M(te) # M shape: (bs,ne,ns)
-
-    te_complex = tf.complex(0.0,te) # shape was: ne // now: (bs,ne)
-    te_complex = tf.expand_dims(te_complex,-1) # shape: (bs,ne,1)
+    te_complex = tf.complex(0.0,te) # (ne,1)
+    M, M_pinv = gen_M(te) # M shape: (ne,ns)
 
     # Generate complex signal
-    if not(complex_data):
-        real_S = acqs[:,:,:,0::2]
-        imag_S = acqs[:,:,:,1::2]
-        S = tf.complex(real_S,imag_S)
-    else:
-        S = acqs
+    S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
-    Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # shape: (bs,nv,ne)
+    Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # shape: (nb,ne,nv)
 
-    r2s = param_maps[:,:,:,0] * r2_sc
-    phi = param_maps[:,:,:,1] * fm_sc
-    # r2s = tf.zeros_like(phi)
+    r2s_pi = out_maps[:,2,:,:,1]
+    phi = out_maps[:,2,:,:,0]
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi,r2s/(2*np.pi))
-    xi_rav = tf.reshape(xi,[n_batch,-1]) # shape: (bs,nv)
-    xi_rav = tf.expand_dims(xi_rav,1) # shape: (bs,1,nv)
+    xi = tf.complex(phi,r2s) * fm_sc
+    xi_rav = tf.reshape(xi,[n_batch,-1]) # shape: (nb,nv)
+    xi_rav = tf.expand_dims(xi_rav,1) # shape: (nb,1,nv)
 
-    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (bs,ne,nv)
+    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
 
     # Matrix operations
-    WmS = Wm * Smtx # shape = (bs,ne,nv)
-    MWmS = tf.linalg.matmul(M_pinv,WmS) # shape = (bs,ns,nv)
-    MMWmS = tf.linalg.matmul(M,MWmS) # shape = (bs,ne,nv)
-    Smtx_hat = Wp * MMWmS # shape = (bs,ne,nv)
+    WmS = Wm * Smtx # shape = (nb,ne,nv)
+    MWmS = tf.linalg.matmul(M_pinv,WmS) # shape = (nb,ns,nv)
+    MMWmS = tf.linalg.matmul(M,MWmS) # shape = (nb,ne,nv)
+    Smtx_hat = Wp * MMWmS # shape = (nb,ne,nv)
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
-    rho_hat = tf.reshape(tf.transpose(MWmS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
-
+    rho_hat = tf.reshape(MWmS, [n_batch,ns,hgt,wdt,1]) / rho_sc
     Re_rho = tf.math.real(rho_hat)
     Im_rho = tf.math.imag(rho_hat)
-    zero_fill = tf.zeros_like(Re_rho)
-    re_stack = tf.stack([Re_rho,zero_fill],4)
-    re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
-    im_stack = tf.stack([zero_fill,Im_rho],4)
-    im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
-    res_rho = re_aux + im_aux
+    res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
 
     # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(tf.transpose(Smtx_hat, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
-
-    if not(complex_data):
-        Re_gt = tf.math.real(S_hat)
-        Im_gt = tf.math.imag(S_hat)
-        zero_fill = tf.zeros_like(Re_gt,dtype=tf.float32)
-        re_stack = tf.stack([Re_gt,zero_fill],4)
-        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*n_ech])
-        im_stack = tf.stack([zero_fill,Im_gt],4)
-        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*n_ech])
-        res_gt = re_aux + im_aux
-        return (res_rho,res_gt)
-    else:
-        return (res_rho,S_hat)
+    S_hat = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
+    Re_gt = tf.math.real(S_hat)
+    Im_gt = tf.math.imag(S_hat)
+    res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+    return (res_rho,res_gt)
 
 
 @tf.custom_gradient
