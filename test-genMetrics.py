@@ -139,9 +139,8 @@ for A in A_dataset_val:
     # SSIM metrics for pairs of synthetic data within batch
     idx_pairs = list(itertools.combinations(range(A.shape[0]), 2))
     for idx_a, idx_b in idx_pairs:
-    	for ech in range(ne):
-    		# ms_ssim_scores.append(ms_ssim(Z2B2A[idx_a][ech], Z2B2A[idx_b][ech]))
-    		ssim_scores.append(ssim(Z2B2A[idx_a][ech].numpy(), Z2B2A[idx_b][ech].numpy(), multichannel=True))
+        ms_ssim_scores.append(tf.image.ssim_multiscale(Z2B2A[idx_a]+1.0, Z2B2A[idx_b]+1.0, 2))
+        ssim_scores.append(tf.image.ssim(Z2B2A[idx_a]+1.0, Z2B2A[idx_b]+1.0, 2))
 
     # Auto-encode real image
     A2Z = encode(A)
@@ -160,8 +159,8 @@ print(f"FID Score: {fid_res.numpy():.4f}")
 mmd_scores = tf.concat(mmd_scores,axis=0)
 print(f"MMD Score: {tf.reduce_mean(mmd_scores).numpy():.4f} +- {tf.math.reduce_std(mmd_scores).numpy():.4f}")
 
-# ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
-# print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
+ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
+print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
 
-# ssim_scores = tf.concat(ssim_scores,axis=0)
-print(f"SSIM Score: {np.mean(ssim_scores):.4f} +- {np.std(ssim_scores):.4f}")
+ssim_scores = tf.concat(ssim_scores,axis=0)
+print(f"SSIM Score: {tf.reduce_mean(ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ssim_scores).numpy():.4f}")
