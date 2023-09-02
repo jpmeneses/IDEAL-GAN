@@ -77,7 +77,7 @@ def acq_to_acq(acqs, param_maps, te=None):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # shape: (nb,ne,nv)
 
-    r2s_pi = param_maps[:,0,:,:,1]
+    r2s = param_maps[:,0,:,:,1]
     phi = param_maps[:,0,:,:,0]
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
