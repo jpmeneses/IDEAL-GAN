@@ -176,7 +176,7 @@ LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
-cycle_loss_fn = tf.losses.MeanSquaredError()
+cycle_loss_fn = tf.losses.MeanAbsoluteError()
 cosine_loss = tf.losses.CosineSimilarity()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
@@ -231,7 +231,7 @@ def train_G(A, B):
                 A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
+        B2A2B_cycle_loss = cycle_loss_fn(B[:,2,:,:,:], A2B[:,2,:,:,:])
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
@@ -327,7 +327,7 @@ def sample(A, B):
             val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
-    val_B2A2B_loss = cycle_loss_fn(B, A2B)
+    val_B2A2B_loss = cycle_loss_fn(B[:,2,:,:,:], A2B[:,2,:,:,:])
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B,A2B2A_L,{'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
