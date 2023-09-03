@@ -254,6 +254,8 @@ def UNet(
                         loc=t[...,:n_out],
                         scale=tf.math.sqrt(t[...,n_out:])),
                     )(x_prob)
+        if output_activation != 'tanh':
+            out_prob = tf.nn.relu(out_prob)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
         out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
