@@ -104,6 +104,12 @@ valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
 trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
+# Over-correct data type
+trainX = tf.cast(trainX, tf.float32)
+trainY = tf.cast(trainY, tf.float32)
+valX = tf.cast(valX, tf.float32)
+valY = tf.cast(valY, tf.float32)
+
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
 _,n_out,_,_,_ = np.shape(valY)
@@ -167,12 +173,6 @@ if not(args.out_vars == 'FM'):
 
 @tf.function
 def train_G(A, B):
-    # indx_B = tf.concat([tf.zeros_like(A[:,:,:,:4],dtype=tf.int32),
-    #                     tf.ones_like(A[:,:,:,:2],dtype=tf.int32)],axis=-1)
-
-    # indx_PM =tf.concat([tf.zeros_like(A[:,:,:,:1],dtype=tf.int32),
-    #                     tf.ones_like(A[:,:,:,:1],dtype=tf.int32)],axis=-1)
-
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         if args.UQ:
