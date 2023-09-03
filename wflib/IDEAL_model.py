@@ -79,8 +79,8 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
 
     r2s = param_maps[:,0,:,:,1]
     phi = param_maps[:,0,:,:,0]
-    if only_mag:
-        r2s = tf.nn.relu(r2s)
+    # if only_mag:
+    #     r2s = tf.nn.relu(r2s)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s) * fm_sc
@@ -98,6 +98,8 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
     # Matrix operations
     WmS = Wm * Smtx # shape = (nb,ne,nv)
     MWmS = tf.linalg.matmul(M_pinv,WmS) # shape = (nb,ns,nv)
+    if only_mag:
+        MWmS = tf.complex(tf.abs(MWmS),0.0)
     MMWmS = tf.linalg.matmul(M,MWmS) # shape = (nb,ne,nv)
     if only_mag:
         MMWmS = tf.abs(MMWmS)
@@ -108,7 +110,10 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
     rho_hat = tf.reshape(MWmS, [n_batch,ns,hgt,wdt,1]) / rho_sc
     Re_rho = tf.math.real(rho_hat)
     Im_rho = tf.math.imag(rho_hat)
-    res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
+    if only_mag:
+        res_rho = Re_rho
+    else:
+        res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
 
     # Reshape to original acquisition dimensions
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
