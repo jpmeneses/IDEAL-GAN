@@ -614,7 +614,7 @@ for ep in range(args.epochs):
                 if args.UQ:
                     R2_var_aux = np.squeeze(A2B_var[:,0,:,:,1])*(r2_sc**2)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
-                                            interpolation='none', vmin=0, vmax=2)
+                                            interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
                     axs[1,3].axis('off')
 
