@@ -613,13 +613,13 @@ for ep in range(args.epochs):
                 axs[1,4].axis('off')
                 
                 if args.UQ:
-                    R2_var_aux = np.squeeze(A2B_var[:,2,:,:,1])*(r2_sc**2)
+                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,1])*(r2_sc**2)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
                                             interpolation='none', vmin=0, vmax=2)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
                     axs[1,3].axis('off')
 
-                    FM_var_aux = np.squeeze(A2B_var[:,2,:,:,0])*(fm_sc**2)
+                    FM_var_aux = np.squeeze(A2B_var[:,0,:,:,0])*(fm_sc**2)
                     FM_var_ok= axs[1,5].imshow(FM_var_aux, cmap='gnuplot2',
                                             interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(FM_var_ok, ax=axs[1,5])
