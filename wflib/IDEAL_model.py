@@ -81,7 +81,10 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
     phi = param_maps[:,0,:,:,0]
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi,r2s) * fm_sc
+    if only_mag:
+        xi = tf.complex(phi,0.0) * fm_sc
+    else:
+        xi = tf.complex(phi,r2s) * fm_sc
     xi_rav = tf.reshape(xi,[n_batch,-1]) # shape: (nb,nv)
     xi_rav = tf.expand_dims(xi_rav,1) # shape: (nb,1,nv)
 
