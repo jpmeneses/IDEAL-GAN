@@ -105,10 +105,10 @@ trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
 # Over-correct data type
-trainX = trainX.astype(float32)
-trainY = trainY.astype(float32)
-valX = valX.astype(float32)
-valY = valY.astype(float32)
+trainX = trainX.astype(np.float32)
+trainY = trainY.astype(np.float32)
+valX = valX.astype(np.float32)
+valY = valY.astype(np.float32)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
