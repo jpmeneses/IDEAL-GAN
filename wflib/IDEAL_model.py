@@ -58,7 +58,7 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
         return M
 
 
-def acq_to_acq(acqs, param_maps, te=None):
+def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
@@ -86,12 +86,19 @@ def acq_to_acq(acqs, param_maps, te=None):
     xi_rav = tf.expand_dims(xi_rav,1) # shape: (nb,1,nv)
 
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
-    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
+    if only_mag:
+        r2s_rav = tf.reshape(r2s*fm_sc,[n_batch,-1]) # shape: (nb,nv)
+        r2s_rav = tf.expand_dims(r2s_rav,1) # shape: (nb,1,nv)
+        Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * tf.transpose(te), -r2s_rav))
+    else:
+        Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
 
     # Matrix operations
     WmS = Wm * Smtx # shape = (nb,ne,nv)
     MWmS = tf.linalg.matmul(M_pinv,WmS) # shape = (nb,ns,nv)
     MMWmS = tf.linalg.matmul(M,MWmS) # shape = (nb,ne,nv)
+    if only_mag:
+        MMWmS = tf.abs(MMWmS)
     Smtx_hat = Wp * MMWmS # shape = (nb,ne,nv)
 
     # Extract corresponding Water/Fat signals
@@ -102,10 +109,11 @@ def acq_to_acq(acqs, param_maps, te=None):
     res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
 
     # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
-    Re_gt = tf.math.real(S_hat)
-    Im_gt = tf.math.imag(S_hat)
-    res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+    res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
+    if not(only_mag):
+        Re_gt = tf.math.real(res_gt)
+        Im_gt = tf.math.imag(res_gt)
+        res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
     return (res_rho,res_gt)
 
 
