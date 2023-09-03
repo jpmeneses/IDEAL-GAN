@@ -105,10 +105,10 @@ trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
 # Over-correct data type
-trainX = tf.cast(trainX, tf.float32)
-trainY = tf.cast(trainY, tf.float32)
-valX = tf.cast(valX, tf.float32)
-valY = tf.cast(valY, tf.float32)
+trainX = trainX.astype(float32)
+trainY = trainY.astype(float32)
+valX = valX.astype(float32)
+valY = valY.astype(float32)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
