@@ -88,12 +88,9 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
     xi_rav = tf.expand_dims(xi_rav,1) # shape: (nb,1,nv)
 
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
     if only_mag:
-        r2s_rav = tf.reshape(r2s*fm_sc,[n_batch,-1]) # shape: (nb,nv)
-        r2s_rav = tf.expand_dims(r2s_rav,1) # shape: (nb,1,nv)
-        Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * tf.transpose(te), -r2s_rav))
-    else:
-        Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
+        Wp = tf.abs(Wp)
 
     # Matrix operations
     WmS = Wm * Smtx # shape = (nb,ne,nv)
