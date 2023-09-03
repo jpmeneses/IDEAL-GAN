@@ -290,8 +290,8 @@ def train_G_R2(A, B):
         ########### Splitted R2s and FM Losses ############
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
         WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
-        R2_loss = cycle_loss_fn(B_R2, A2B_R2)
-        FM_loss = cycle_loss_fn(B_FM, A2B_FM)
+        R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
+        FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2))
@@ -390,8 +390,8 @@ def sample(A, B):
     ########### Splitted R2s and FM Losses ############
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
     WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
-    R2_loss = cycle_loss_fn(B_R2, A2B_R2)
-    FM_loss = cycle_loss_fn(B_FM, A2B_FM)
+    R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
+    FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
     if args.UQ:
         if args.out_vars == 'FM':
