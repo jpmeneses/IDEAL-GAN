@@ -643,7 +643,7 @@ for ep in range(args.epochs):
 
                 r2n_aux = np.squeeze(B[:,2,:,:,1])
                 r2_unet = axs[2,2].imshow(r2n_aux*r2_sc, cmap='copper',
-                                     interpolation='none', vmin=0, vmax=r2_sc)
+                                     interpolation='none', vmin=0, vmax=fm_sc)
                 fig.colorbar(r2_unet, ax=axs[2,2])
                 axs[2,2].axis('off')
 
