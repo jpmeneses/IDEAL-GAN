@@ -226,8 +226,8 @@ def train_G(A, B):
         FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
         ################ Regularizers #####################
-        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM))
-        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3)))
+        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM[:,0,:,:,:]))
+        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3,4)))
         reg_term = FM_TV * args.FM_TV_weight + FM_L1 * args.FM_L1_weight
         
         G_loss = A2B2A_cycle_loss + reg_term
