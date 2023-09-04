@@ -244,10 +244,13 @@ def UNet(
         cont += 1
 
     output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
+    if output_activation == 'sigmoid':
+        output = tf.keras.layers.Lambda(lambda x: x*0.05)(output)
     if bayesian:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
-        # out_var = tf.keras.layers.Lambda(lambda x: 1e-3 + 0.1*x)(out_var)
+        if output_activation == 'sigmoid':
+            out_var = tf.keras.layers.Lambda(lambda x: x*0.05)(out_var)
         x_prob = tf.concat([output,out_var],axis=-1)
         if output_activation == 'tanh':
             out_prob = tfp.layers.DistributionLambda(
