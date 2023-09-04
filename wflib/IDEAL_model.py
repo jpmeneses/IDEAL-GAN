@@ -236,7 +236,7 @@ class LWF_Layer(tf.keras.layers.Layer):
 
 
 def IDEAL_mag(out_WF_abs, out_PM):
-    n_batch,_,hgt,wdt,_ = out_maps.shape
+    n_batch,_,hgt,wdt,_ = out_WF_abs.shape
     ne = 6
     
     te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
