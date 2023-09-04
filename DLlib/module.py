@@ -245,16 +245,23 @@ def UNet(
 
     output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
     if bayesian:
-        pm_init = keras.initializers.VarianceScaling(scale=1e-6,mode='fan_out',distribution='uniform')
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
-        out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer=pm_init)(x_std)
+        out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
         # out_var = tf.keras.layers.Lambda(lambda x: 1e-3 + 0.1*x)(out_var)
         x_prob = tf.concat([output,out_var],axis=-1)
-        out_prob = tfp.layers.DistributionLambda(
-                    lambda t: tfp.distributions.HalfCauchy(
-                        loc=t[...,:n_out],
-                        scale=tf.math.sqrt(t[...,n_out:])),
-                    )(x_prob)
+        if output_activation == 'tanh':
+            out_prob = tfp.layers.DistributionLambda(
+                        lambda t: tfp.distributions.Normal(
+                            loc=t[...,:n_out],
+                            scale=tf.math.sqrt(t[...,n_out:])),
+                        )(x_prob)
+        else:
+            out_prob = tfp.layers.DistributionLambda(
+                        lambda t: tfp.distributions.HalfStudentT(
+                            df=1e4,
+                            loc=t[...,:n_out],
+                            scale=tf.math.sqrt(t[...,n_out:])),
+                        )(x_prob)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
         out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
