@@ -69,6 +69,8 @@ def acq_to_acq(acqs, param_maps, te=None,):
     te_complex = tf.expand_dims(tf.complex(0.0,te),-1) # (ne,1)
     te = tf.expand_dims(te,0) # (1,ne)
     M, M_pinv = gen_M(te) # M shape: (ne,ns)
+    M = tf.squeeze(M,axis=0)
+    M_pinv = tf.squeeze(M_pinv,axis=0)
 
     # Generate complex signal
     S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
@@ -247,13 +249,8 @@ def IDEAL_mag(out_WF_abs, out_PM):
     M = tf.squeeze(M,axis=0)
 
     # Generate complex water/fat signals
-    real_rho = tf.transpose(out_WF_abs)
-    imag_rho = tf.zeros_like(real_rho)
-    rho = tf.complex(real_rho,imag_rho) * rho_sc
-
-    voxel_shape = tf.convert_to_tensor((hgt,wdt))
-    num_voxel = tf.math.reduce_prod(voxel_shape)
-    rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
+    rho = tf.complex(out_WF_abs,0.0) * rho_sc
+    rho_mtx = tf.reshape(rho, [n_batch, ns, -1]) # (nb,ns,nv)
 
     r2s_pi = out_PM[:,0,:,:,1]
     phi = out_PM[:,0,:,:,0]
