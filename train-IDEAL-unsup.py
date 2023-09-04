@@ -145,7 +145,6 @@ if args.G_model == 'U-Net':
         G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
                         bayesian=args.UQ,
                         ME_layer=args.ME_layer,
-                        only_mag=True,
                         te_input=False,
                         te_shape=(args.n_echoes,),
                         filters=args.n_G_filters,
@@ -183,12 +182,13 @@ def train_G(A, B):
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         if args.out_vars == 'PM':
+            A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
             # Compute R2s map from only-mag images
             if args.UQ:
                 # _, A2B_R2, A2B_R2_var = G_A2R2(A_abs, training=True) # Mean R2s
-                A2B_R2, _, A2B_R2_var = G_A2R2(A, training=(args.out_vars=='PM')) # Randomly sampled R2s
+                A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=(args.out_vars=='PM')) # Randomly sampled R2s
             else:
-                A2B_R2 = G_A2R2(A, training=(args.out_vars=='PM'))
+                A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
                 A2B_R2_var = None
             A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
@@ -250,11 +250,13 @@ def train_G(A, B):
 def train_G_R2(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
+        A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+
         # Compute R2s map from only-mag images
         if args.UQ:
-            A2B_R2, _, A2B_R2_var = G_A2R2(A, training=True) # Randomly-sampled R2s
+            A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=True) # Randomly-sampled R2s
         else:
-            A2B_R2 = G_A2R2(A, training=True)
+            A2B_R2 = G_A2R2(A_abs, training=True)
             A2B_R2_var = None
         A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
@@ -267,7 +269,9 @@ def train_G_R2(A, B):
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
         # Magnitude of water/fat images
-        A2B_WF_abs, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, only_mag=True)
+        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+        A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
+        A2B2A_abs = wf.IDEAL_mag(A2B_WF_abs, A2B_PM)
         
         # Variance map mask
         if args.UQ:
@@ -276,7 +280,6 @@ def train_G_R2(A, B):
             A2B_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
 
         ############ Cycle-Consistency Losses #############
-        A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
         # CHECK
         if args.UQ:
             A2B2A_cycle_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
@@ -350,11 +353,12 @@ def sample(A, B):
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
 
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
+        A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
         # Compute R2s maps using only-mag images
         if args.UQ:
-            A2B_R2, A2B_R2_mean, A2B_R2_var = G_A2R2(A, training=False) 
+            A2B_R2, A2B_R2_mean, A2B_R2_var = G_A2R2(A_abs, training=False) 
         else:
-            A2B_R2 = G_A2R2(A, training=False)
+            A2B_R2 = G_A2R2(A_abs, training=False)
             A2B_R2_var = None
         A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
@@ -382,7 +386,6 @@ def sample(A, B):
         A2B_var = None
 
     ########### Splitted R2s and FM Losses ############
-    A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
     WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
     R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)

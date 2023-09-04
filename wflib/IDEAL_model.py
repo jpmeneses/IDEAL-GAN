@@ -58,7 +58,7 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
         return M
 
 
-def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
+def acq_to_acq(acqs, param_maps, te=None,):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
@@ -79,8 +79,7 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
 
     r2s = param_maps[:,0,:,:,1]
     phi = param_maps[:,0,:,:,0]
-    if only_mag:
-        r2s = tf.nn.relu(r2s)
+    # r2s = tf.nn.relu(r2s)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s) * fm_sc
@@ -89,17 +88,11 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
 
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
-    if only_mag:
-        Wp = tf.abs(Wp)
 
     # Matrix operations
     WmS = Wm * Smtx # shape = (nb,ne,nv)
     MWmS = tf.linalg.matmul(M_pinv,WmS) # shape = (nb,ns,nv)
-    if only_mag:
-        MWmS = tf.complex(tf.abs(MWmS),0.0)
     MMWmS = tf.linalg.matmul(M,MWmS) # shape = (nb,ne,nv)
-    if only_mag:
-        MMWmS = tf.abs(MMWmS)
     Smtx_hat = Wp * MMWmS # shape = (nb,ne,nv)
 
     # Extract corresponding Water/Fat signals
@@ -107,17 +100,13 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
     rho_hat = tf.reshape(MWmS, [n_batch,ns,hgt,wdt,1]) / rho_sc
     Re_rho = tf.math.real(rho_hat)
     Im_rho = tf.math.imag(rho_hat)
-    if only_mag:
-        res_rho = Re_rho
-    else:
-        res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
+    res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
 
     # Reshape to original acquisition dimensions
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
-    if not(only_mag):
-        Re_gt = tf.math.real(res_gt)
-        Im_gt = tf.math.imag(res_gt)
-        res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+    Re_gt = tf.math.real(res_gt)
+    Im_gt = tf.math.imag(res_gt)
+    res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
     return (res_rho,res_gt)
 
 
@@ -244,6 +233,46 @@ class LWF_Layer(tf.keras.layers.Layer):
         res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
 
         return res_gt
+
+
+def IDEAL_mag(out_WF_abs, out_PM):
+    n_batch,_,hgt,wdt,_ = out_maps.shape
+    ne = 6
+    
+    te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
+    te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
+    te_complex = tf.complex(0.0,te) # (1,ne)
+    
+    M = gen_M(te,get_Mpinv=False) # (ne,ns)
+    M = tf.squeeze(M,axis=0)
+
+    # Generate complex water/fat signals
+    real_rho = tf.transpose(out_WF_abs)
+    imag_rho = tf.zeros_like(real_rho)
+    rho = tf.complex(real_rho,imag_rho) * rho_sc
+
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
+    rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
+
+    r2s_pi = out_PM[:,0,:,:,1]
+    phi = out_PM[:,0,:,:,0]
+
+    # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
+    xi = tf.complex(phi,r2s_pi) * fm_sc #/(2*np.pi))
+    xi_rav = tf.reshape(xi,[n_batch,-1])
+    xi_rav = tf.expand_dims(xi_rav,-1) # (nb,nv,1)
+
+    Wp = tf.math.exp(tf.linalg.matmul(xi_rav, +2*np.pi * te_complex)) # (nb,nv,ne)
+    Wp = tf.transpose(Wp, perm=[0,2,1]) # (nb,ne,nv)
+
+    # Matrix operations
+    Smtx = tf.abs(Wp) * tf.abs(tf.linalg.matmul(M,rho_mtx)) # (nb,ne,nv)
+
+    # Reshape to original acquisition dimensions
+    res_gt = tf.reshape(Smtx,[n_batch,ne,hgt,wdt,1])
+    
+    return res_gt
 
 
 @tf.function

@@ -179,7 +179,6 @@ def UNet(
     n_out=1,
     bayesian=False,
     ME_layer=False,
-    only_mag=False,
     te_input=False,
     te_shape=(6,),
     filters=72,
@@ -193,9 +192,6 @@ def UNet(
     x = inputs1 = keras.Input(input_shape)
     if te_input:
         te = inputs2 = keras.Input(te_shape)
-
-    if only_mag:
-        x = keras.layers.Lambda(lambda z: tf.math.sqrt(tf.reduce_sum(tf.square(z),axis=-1,keepdims=True)))(x)
 
     if ME_layer:
         x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
