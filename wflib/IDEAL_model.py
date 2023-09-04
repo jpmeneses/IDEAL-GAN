@@ -79,7 +79,7 @@ def acq_to_acq(acqs, param_maps, te=None,):
 
     r2s = param_maps[:,0,:,:,1]
     phi = param_maps[:,0,:,:,0]
-    r2s = tf.nn.relu(r2s)
+    # r2s = tf.nn.relu(r2s)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s) * fm_sc
@@ -257,7 +257,7 @@ def IDEAL_mag(out_WF_abs, out_PM):
 
     r2s_pi = out_PM[:,0,:,:,1]
     phi = out_PM[:,0,:,:,0]
-    r2s_pi = tf.nn.relu(r2s_pi)
+    # r2s_pi = tf.nn.relu(r2s_pi)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s_pi) * fm_sc #/(2*np.pi))
