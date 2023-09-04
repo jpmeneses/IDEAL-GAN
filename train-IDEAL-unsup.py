@@ -281,10 +281,10 @@ def train_G_R2(A, B):
 
         ############ Cycle-Consistency Losses #############
         # CHECK
-        # if args.UQ:
-        #     A2B2A_cycle_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
-        # else:
-        A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+        if args.UQ:
+            A2B2A_cycle_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
+        else:
+            A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
 
         ########### Splitted R2s and FM Losses ############
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
