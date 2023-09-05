@@ -145,6 +145,7 @@ for A in A_dataset_val:
     A2Z2B, A2B2A = sample(A2Z)
 
     # Compute MMD
+    mmd.reset_state()
     mmd_scores.append(mmd(A, A2B2A))
 
 	
