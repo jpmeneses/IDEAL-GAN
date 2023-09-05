@@ -231,7 +231,7 @@ def train_G(A, B):
                 A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B2A2B_cycle_loss = cycle_loss_fn(B[:,2,:,:,:], A2B[:,2,:,:,:])
+        B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
