@@ -70,7 +70,7 @@ A2B2A_pool = data.ItemPool(args.pool_size)
 
 ech_idx = args.n_echoes * 2
 fm_sc = 300.0
-r2_sc = 2*np.pi*fm_sc
+r2_sc = 200.0
 
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
