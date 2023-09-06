@@ -44,6 +44,7 @@ py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wg
 py.arg('--gradient_penalty_weight', type=float, default=10.0)
 py.arg('--R1_reg_weight', type=float, default=0.2)
 py.arg('--R2_reg_weight', type=float, default=0.2)
+py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE'])
 py.arg('--perceptual_loss', type=bool, default=True)
 py.arg('--cycle_loss_weight', type=float, default=10.0)
 py.arg('--B2A2B_weight', type=float, default=1.0)
@@ -176,7 +177,12 @@ LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
-cycle_loss_fn = tf.losses.MeanAbsoluteError()
+if args.main_loss == 'MSE':
+    cycle_loss_fn = tf.losses.MeanSquaredError()
+elif args.main_loss == 'MAE':
+    cycle_loss_fn = tf.losses.MeanAbsoluteError()
+else:
+    raise(NameError('Unrecognized Main Loss Function'))
 cosine_loss = tf.losses.CosineSimilarity()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
