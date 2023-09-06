@@ -169,7 +169,7 @@ def IDEAL_model(out_maps):
         # Xi gradient, considering Taylor approximation
         dxi = tf.squeeze(tf.linalg.diag(2*np.pi*te_complex)) # (1,ne) --> (ne,ne)
         ds_dxi = tf.linalg.matmul(dxi,Smtx) # (nb,ne,nv)
-        ds_dxi = tf.complex(tf.math.real(ds_dxi)*r2_sc/(2*np.pi),tf.math.imag(ds_dxi)*fm_sc)
+        ds_dxi = tf.complex(tf.math.real(ds_dxi)*fm_sc,tf.math.imag(ds_dxi)*r2_sc/(2*np.pi))
         ds_dxi = tf.expand_dims(tf.transpose(ds_dxi,perm=[0,2,1]),axis=-1) ## (nb,nv,ne,1) I2
 
         # Concatenate d_s/d_param gradients
