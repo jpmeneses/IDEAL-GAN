@@ -504,7 +504,7 @@ for ep in range(args.epochs):
 
             r2_aux = np.squeeze(A2B[:,2,:,:,1])
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
-                                    interpolation='none', vmin=0, vmax=fm_sc)
+                                    interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
@@ -531,7 +531,7 @@ for ep in range(args.epochs):
 
             r2n_aux = np.squeeze(B[:,2,:,:,1])
             r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
-                                 interpolation='none', vmin=0, vmax=fm_sc)
+                                 interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_unet, ax=axs[2,3])
             axs[2,3].axis('off')
 
