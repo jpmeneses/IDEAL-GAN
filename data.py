@@ -50,7 +50,7 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,
         idxs_list = [i for i in range(len(out_maps))]
 
     # Pre-process out maps
-    r2_resc = (2/3)*(1/(2*np.pi))
+    r2_resc = 1.0 #(2/3)*(1/(2*np.pi))
     out_maps = out_maps[idxs_list,:,:,:]
     if MEBCRN:
         out_rho_w = np.expand_dims(out_maps[:,:,:,:2],axis=1)

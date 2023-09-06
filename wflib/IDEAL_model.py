@@ -79,12 +79,12 @@ def acq_to_acq(acqs, param_maps, te=None,):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # shape: (nb,ne,nv)
 
-    r2s = param_maps[:,0,:,:,1]
-    phi = param_maps[:,0,:,:,0]
+    r2s = param_maps[:,0,:,:,1] * r2_sc
+    phi = param_maps[:,0,:,:,0] * fm_sc
     # r2s = tf.nn.relu(r2s)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi,r2s) * fm_sc
+    xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1]) # shape: (nb,nv)
     xi_rav = tf.expand_dims(xi_rav,1) # shape: (nb,1,nv)
 
@@ -133,11 +133,11 @@ def IDEAL_model(out_maps):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.transpose(tf.reshape(rho, [n_batch, num_voxel, ns]), perm=[0,2,1]) # (nb,ns,nv)
 
-    r2s_pi = out_maps[:,2,:,:,1]
-    phi = out_maps[:,2,:,:,0]
+    r2s = out_maps[:,2,:,:,1] * r2_sc
+    phi = out_maps[:,2,:,:,0] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi,r2s_pi) * fm_sc #/(2*np.pi))
+    xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,-1) # (nb,nv,1)
 
@@ -252,12 +252,12 @@ def IDEAL_mag(out_WF_abs, out_PM):
     rho = tf.complex(out_WF_abs,0.0) * rho_sc
     rho_mtx = tf.reshape(rho, [n_batch, ns, -1]) # (nb,ns,nv)
 
-    r2s_pi = out_PM[:,0,:,:,1]
-    phi = out_PM[:,0,:,:,0]
+    r2s = out_PM[:,0,:,:,1] * r2_sc
+    phi = out_PM[:,0,:,:,0] * fm_sc
     # r2s_pi = tf.nn.relu(r2s_pi)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi,r2s_pi) * fm_sc #/(2*np.pi))
+    xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,-1) # (nb,nv,1)
 
