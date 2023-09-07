@@ -58,7 +58,7 @@ def gen_M(te,get_Mpinv=True,get_P0=False):
         return M
 
 
-def acq_to_acq(acqs, param_maps, te=None,):
+def acq_to_acq(acqs, param_maps, te=None):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
@@ -238,11 +238,10 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
-def IDEAL_mag(out_WF_abs, out_PM):
-    n_batch,_,hgt,wdt,_ = out_WF_abs.shape
-    ne = 6
+def IDEAL_mag(out_WF_abs, out_PM, te=None):
+    n_batch,ne,hgt,wdt,_ = out_WF_abs.shape
     
-    te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
+    te = np.arange(start=1.3e-3,stop=(2*ne)*1e-3,step=2.1e-3)
     te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
     te_complex = tf.complex(0.0,te) # (1,ne)
     
