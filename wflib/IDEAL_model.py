@@ -238,8 +238,8 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
-def IDEAL_mag(out_WF_abs, out_PM, te=None):
-    n_batch,ne,hgt,wdt,_ = out_WF_abs.shape
+def IDEAL_mag(out_WF_abs, out_PM, ne=6):
+    n_batch,_,hgt,wdt,_ = out_WF_abs.shape
     
     te = np.arange(start=1.3e-3,stop=(2*ne)*1e-3,step=2.1e-3)
     te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)

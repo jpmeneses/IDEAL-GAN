@@ -271,7 +271,7 @@ def train_G_R2(A, B):
         # Magnitude of water/fat images
         A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
-        A2B2A_abs = wf.IDEAL_mag(A2B_WF_abs, A2B_PM)
+        A2B2A_abs = wf.IDEAL_mag(A2B_WF_abs, A2B_PM, ne=args.n_echoes)
         
         # Variance map mask
         if args.UQ:
