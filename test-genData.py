@@ -31,7 +31,7 @@ args.__dict__.update(test_args.__dict__)
 
 ech_idx = args.n_echoes * 2
 fm_sc = 300.0
-r2_sc = 2*np.pi*fm_sc
+r2_sc = 200.0
 hgt,wdt,n_ch = 192,192,2
 
 
@@ -174,7 +174,7 @@ for k in range(args.n_samples):
 	axs[1,2].axis('off')
 
 	r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
-                            interpolation='none', vmin=0, vmax=fm_sc)
+                            interpolation='none', vmin=0, vmax=r2_sc)
 	fig.colorbar(r2_ok, ax=axs[1,3])
 	axs[1,3].axis('off')
 
