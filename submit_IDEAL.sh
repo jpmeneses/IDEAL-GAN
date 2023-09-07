@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v116-unsup
-#SBATCH --output=out_unsup_116.txt
+#SBATCH --job-name=v226-GAN
+#SBATCH --output=out_GAN_226.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-unsup.py --dataset 'Unsup-116' --n_echoes 5 --out_vars 'PM' --UQ True --k_fold 1 --epochs 60 --epoch_decay 60 --epoch_ckpt 20
+python train-IDEAL-GAN.py --dataset 'GAN-226' --adv_train False --n_G_filters 36 --n_downsamplings 4 --n_res_blocks 2 --encoded_size 24 --epochs 100 --epoch_decay 100 --epoch_ckpt 20 --data_aug_p 0.0 --perceptual_loss True --cycle_loss_weight 1e-1 --B2A2B_weight 8e-1 --ls_reg_weight 3e-7 --Fourier_reg_weight 0.0 --NL_SelfAttention True
