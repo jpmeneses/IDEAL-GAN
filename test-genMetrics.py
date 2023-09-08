@@ -32,7 +32,7 @@ args.__dict__.update(test_args.__dict__)
 
 ech_idx = args.n_echoes * 2
 fm_sc = 300.0
-r2_sc = 2*np.pi*fm_sc
+r2_sc = 200.0
 
 dataset_dir = '../datasets/'
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
