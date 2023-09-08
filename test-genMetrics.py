@@ -145,7 +145,7 @@ for A in A_dataset_val:
     A2Z2B, A2B2A = sample(A2Z)
 
     # Compute MMD
-    mmd.reset_state()
+    # mmd.reset_state()
     mmd_scores.append(mmd(A, A2B2A))
 
 	
@@ -155,8 +155,8 @@ real_features = tf.concat(real_features,axis=0)
 fid_res = fid(synth_features, real_features)
 print(f"FID Score: {fid_res.numpy():.4f}")
 
-mmd_scores = tf.concat(mmd_scores,axis=0)
-print(f"MMD Score: {tf.reduce_mean(mmd_scores).numpy():.4f} +- {tf.math.reduce_std(mmd_scores).numpy():.4f}")
+mmd_res = mmd_scores[-1] / len_dataset
+print(f"MMD Score: {mmd_res.numpy():.4f}")
 
 ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
 print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
