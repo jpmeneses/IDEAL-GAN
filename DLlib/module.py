@@ -389,7 +389,7 @@ def MDWF_Generator(
 
 def PM_Generator(
     input_shape,
-    ME_layer=False,
+    ME_layer=True,
     te_input=False,
     te_shape=(6,),
     filters=72,
@@ -487,7 +487,7 @@ def PM_Generator(
     
     outputs = keras.layers.concatenate([x3,x2])
     if ME_layer:
-        output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
+        outputs = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(outputs)
 
     if te_input:
         return keras.Model(inputs=[inputs,inputs2], outputs=outputs)
