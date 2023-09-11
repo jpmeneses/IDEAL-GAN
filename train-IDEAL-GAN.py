@@ -172,7 +172,7 @@ D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2),
 
 metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
 
-IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
+IDEAL_op = wf.IDEAL_Layer()
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
 
