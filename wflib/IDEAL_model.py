@@ -189,7 +189,7 @@ class IDEAL_Layer(tf.keras.layers.Layer):
 
     def call(self,out_maps,te=None,training=None):
         if te is None:
-            te = wf.gen_TEvar(6, out_maps.shape[0], orig=True)
+            te = gen_TEvar(6, out_maps.shape[0], orig=True)
         return IDEAL_model(out_maps, [self.field, te])
 
 
