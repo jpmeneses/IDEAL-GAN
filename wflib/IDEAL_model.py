@@ -5,9 +5,9 @@ import numpy as np
 species = ["water", "fat"]
 ns = len(species)
 
-field = 1.5
+# field = 1.5
 
-f_p = np.array([ 0., -3.80, -3.40, -2.60, -1.94, -0.39, 0.60 ]) * 1E-6 * 42.58E6 * field
+f_p = np.array([ 0., -3.80, -3.40, -2.60, -1.94, -0.39, 0.60 ]) * 1E-6 * 42.58E6 #* field
 f_p = tf.convert_to_tensor(f_p,dtype=tf.complex64)
 f_p = tf.expand_dims(f_p,0)
 
@@ -34,12 +34,13 @@ def gen_TEvar(n_ech,orig=False):
 
 
 @tf.function
-def gen_M(te,get_Mpinv=True,get_P0=False):
+def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False):
     ne = te.shape[1] # len(te)
-    te = tf.cast(te,tf.complex64)
+    field = tf.cast(field, tf.complex64)
+    te = tf.cast(te, tf.complex64)
     te = tf.expand_dims(te,-1)
 
-    M = tf.linalg.matmul(tf.math.exp(tf.tensordot(2j*np.pi*te,f_p,axes=1)),A_p) # shape: bs x ne x ns
+    M = tf.linalg.matmul(tf.math.exp(tf.tensordot(2j*np.pi*te, field*f_p, axes=1)),A_p) # shape: bs x ne x ns
 
     Q, R = tf.linalg.qr(M)
     if get_P0:
@@ -113,15 +114,16 @@ def acq_to_acq(acqs, param_maps, te=None):
 
 
 @tf.custom_gradient
-def IDEAL_model(out_maps):
+def IDEAL_model(out_maps, params):
     n_batch,_,hgt,wdt,_ = out_maps.shape
-    ne = 6
     
-    te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
-    te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
+    # te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
+    # te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
+    te = params[1]
     te_complex = tf.complex(0.0,te) # (1,ne)
+    ne = te.shape[1]
     
-    M = gen_M(te,get_Mpinv=False) # (ne,ns)
+    M = gen_M(te, field=params[0], get_Mpinv=False) # (ne,ns)
     M = tf.squeeze(M,axis=0)
 
     # Generate complex water/fat signals
@@ -157,7 +159,7 @@ def IDEAL_model(out_maps):
     Im_gt = tf.math.imag(S_hat)
     res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
     
-    def grad(upstream): # Must be same shape as out_maps
+    def grad(upstream, variables=params): # Must be same shape as out_maps
         # Re-format upstream 
         upstream = tf.complex(0.5*upstream[:,:,:,:,0],-0.5*upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
         upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
@@ -182,19 +184,18 @@ def IDEAL_model(out_maps):
         grad_res_i = -2*tf.math.imag(tf.expand_dims(grad_res,axis=-1))
         grad_res = tf.concat([grad_res_r,grad_res_i],axis=-1) # (nb,ns+1,hgt,wdt,2)
 
-        return grad_res
+        return (grad_res, [tf.constant([1.0],dtype=tf.float32), tf.ones((1,ne),dtype=tf.float32)])
     
     return res_gt, grad
 
 
 class IDEAL_Layer(tf.keras.layers.Layer):
-    def __init__(self,n_ech,MEBCRN=False):
+    def __init__(self, field=1.5):
         super(IDEAL_Layer, self).__init__()
-        self.n_ech = n_ech
-        self.MEBCRN = MEBCRN
+        self.field = field
 
     def call(self,out_maps,te=None,training=None):
-        return IDEAL_model(out_maps)
+        return IDEAL_model(out_maps, [self.field, te])
 
 
 class LWF_Layer(tf.keras.layers.Layer):
@@ -328,65 +329,49 @@ def get_Ps_norm(acqs,param_maps,te=None):
     return L2_norm
 
 
-@tf.function
-def get_rho(acqs,param_maps,te=None,complex_data=False):
-    n_batch,hgt,wdt,d_ech = acqs.shape
-    if complex_data:
-        n_ech = d_ech
-    else:
-        n_ech = d_ech//2
+def get_rho(acqs, param_maps, field, te=None):
+    n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
-        stop_te = (n_ech*12/6)*1e-3
+        stop_te = (ne*12/6)*1e-3
         te = np.arange(start=1.3e-3,stop=stop_te,step=2.1e-3)
-        te = tf.convert_to_tensor(te,dtype=tf.float32)
-        te = tf.expand_dims(te,0)
-        te = tf.tile(te,[n_batch,1])
-
-    ne = te.shape[1]
-    M, M_pinv = gen_M(te)
-
-    te_complex = tf.complex(0.0,te)
-    te_complex = tf.expand_dims(te_complex,-1)
+        te = tf.convert_to_tensor(te,dtype=tf.float32) # (ne,1)
+    
+    te_complex = tf.expand_dims(tf.complex(0.0,te),-1) # (ne,1)
+    te = tf.expand_dims(te,0) # (1,ne)
+    
+    M, M_pinv = gen_M(te, field=field) # M shape: (ne,ns)
+    M = tf.squeeze(M,axis=0)
+    M_pinv = tf.squeeze(M_pinv,axis=0)
 
     # Generate complex signal
-    if not(complex_data):
-        real_S = acqs[:,:,:,0::2]
-        imag_S = acqs[:,:,:,1::2]
-        S = tf.complex(real_S,imag_S)
-    else:
-        S = acqs
+    S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1])
 
-    r2s = param_maps[:,:,:,0] * r2_sc
-    phi = param_maps[:,:,:,1] * fm_sc
+    r2s = param_maps[:,:,:,:,1:] * r2_sc
+    phi = param_maps[:,:,:,:,:1] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1)
 
-    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav))
+    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
 
     # Matrix operations
-    WmS = Wm * Smtx
-    MWmS = tf.linalg.matmul(M_pinv,WmS)
+    WmS = Wm * Smtx # (nb,ne,nv)
+    MWmS = tf.linalg.matmul(M_pinv,WmS) # (nb,ns,nv)
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
-    rho_hat = tf.reshape(tf.transpose(MWmS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
+    rho_hat = tf.expand_dims(tf.reshape(MWmS, [n_batch,ns,hgt,wdt]), -1) / rho_sc
 
     Re_rho = tf.math.real(rho_hat)
     Im_rho = tf.math.imag(rho_hat)
-    zero_fill = tf.zeros_like(Re_rho)
-    re_stack = tf.stack([Re_rho,zero_fill],4)
-    re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
-    im_stack = tf.stack([zero_fill,Im_rho],4)
-    im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
-    res_rho = re_aux + im_aux
+    res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
     
     return res_rho
 
