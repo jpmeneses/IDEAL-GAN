@@ -31,8 +31,8 @@ py.arg('--epochs', type=int, default=200)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
 py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpoint
 py.arg('--lr', type=float, default=0.0002)
-py.arg('--beta_1', type=float, default=0.5)
-py.arg('--beta_2', type=float, default=0.9)
+py.arg('--beta_1', type=float, default=0.9)
+py.arg('--beta_2', type=float, default=0.999)
 py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--R2_L1_weight', type=float, default=0.0)
