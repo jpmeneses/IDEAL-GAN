@@ -18,7 +18,7 @@ r2_sc = 200.0   # HR:150 / GC:200
 fm_sc = 300.0   # HR:300 / GC:400
 rho_sc = 1.4
 
-def gen_TEvar(n_ech,orig=False):
+def gen_TEvar(n_ech, bs=1, orig=False):
     if orig:
         TE_ini_var = 1.3 * 1e-3
         d_TE_var = 2.1 * 1e-3
@@ -29,27 +29,27 @@ def gen_TEvar(n_ech,orig=False):
     te_var_np = np.arange(start=TE_ini_var,stop=stp_te,step=d_TE_var)
     te_var = tf.convert_to_tensor(te_var_np,dtype=tf.float32)
     te_var = tf.expand_dims(te_var,0)
-    # te_var = tf.tile(te_var,[bs,1])
+    te_var = tf.tile(te_var,[bs,1])
+    te_var = tf.expand_dims(te_var,-1)
     return te_var
 
 
 @tf.function
 def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False):
     ne = te.shape[1] # len(te)
-    field = tf.cast(field, tf.complex64)
     te = tf.cast(te, tf.complex64)
-    te = tf.expand_dims(te,-1)
+    field = tf.cast(field, tf.complex64)
 
-    M = tf.linalg.matmul(tf.math.exp(tf.tensordot(2j*np.pi*te, field*f_p, axes=1)),A_p) # shape: bs x ne x ns
+    M = tf.linalg.matmul(tf.math.exp(tf.linalg.matmul(2j*np.pi*te, field*f_p)), A_p) # shape: bs x ne x ns
 
     Q, R = tf.linalg.qr(M)
     if get_P0:
-        P0 = tf.eye(ne,dtype=tf.complex64) - tf.linalg.matmul(Q, tf.transpose(Q,perm=[0,2,1],conjugate=True))
-        P0 = 0.5 * (tf.transpose(P0,perm=[0,2,1],conjugate=True) + P0)
+        P0 = tf.eye(ne, dtype=tf.complex64) - tf.linalg.matmul(Q, tf.transpose(Q,perm=[0,2,1], conjugate=True))
+        P0 = 0.5 * (tf.transpose(P0, perm=[0,2,1], conjugate=True) + P0)
 
     # Pseudo-inverse
     if get_Mpinv:
-        M_pinv = tf.linalg.solve(R, tf.transpose(Q,perm=[0,2,1],conjugate=True))
+        M_pinv = tf.linalg.solve(R, tf.transpose(Q, perm=[0,2,1], conjugate=True))
 
     if get_P0 and get_Mpinv:
         return M, P0, M_pinv
@@ -63,14 +63,11 @@ def acq_to_acq(acqs, param_maps, te=None):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
-        stop_te = (ne*12/6)*1e-3
-        te = np.arange(start=1.3e-3,stop=stop_te,step=2.1e-3)
-        te = tf.convert_to_tensor(te,dtype=tf.float32) # (ne,1)
+        te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
     
-    te_complex = tf.expand_dims(tf.complex(0.0,te),-1) # (ne,1)
-    te = tf.expand_dims(te,0) # (1,ne)
+    te_complex = tf.complex(0.0,te) # (nb,ne,1)
+
     M, M_pinv = gen_M(te) # M shape: (ne,ns)
-    M = tf.squeeze(M,axis=0)
     M_pinv = tf.squeeze(M_pinv,axis=0)
 
     # Generate complex signal
@@ -117,23 +114,20 @@ def acq_to_acq(acqs, param_maps, te=None):
 def IDEAL_model(out_maps, params):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     
-    # te = np.arange(start=1.3e-3,stop=12*1e-3,step=2.1e-3)
-    # te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
-    te = params[1]
-    te_complex = tf.complex(0.0,te) # (1,ne)
+    te = params[1] # (nb,ne,1)
+    te_complex = tf.complex(0.0,te) 
     ne = te.shape[1]
     
-    M = gen_M(te, field=params[0], get_Mpinv=False) # (ne,ns)
-    M = tf.squeeze(M,axis=0)
+    M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
 
     # Generate complex water/fat signals
-    real_rho = tf.transpose(out_maps[:,:2,:,:,0],perm=[0,2,3,1])
-    imag_rho = tf.transpose(out_maps[:,:2,:,:,1],perm=[0,2,3,1])
-    rho = tf.complex(real_rho,imag_rho) * rho_sc
+    real_rho = out_maps[:,:2,:,:,0]
+    imag_rho = out_maps[:,:2,:,:,1]
+    rho = tf.complex(real_rho, imag_rho) * rho_sc # (nb,ns,hgt,wdt)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
-    rho_mtx = tf.transpose(tf.reshape(rho, [n_batch, num_voxel, ns]), perm=[0,2,1]) # (nb,ns,nv)
+    rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
     r2s = out_maps[:,2,:,:,1] * r2_sc
     phi = out_maps[:,2,:,:,0] * fm_sc
@@ -141,23 +135,22 @@ def IDEAL_model(out_maps, params):
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
-    xi_rav = tf.expand_dims(xi_rav,-1) # (nb,nv,1)
+    xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
-    Wp = tf.math.exp(tf.linalg.matmul(xi_rav, +2*np.pi * te_complex)) # (nb,nv,ne)
-    Wp = tf.transpose(Wp, perm=[0,2,1]) # (nb,ne,nv)
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # (nb,ne,nv)
 
     # Matrix operations
-    Mp = tf.linalg.matmul(M,rho_mtx) # (nb,ne,nv)
+    Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
     Smtx = Wp * Mp # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(tf.transpose(Smtx, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
-    S_hat = tf.expand_dims(tf.transpose(S_hat, perm=[0,3,1,2]),-1)
+    S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
+    S_hat = tf.expand_dims(S_hat, -1)
     
     # Split into real and imaginary channels
     Re_gt = tf.math.real(S_hat)
     Im_gt = tf.math.imag(S_hat)
-    res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+    res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
     
     def grad(upstream, variables=params): # Must be same shape as out_maps
         # Re-format upstream 
@@ -184,7 +177,7 @@ def IDEAL_model(out_maps, params):
         grad_res_i = -2*tf.math.imag(tf.expand_dims(grad_res,axis=-1))
         grad_res = tf.concat([grad_res_r,grad_res_i],axis=-1) # (nb,ns+1,hgt,wdt,2)
 
-        return (grad_res, [tf.constant([1.0],dtype=tf.float32), tf.ones((1,ne),dtype=tf.float32)])
+        return (grad_res, [tf.constant([1.0],dtype=tf.float32), tf.ones((n_batch,ne,1),dtype=tf.float32)])
     
     return res_gt, grad
 
@@ -333,12 +326,9 @@ def get_rho(acqs, param_maps, field, te=None):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
-        stop_te = (ne*12/6)*1e-3
-        te = np.arange(start=1.3e-3,stop=stop_te,step=2.1e-3)
-        te = tf.convert_to_tensor(te,dtype=tf.float32) # (ne,1)
+        te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
     
-    te_complex = tf.expand_dims(tf.complex(0.0,te),-1) # (ne,1)
-    te = tf.expand_dims(te,0) # (1,ne)
+    te_complex = tf.complex(0.0,te) # (nb,ne,1)
     
     M, M_pinv = gen_M(te, field=field) # M shape: (ne,ns)
     M = tf.squeeze(M,axis=0)
@@ -349,7 +339,7 @@ def get_rho(acqs, param_maps, field, te=None):
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
-    Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1])
+    Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # (nb,ne,nv)
 
     r2s = param_maps[:,:,:,:,1:] * r2_sc
     phi = param_maps[:,:,:,:,:1] * fm_sc
@@ -357,7 +347,7 @@ def get_rho(acqs, param_maps, field, te=None):
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
-    xi_rav = tf.expand_dims(xi_rav,1)
+    xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
 
