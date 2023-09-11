@@ -389,7 +389,7 @@ def MDWF_Generator(
 
 def PM_Generator(
     input_shape,
-    bayesian=False,
+    ME_layer=False,
     te_input=False,
     te_shape=(6,),
     filters=72,
@@ -403,6 +403,15 @@ def PM_Generator(
     if te_input:
         te = inputs2 = keras.Input(te_shape)
 
+    if ME_layer:
+        x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    elif len(input_shape) > 3:
+        x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[-3],x.shape[-2],x.shape[-1]]))(x)
+        # Fully-connected network for processing the vector with echo-times
+        y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
+        # Adaptive Instance Normalization for Style-Transfer
+        x = AdaIN(x, y)
+
     down_layers = []
     for l in range(num_layers):
         x = _conv2d_block(
@@ -412,10 +421,10 @@ def PM_Generator(
             norm=norm
             )
 
-        if te_input:
+        if te_input and not(ME_layer):
             # Fully-connected network for processing the vector with echo-times
             y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
-            # Adaptive Instance Normalization for Style-Trasnfer
+            # Adaptive Instance Normalization for Style-Transfer
             x = AdaIN(x, y)
 
         down_layers.append(x)
@@ -473,27 +482,15 @@ def PM_Generator(
         # Update counter
         cont += 1
 
-    if not(bayesian):
-        x2 = keras.layers.Conv2D(1, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
-        x3 = keras.layers.Conv2D(1, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
-        
-    else:
-        x2_prob = keras.layers.Conv2D(2, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
-        x2 = tf.transpose(x2_prob,perm=[0,3,1,2])
-        x2 = tf.keras.layers.Flatten()(x2)
-        x2 = tfp.layers.IndependentNormal([input_shape[0],input_shape[1],1])(x2)
-        x3_prob = keras.layers.Conv2D(2, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x3)
-        x3 = tf.transpose(x3_prob,perm=[0,3,1,2])
-        x3 = tf.keras.layers.Flatten()(x3)
-        x3 = tfp.layers.IndependentNormal([input_shape[0],input_shape[1],1])(x3)
-        out_prob = keras.layers.concatenate([x2_prob,x3_prob])
+    x2 = keras.layers.Conv2D(1, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
+    x3 = keras.layers.Conv2D(1, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
     
-    outputs = keras.layers.concatenate([x2,x3])
+    outputs = keras.layers.concatenate([x3,x2])
+    if ME_layer:
+        output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
 
     if te_input:
         return keras.Model(inputs=[inputs,inputs2], outputs=outputs)
-    elif bayesian:
-        return keras.Model(inputs=inputs, outputs=[outputs,out_prob])
     else:
         return keras.Model(inputs=inputs, outputs=outputs)
 
