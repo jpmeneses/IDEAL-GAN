@@ -1,6 +1,4 @@
 import functools
-import warnings
-import os
 
 import random
 import numpy as np
@@ -13,9 +11,7 @@ import tf2gan as gan
 import DLlib as dl
 import pylib as py
 
-import falib as fa
 import wflib as wf
-
 import data
 
 from itertools import cycle
@@ -54,9 +50,6 @@ py.mkdir(output_dir)
 
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
-
-# mirrored_strategy = tf.distribute.Mirrored_Strategy(devices=["/gpu:0", "/gpu:1"])
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # ==============================================================================
 # =                                    data                                    =
