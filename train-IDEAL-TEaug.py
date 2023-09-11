@@ -21,6 +21,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
+py.arg('--field', default=1.5, choices=[1.5, 3.0])
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
@@ -53,10 +54,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # =                                    data                                    =
 # ==============================================================================
 
-if args.G_model == 'complex':
-    ech_idx = args.n_echoes
-else:
-    ech_idx = args.n_echoes * 2
+ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -65,33 +63,23 @@ r2_sc,fm_sc = 200.0,300.0
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
 out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                            acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+                            acqs_data=False, te_data=False, MEBCRN=True)
 
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
 out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                            acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+                            acqs_data=False, te_data=False, MEBCRN=True)
 
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
 out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                            acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+                            acqs_data=False, te_data=False, MEBCRN=True)
 
 dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
 out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                            acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+                            acqs_data=False, te_data=False, MEBCRN=True)
 
 dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
 out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                            acqs_data=False, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+                            acqs_data=False, te_data=False, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -105,12 +93,8 @@ trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
 valY    = out_maps_1
 
 # Overall dataset statistics
-len_dataset,hgt,wdt,n_out = np.shape(trainY)
+len_dataset,_,hgt,wdt,n_ch = np.shape(trainY)
 echoes = args.n_echoes
-if args.G_model == 'complex':
-    d_ech = echoes
-else:
-    d_ech = echoes*2
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
@@ -135,7 +119,7 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 if args.G_model == 'multi-decod':
     if args.out_vars == 'WF-PM':
-        G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
+        G_A2B=dl.MDWF_Generator(input_shape=(echoes,hgt,wdt,n_ch),
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
                                 filters=args.n_G_filters,
@@ -143,7 +127,7 @@ if args.G_model == 'multi-decod':
                                 R2_self_attention=args.D2_SelfAttention,
                                 FM_self_attention=args.D3_SelfAttention)
     else:
-        G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+        G_A2B = dl.PM_Generator(input_shape=(echoes,hgt,wdt,n_ch),
                                 filters=args.n_G_filters,
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
@@ -154,7 +138,7 @@ elif args.G_model == 'U-Net':
         n_out = 4
     else:
         n_out = 2
-    G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+    G_A2B = dl.UNet(input_shape=(echoes,hgt,wdt,n_ch),
                     n_out=n_out,
                     te_input=args.te_input,
                     te_shape=(args.n_echoes,),
@@ -167,7 +151,7 @@ elif args.G_model == 'MEBCRN':
     else:
         n_out = 2
         out_activ = 'sigmoid'
-    G_A2B=dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
+    G_A2B=dl.MEBCRN(input_shape=(echoes,hgt,wdt,n_ch),
                     n_outputs=n_out,
                     output_activation=out_activ,
                     n_res_blocks=9,
@@ -176,6 +160,8 @@ elif args.G_model == 'MEBCRN':
                     self_attention=args.D1_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
+
+IDEAL_op = wf.IDEAL_Layer(args.n_echoes, field=args.field)
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
@@ -188,34 +174,12 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(B, te=None):
-    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
-
-    indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                            tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-
-    indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-
     with tf.GradientTape() as t:
         ##################### B Cycle #####################
-        # Split B outputs
-        B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
-        B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-
-        # Magnitude of water/fat images
-        B_WF_real = B_WF[:,:,:,0::2]
-        B_WF_imag = B_WF[:,:,:,1::2]
-        B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
-
-        # Split B param maps
-        B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
-        B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
-        B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
-
-        B2A = wf.IDEAL_model(B,echoes,te=te,MEBCRN=(args.G_model=='MEBCRN'))
+        B2A = IDEAL_op(B, te=te, training=False)
         B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
+        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
+        B_PM = B[:,2:,:,:,:]
 
         if args.out_vars == 'WF':
             # Compute model's output
@@ -223,15 +187,14 @@ def train_G(B, te=None):
                 B2A2B_WF_abs = G_A2B([B2A,te], training=True)
             else:
                 B2A2B_WF_abs = G_A2B(B2A, training=True)
-            B2A2B_WF_abs = tf.where(B[:,:,:,:2]!=0.0,B2A2B_WF_abs,0.0)
+            B2A2B_WF_abs = tf.where(B[:,:2,:,:,:1]!=0.0,B2A2B_WF_abs,0.0)
 
             # Compute zero-valued param maps
-            B2A2B_PM = tf.zeros_like(B2A2B_WF_abs)
+            B2A2B_PM = tf.zeros_like(B_PM)
 
             # Split A2B param maps
-            B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+            B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
+            B2A2B_FM = B2A2B_PM[:,:,:,:,:1]
 
             # Compute loss
             sup_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
@@ -242,20 +205,15 @@ def train_G(B, te=None):
                 B2A2B_WF = G_A2B([B2A,te], training=True)
             else:
                 B2A2B_WF = G_A2B(B2A, training=True)
-            B2A2B_WF = tf.where(B[:,:,:,:4]!=0.0,B2A2B_WF,0.0)
+            B2A2B_WF = tf.where(B[:,:2,:,:,:]!=0.0,B2A2B_WF,0.0)
 
             # Magnitude of water/fat images
-            B2A2B_WF_real = B2A2B_WF[:,:,:,0::2]
-            B2A2B_WF_imag = B2A2B_WF[:,:,:,1::2]
-            B2A2B_WF_abs = tf.abs(tf.complex(B2A2B_WF_real,B2A2B_WF_imag))
+            B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
 
             # Compute zero-valued param maps
-            B2A2B_PM = tf.zeros_like(B2A2B_WF_abs)
-
-            # Split A2B param maps
-            B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+            B2A2B_PM = tf.zeros_like(B[:,2:,:,:,:])
+            B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
+            B2A2B_FM = B2A2B_PM[:,:,:,:,:1]
 
             # Compute loss
             sup_loss = sup_loss_fn(B_WF, B2A2B_WF)
@@ -266,12 +224,11 @@ def train_G(B, te=None):
                 B2A2B_PM = G_A2B([B2A,te], training=True)
             else:
                 B2A2B_PM = G_A2B(B2A, training=True)
-            B2A2B_PM = tf.where(B[:,:,:,:2]!=0.0,B2A2B_PM,0.0)
+            B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
             # Split A2B param maps
-            B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+            B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
+            B2A2B_FM = B2A2B_PM[:,:,:,:,:1]
 
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
@@ -280,43 +237,41 @@ def train_G(B, te=None):
                 B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
 
             # Compute water/fat
-            B2A2B_WF = wf.get_rho(B2A, B2A2B_PM)
+            B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te)
             
             # Magnitude of water/fat images
-            B2A2B_WF_real = B2A2B_WF[:,:,:,0::2]
-            B2A2B_WF_imag = B2A2B_WF[:,:,:,1::2]
-            B2A2B_WF_abs = tf.abs(tf.complex(B2A2B_WF_real,B2A2B_WF_imag))
+            B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
             
             # Compute loss
             sup_loss = sup_loss_fn(B_PM, B2A2B_PM)
 
-        elif args.out_vars == 'WF-PM':
-            # Compute model's output
-            B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
-            if args.te_input:
-                B2A2B_abs = G_A2B([B2A,te], training=True)
-            else:
-                B2A2B_abs = G_A2B(B2A, training=True)
-            B2A2B_abs = tf.where(B[:,:,:,:4]!=0.0,B2A2B_abs,0.0)
+        # elif args.out_vars == 'WF-PM':
+        #     # Compute model's output
+        #     B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
+        #     if args.te_input:
+        #         B2A2B_abs = G_A2B([B2A,te], training=True)
+        #     else:
+        #         B2A2B_abs = G_A2B(B2A, training=True)
+        #     B2A2B_abs = tf.where(B[:,:,:,:4]!=0.0,B2A2B_abs,0.0)
 
-            # Split A2B outputs
-            B2A2B_WF_abs, B2A2B_PM = tf.dynamic_partition(B2A2B_abs,indx_B_abs,num_partitions=2)
-            B2A2B_WF_abs = tf.reshape(B2A2B_WF_abs,B[:,:,:,:2].shape)
-            B2A2B_PM = tf.reshape(B2A2B_PM,B[:,:,:,4:].shape)
+        #     # Split A2B outputs
+        #     B2A2B_WF_abs, B2A2B_PM = tf.dynamic_partition(B2A2B_abs,indx_B_abs,num_partitions=2)
+        #     B2A2B_WF_abs = tf.reshape(B2A2B_WF_abs,B[:,:,:,:2].shape)
+        #     B2A2B_PM = tf.reshape(B2A2B_PM,B[:,:,:,4:].shape)
 
-            # Split A2B param maps
-            B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-            B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-            B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+        #     # Split A2B param maps
+        #     B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+        #     B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
+        #     B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
 
-            # Restore field-map when necessary
-            if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-                B2A2B_FM = (B2A2B_FM - 0.5) * 2
-                B2A2B_FM = tf.where(B[:,:,:,:1]!=0.0,B2A2B_FM,0.0)
-                B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_R2,B2A2B_FM],axis=-1)
+        #     # Restore field-map when necessary
+        #     if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+        #         B2A2B_FM = (B2A2B_FM - 0.5) * 2
+        #         B2A2B_FM = tf.where(B[:,:,:,:1]!=0.0,B2A2B_FM,0.0)
+        #         B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_R2,B2A2B_FM],axis=-1)
 
-            # Compute loss
-            sup_loss = sup_loss_fn(B_abs, B2A2B_abs)
+        #     # Compute loss
+        #     sup_loss = sup_loss_fn(B_abs, B2A2B_abs)
 
         ############### Splited losses ####################
         WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
@@ -352,27 +307,12 @@ def train_step(B, te=None):
 
 @tf.function
 def sample(B, te=None):
-    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:2],dtype=tf.int32)],axis=-1)
-    indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                            tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-    indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
     # Split B
-    B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-    B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
-    B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-    # Magnitude of water/fat images
-    B_WF_real = B_WF[:,:,:,0::2]
-    B_WF_imag = B_WF[:,:,:,1::2]
-    B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
-    # Split B param maps
-    B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
-    B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
-    B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
+    B_PM = B[:,2:,:,:,:]
 
     # Compute B2A (+ noise) and estimate B2A2B
-    B2A = wf.IDEAL_model(B,echoes,te=te,MEBCRN=(args.G_model=='MEBCRN'))
+    B2A = IDEAL_op(B, te=te, training=False)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     
     # Estimate A2B
@@ -381,77 +321,74 @@ def sample(B, te=None):
             B2A2B_WF_abs = G_A2B([B2A,te], training=True)
         else:
             B2A2B_WF_abs = G_A2B(B2A, training=True)
-        B2A2B_WF_abs = tf.where(B[:,:,:,:2]!=0.0,B2A2B_WF_abs,0.0)
+        B2A2B_WF_abs = tf.where(B_WF_abs!=0.0,B2A2B_WF_abs,0.0)
+        B2A2B_WF = tf.concat([B2A2B_WF_abs, tf.zeros_like(B2A2B_WF_abs)], axis=1)
         B2A2B_PM = tf.zeros_like(B_PM)
         # Split A2B param maps
-        B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-        B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-        B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
-        B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_PM],axis=-1)
+        B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
+        B2A2B_FM = B2A2B_PM[:,:,:,:,:1]
+        B2A2B_abs = tf.concat([B2A2B_WF,B2A2B_PM],axis=-1)
         val_sup_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
-    elif args.out_vars == 'WFc':
-        if args.te_input:
-            B2A2B_WF = G_A2B([B2A,te], training=True)
-        else:
-            B2A2B_WF = G_A2B(B2A, training=True)
-        B2A2B_WF = tf.where(B[:,:,:,:4]!=0.0,B2A2B_WF,0.0)
-        B2A2B_WF_real = B2A2B_WF[:,:,:,0::2]
-        B2A2B_WF_imag = B2A2B_WF[:,:,:,1::2]
-        B2A2B_WF_abs = tf.abs(tf.complex(B2A2B_WF_real,B2A2B_WF_imag))
-        B2A2B_PM = tf.zeros_like(B_PM)
-        # Split A2B param maps
-        B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-        B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-        B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
-        B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_PM],axis=-1)
-        val_sup_loss = sup_loss_fn(B_WF, B2A2B_WF)
+    # elif args.out_vars == 'WFc':
+    #     if args.te_input:
+    #         B2A2B_WF = G_A2B([B2A,te], training=True)
+    #     else:
+    #         B2A2B_WF = G_A2B(B2A, training=True)
+    #     B2A2B_WF = tf.where(B[:,:,:,:4]!=0.0,B2A2B_WF,0.0)
+    #     B2A2B_WF_real = B2A2B_WF[:,:,:,0::2]
+    #     B2A2B_WF_imag = B2A2B_WF[:,:,:,1::2]
+    #     B2A2B_WF_abs = tf.abs(tf.complex(B2A2B_WF_real,B2A2B_WF_imag))
+    #     B2A2B_PM = tf.zeros_like(B_PM)
+    #     # Split A2B param maps
+    #     B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+    #     B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
+    #     B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+    #     B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_PM],axis=-1)
+    #     val_sup_loss = sup_loss_fn(B_WF, B2A2B_WF)
     elif args.out_vars == 'PM':
         if args.te_input:
             B2A2B_PM = G_A2B([B2A,te], training=True)
         else:
             B2A2B_PM = G_A2B(B2A, training=True)
         B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
-        B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-        B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-        B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+        B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
+        B2A2B_FM = B2A2B_PM[:,:,:,:,:1]
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
             B2A2B_FM = (B2A2B_FM - 0.5) * 2
-            B2A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,B2A2B_FM,0.0)
-            B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
-        B2A2B_WF = wf.get_rho(B2A,B2A2B_PM)
-        B2A2B_WF_real = B2A2B_WF[:,:,:,0::2]
-        B2A2B_WF_imag = B2A2B_WF[:,:,:,1::2]
-        B2A2B_WF_abs = tf.abs(tf.complex(B2A2B_WF_real,B2A2B_WF_imag))
-        B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_PM],axis=-1)
+            B2A2B_FM = tf.where(B_PM[:,:,:,:,:1]!=0.0,B2A2B_FM,0.0)
+            B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=1)
+        B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te)
+        B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
+        B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=1)
         val_sup_loss = sup_loss_fn(B_PM, B2A2B_PM)
-    elif args.out_vars == 'WF-PM':
-        B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
-        if args.te_input:
-            B2A2B_abs = G_A2B([B2A,te], training=True)
-        else:
-            B2A2B_abs = G_A2B(B2A, training=True)
-        B2A2B_abs = tf.where(B_abs!=0.0,B2A2B_abs,0.0)
-        B2A2B_WF_abs,B2A2B_PM = tf.dynamic_partition(B2A2B_abs,indx_B_abs,num_partitions=2)
-        B2A2B_WF_abs = tf.reshape(B2A2B_WF_abs,B[:,:,:,:2].shape)
-        B2A2B_PM = tf.reshape(B2A2B_PM,B[:,:,:,4:].shape)
-        B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
-        B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
-        B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
-        if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-            B2A2B_FM = (B2A2B_FM - 0.5) * 2
-            B2A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,B2A2B_FM,0.0)
-            B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_R2,B2A2B_FM],axis=-1)
-        val_sup_loss = sup_loss_fn(B_abs, B2A2B_abs)
+    # elif args.out_vars == 'WF-PM':
+    #     B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
+    #     if args.te_input:
+    #         B2A2B_abs = G_A2B([B2A,te], training=True)
+    #     else:
+    #         B2A2B_abs = G_A2B(B2A, training=True)
+    #     B2A2B_abs = tf.where(B_abs!=0.0,B2A2B_abs,0.0)
+    #     B2A2B_WF_abs,B2A2B_PM = tf.dynamic_partition(B2A2B_abs,indx_B_abs,num_partitions=2)
+    #     B2A2B_WF_abs = tf.reshape(B2A2B_WF_abs,B[:,:,:,:2].shape)
+    #     B2A2B_PM = tf.reshape(B2A2B_PM,B[:,:,:,4:].shape)
+    #     B2A2B_R2, B2A2B_FM = tf.dynamic_partition(B2A2B_PM,indx_PM,num_partitions=2)
+    #     B2A2B_R2 = tf.reshape(B2A2B_R2,B[:,:,:,:1].shape)
+    #     B2A2B_FM = tf.reshape(B2A2B_FM,B[:,:,:,:1].shape)
+    #     if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+    #         B2A2B_FM = (B2A2B_FM - 0.5) * 2
+    #         B2A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,B2A2B_FM,0.0)
+    #         B2A2B_abs = tf.concat([B2A2B_WF_abs,B2A2B_R2,B2A2B_FM],axis=-1)
+    #     val_sup_loss = sup_loss_fn(B_abs, B2A2B_abs)
 
     ############### Splited losses ####################
     WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
     R2_loss = sup_loss_fn(B_R2, B2A2B_R2)
     FM_loss = sup_loss_fn(B_FM, B2A2B_FM)
     
-    return B2A, B2A2B_abs, {'sup_loss': val_sup_loss,
-                            'WF_loss': WF_abs_loss,
-                            'R2_loss': R2_loss,
-                            'FM_loss': FM_loss}
+    return B2A, B2A2B, {'sup_loss': val_sup_loss,
+                        'WF_loss': WF_abs_loss,
+                        'R2_loss': R2_loss,
+                        'FM_loss': FM_loss}
 
 def validation_step(B, TE):
     B2A, B2A2B_abs, val_B2A2B_dict = sample(B, TE)
@@ -501,22 +438,25 @@ for ep in range(args.epochs):
         # ==============================================================================
         p = np.random.rand()
         if p <= 0.4:
+            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
+
             # Random 90 deg rotations
-            for _ in range(np.random.randint(3)):
-                B = tf.image.rot90(B)
+            B = tf.image.rot90(B,k=np.random.randint(3))
 
             # Random horizontal reflections
             B = tf.image.random_flip_left_right(B)
 
             # Random vertical reflections
             B = tf.image.random_flip_up_down(B)
+
+            B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
         # ==============================================================================
 
         # ==============================================================================
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        te_var = wf.gen_TEvar(args.n_echoes,args.batch_size)
+        te_var = wf.gen_TEvar(args.n_echoes)
 
         G_loss_dict = train_step(B, te=te_var)
 
@@ -529,9 +469,14 @@ for ep in range(args.epochs):
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
             B = next(val_iter)
-            B = tf.expand_dims(B,axis=0)
+            B = tf.expand_dims(B, axis=0)
+            B_WF = B[:,:2,:,:,:]
+            B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
+
             TE_valid = wf.gen_TEvar(args.n_echoes,1)
             B2A, B2A2B, val_A2B_dict = validation_step(B, TE_valid)
+            B2A2B_WF = B2A2B[:,:2,:,:,:]
+            B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
 
             # # summary
             with val_summary_writer.as_default():
@@ -540,40 +485,16 @@ for ep in range(args.epochs):
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            if args.G_model == 'complex':
-                im_ech1 = np.squeeze(np.abs(B2A[:,:,:,0]))
-                im_ech2 = np.squeeze(np.abs(B2A[:,:,:,1]))
-                if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(np.abs(B2A[:,:,:,2]))
-                if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(np.abs(B2A[:,:,:,3]))
-                if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(np.abs(B2A[:,:,:,4]))
-                if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(np.abs(B2A[:,:,:,5]))
-            elif args.G_model == 'MEBCRN':
-                im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,0,:,:,0],B2A[:,0,:,:,1])))
-                im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,1,:,:,0],B2A[:,1,:,:,1])))
-                if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,2,:,:,0],B2A[:,2,:,:,1])))
-                if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,3,:,:,0],B2A[:,3,:,:,1])))
-                if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,4,:,:,0],B2A[:,4,:,:,1])))
-                if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,5,:,:,0],B2A[:,5,:,:,1])))
-            else:
-                im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,0],B2A[:,:,:,1])))
-                im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,2],B2A[:,:,:,3])))
-                if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,4],B2A[:,:,:,5])))
-                if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,6],B2A[:,:,:,7])))
-                if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,8],B2A[:,:,:,9])))
-                if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,:,:,10],B2A[:,:,:,11])))
-                
+            im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,0,:,:,0],B2A[:,0,:,:,1])))
+            im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,1,:,:,0],B2A[:,1,:,:,1])))
+            if args.n_echoes >= 3:
+                im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,2,:,:,0],B2A[:,2,:,:,1])))
+            if args.n_echoes >= 4:
+                im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,3,:,:,0],B2A[:,3,:,:,1])))
+            if args.n_echoes >= 5:
+                im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,4,:,:,0],B2A[:,4,:,:,1])))
+            if args.n_echoes >= 6:
+                im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,5,:,:,0],B2A[:,5,:,:,1])))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
@@ -614,25 +535,25 @@ for ep in range(args.epochs):
                 fig.delaxes(axs[0,5])
 
             # B2A2B maps in the second row
-            w_aux = np.squeeze(B2A2B[:,:,:,0])
+            w_aux = np.squeeze(B2A2B_WF_abs[:,0,:,:,:])
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            f_aux = np.squeeze(B2A2B[:,:,:,1])
+            f_aux = np.squeeze(B2A2B_WF_abs[:,1,:,:,:])
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_aux = np.squeeze(B2A2B[:,:,:,2])
+            r2_aux = np.squeeze(B2A2B[:,2,:,:,1])
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_aux = np.squeeze(B2A2B[:,:,:,3])
+            field_aux = np.squeeze(B2A2B[:,2,:,:,0])
             field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
@@ -641,25 +562,25 @@ for ep in range(args.epochs):
             fig.delaxes(axs[1,5])
 
             # Ground-truth in the third row
-            wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
+            wn_aux = np.squeeze(B_WF_abs[:,0,:,:,:])
             W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_unet, ax=axs[2,1])
             axs[2,1].axis('off')
 
-            fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
+            fn_aux = np.squeeze(B2A2B_WF_abs[:,1,:,:,:])
             F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_unet, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            r2n_aux = np.squeeze(B[:,:,:,4])
+            r2n_aux = np.squeeze(B[:,2,:,:,1])
             r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
                                  interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_unet, ax=axs[2,3])
             axs[2,3].axis('off')
 
-            fieldn_aux = np.squeeze(B[:,:,:,5])
+            fieldn_aux = np.squeeze(B[:,2,:,:,0])
             field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_unet, ax=axs[2,4])
