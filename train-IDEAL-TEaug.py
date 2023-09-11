@@ -4,12 +4,13 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-import DLlib as dl
-import pylib as py
 import tensorflow as tf
 import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
+import DLlib as dl
+import pylib as py
+
 import wflib as wf
 import data
 
@@ -93,12 +94,11 @@ trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
 valY    = out_maps_1
 
 # Overall dataset statistics
-len_dataset,_,hgt,wdt,n_ch = np.shape(trainY)
+len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
 echoes = args.n_echoes
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
-print('Output Maps:',n_out)
 
 # Input and output dimensions (training data)
 print('Training output shape:',trainY.shape)
@@ -128,31 +128,31 @@ if args.G_model == 'multi-decod':
                                 FM_self_attention=args.D3_SelfAttention)
     else:
         G_A2B = dl.PM_Generator(input_shape=(echoes,hgt,wdt,n_ch),
-                                filters=args.n_G_filters,
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
+                                filters=args.n_G_filters,
                                 R2_self_attention=args.D1_SelfAttention,
                                 FM_self_attention=args.D2_SelfAttention)
 elif args.G_model == 'U-Net':
     if args.out_vars == 'WF-PM':
-        n_out = 4
+        nn_out = 4
     else:
-        n_out = 2
+        nn_out = 2
     G_A2B = dl.UNet(input_shape=(echoes,hgt,wdt,n_ch),
-                    n_out=n_out,
+                    n_out=nn_out,
                     te_input=args.te_input,
                     te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
 elif args.G_model == 'MEBCRN':
     if args.out_vars=='WFc':
-        n_out = 4
+        nn_out = 4
         out_activ = None
     else:
-        n_out = 2
+        nn_out = 2
         out_activ = 'sigmoid'
     G_A2B=dl.MEBCRN(input_shape=(echoes,hgt,wdt,n_ch),
-                    n_outputs=n_out,
+                    n_outputs=nn_out,
                     output_activation=out_activ,
                     n_res_blocks=9,
                     n_downsamplings=0,
@@ -161,7 +161,7 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-IDEAL_op = wf.IDEAL_Layer(args.n_echoes, field=args.field)
+IDEAL_op = wf.IDEAL_Layer(field=args.field)
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
@@ -227,8 +227,8 @@ def train_G(B, te=None):
             B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
             # Split A2B param maps
-            B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
-            B2A2B_FM = B2A2B_PM[:,:,:,:,:1]
+            B2A2B_R2 = B2A2B_PM[:,0,:,:,1:]
+            B2A2B_FM = B2A2B_PM[:,0,:,:,:1]
 
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
@@ -237,7 +237,7 @@ def train_G(B, te=None):
                 B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
 
             # Compute water/fat
-            B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te)
+            B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te=te)
             
             # Magnitude of water/fat images
             B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
@@ -275,8 +275,8 @@ def train_G(B, te=None):
 
         ############### Splited losses ####################
         WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
-        R2_loss = sup_loss_fn(B_R2, B2A2B_R2)
-        FM_loss = sup_loss_fn(B_FM, B2A2B_FM)
+        R2_loss = sup_loss_fn(B[:,2:,:,:,1:], B2A2B_R2)
+        FM_loss = sup_loss_fn(B[:,2:,:,:,:1], B2A2B_FM)
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_R2)) * args.R2_TV_weight
@@ -357,7 +357,7 @@ def sample(B, te=None):
             B2A2B_FM = (B2A2B_FM - 0.5) * 2
             B2A2B_FM = tf.where(B_PM[:,:,:,:,:1]!=0.0,B2A2B_FM,0.0)
             B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=1)
-        B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te)
+        B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te=te)
         B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
         B2A2B = tf.concat([B2A2B_WF,B2A2B_PM],axis=1)
         val_sup_loss = sup_loss_fn(B_PM, B2A2B_PM)
@@ -382,8 +382,8 @@ def sample(B, te=None):
 
     ############### Splited losses ####################
     WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
-    R2_loss = sup_loss_fn(B_R2, B2A2B_R2)
-    FM_loss = sup_loss_fn(B_FM, B2A2B_FM)
+    R2_loss = sup_loss_fn(B[:,2:,:,:,1:], B2A2B_R2)
+    FM_loss = sup_loss_fn(B[:,2:,:,:,:1], B2A2B_FM)
     
     return B2A, B2A2B, {'sup_loss': val_sup_loss,
                         'WF_loss': WF_abs_loss,
@@ -456,7 +456,7 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        te_var = wf.gen_TEvar(args.n_echoes)
+        te_var = wf.gen_TEvar(args.n_echoes, bs=B.shape[0])
 
         G_loss_dict = train_step(B, te=te_var)
 
