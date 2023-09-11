@@ -80,7 +80,7 @@ else:
 
 get_features = dl.get_features((ne,hgt,wdt,n_ch))
 
-IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
+IDEAL_op = wf.IDEAL_Layer()
 
 tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
 
