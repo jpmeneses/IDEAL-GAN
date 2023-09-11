@@ -22,7 +22,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--field', default=1.5, choices=[1.5, 3.0])
+py.arg('--field', type=float)
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
