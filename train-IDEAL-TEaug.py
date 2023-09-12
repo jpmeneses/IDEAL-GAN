@@ -476,7 +476,11 @@ for ep in range(args.epochs):
             B_WF = B[:,:2,:,:,:]
             B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
 
-            TE_valid = wf.gen_TEvar(args.n_echoes,1)
+            if args.field == 3.0:
+                TE_valid = wf.gen_TEvar(args.n_echoes, 1, TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+            else:
+                TE_valid = wf.gen_TEvar(args.n_echoes, 1)
+            
             B2A, B2A2B, val_A2B_dict = validation_step(B, TE_valid)
             B2A2B_WF = B2A2B[:,:2,:,:,:]
             B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
@@ -591,7 +595,7 @@ for ep in range(args.epochs):
             fig.delaxes(axs[2,0])
             fig.delaxes(axs[2,5])
 
-            fig.suptitle('TE1/dTE: '+str([TE_valid[0,0].numpy(),np.mean(np.diff(TE_valid))]), fontsize=16)
+            fig.suptitle('TE1/dTE: '+str([TE_valid[0,0,0].numpy(),np.mean(np.diff(TE_valid,axis=1))]), fontsize=16)
 
             # plt.show()
             plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
