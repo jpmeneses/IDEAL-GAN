@@ -227,7 +227,7 @@ def train_G(A, B):
         if args.adv_train:
             if args.cGAN:
                 A_ref = A[:,:3,:,:,:]
-                A_g = A2B2A[:,3:,:,:,:]
+                A_g = A2B2A_L[:,3:,:,:,:]
                 A2B2A_d_logits = D_A([A_g,A_ref], training=False)
             else:
                 A2B2A_d_logits = D_A(A2B2A_L, training=False)
@@ -323,8 +323,6 @@ def sample(A, B):
     A2Z2B_xi= dec_xi(A2Z, training=True)
     A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     A2B2A = IDEAL_op(A2B, training=False)
-    A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
-    A2B2A_L = LWF_op(A2B_L, training=False)
 
     # B2A2B Cycle
     # B2A = IDEAL_op(B, training=False)
@@ -336,7 +334,12 @@ def sample(A, B):
     
     # Discriminative Losses
     if args.adv_train:
-        A2B2A_d_logits = D_A(A2B2A, training=False)
+        if args.cGAN:
+            A_ref = A[:,:3,:,:,:]
+            A_g = A2B2A[:,3:,:,:,:]
+            A2B2A_d_logits = D_A([A_g,A_ref], training=False)
+        else:
+            A2B2A_d_logits = D_A(A2B2A, training=False)
         val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     else:
         val_A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
@@ -352,7 +355,7 @@ def sample(A, B):
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B[:,2,:,:,:], A2B[:,2,:,:,:])
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
-    return A2B,A2B2A_L,{'A2B2A_g_loss': val_A2B2A_g_loss,
+    return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
                         'B2A2B_cycle_loss': val_B2A2B_loss,
                         'A2B2A_f_cycle_loss': val_A2B2A_f_loss,}
