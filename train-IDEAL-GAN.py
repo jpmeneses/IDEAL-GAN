@@ -281,7 +281,10 @@ def train_D(A, A2B2A):
         
         # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
-        D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
+        if args.cGAN:
+            D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), [A_r,A_ref])
+        else:
+            D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), A)
 
         # D_Z_r2 = gan.R1_regularization(functools.partial(D_Z, training=True), A2Z.sample())
 
