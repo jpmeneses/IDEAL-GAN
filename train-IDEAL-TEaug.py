@@ -456,7 +456,10 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        te_var = wf.gen_TEvar(args.n_echoes, bs=B.shape[0])
+        if args.field == 3.0:
+            te_var = wf.gen_TEvar(args.n_echoes, bs=B.shape[0], TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+        else:
+            te_var = wf.gen_TEvar(args.n_echoes, bs=B.shape[0])
 
         G_loss_dict = train_step(B, te=te_var)
 
