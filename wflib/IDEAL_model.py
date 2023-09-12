@@ -18,15 +18,21 @@ r2_sc = 200.0   # HR:150 / GC:200
 fm_sc = 300.0   # HR:300 / GC:400
 rho_sc = 1.4
 
-def gen_TEvar(n_ech, bs=1, orig=False):
+def gen_TEvar(n_ech, bs=1, orig=False, TE_ini_min=1.0e-3, TE_ini_d=1.4e-3, d_TE_min=1.6e-3, d_TE_d=1.0e-3):
     if orig:
         TE_ini_var = 1.3 * 1e-3
         d_TE_var = 2.1 * 1e-3
+        stp_te = TE_ini_var + d_TE_var * (n_ech-1) + 1e-4
+        te_var_np = np.arange(start=TE_ini_var,stop=stp_te,step=d_TE_var)
     else:
-        TE_ini_var = (1.0 + 1.5*np.random.uniform()) * 1e-3
-        d_TE_var = (1.5 + 1.0*np.random.uniform()) * 1e-3
-    stp_te = TE_ini_var + d_TE_var * (n_ech-1) + 1e-4
-    te_var_np = np.arange(start=TE_ini_var,stop=stp_te,step=d_TE_var)
+        # TE_ini_var = (1.0 + 1.5*np.random.uniform()) * 1e-3
+        TE_ini_var = TE_ini_min + np.random.uniform(0,TE_ini_d)
+        # d_TE_var = (1.5 + 1.0*np.random.uniform()) * 1e-3
+        d_TE_c = d_TE_min + np.random.uniform(0,d_TE_d)
+        # The lowest the SD, the more equally-distanced TEs
+        d_TE_var = np.random.normal(d_TE_c, 1e-4, size=(n_ech-1,)) 
+        d_TE_var = np.concatenate((np.array([0.0]), d_TE_var), axis=0)
+        te_var_np = np.cumsum(d_TE_var) + TE_ini_var
     te_var = tf.convert_to_tensor(te_var_np,dtype=tf.float32)
     te_var = tf.expand_dims(te_var,0)
     te_var = tf.tile(te_var,[bs,1])
