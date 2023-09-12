@@ -21,6 +21,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--adv_train', type=bool, default=False)
+py.arg('--cGAN', type=bool, default=False)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--G_model', default='encod-decod', choices=['multi-decod','encod-decod','U-Net','MEBCRN'])
 py.arg('--n_G_filters', type=int, default=36)
@@ -166,6 +167,7 @@ else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), 
+                cGAN=args.cGAN,
                 multi_echo=True,
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
@@ -223,7 +225,12 @@ def train_G(A, B):
         
         ############## Discriminative Losses ##############
         if args.adv_train:
-            A2B2A_d_logits = D_A(A2B2A_L, training=False)
+            if args.cGAN:
+                A_ref = A[:,:3,:,:,:]
+                A_g = A2B2A[:,3:,:,:,:]
+                A2B2A_d_logits = D_A([A_g,A_ref], training=False)
+            else:
+                A2B2A_d_logits = D_A(A2B2A_L, training=False)
             A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         else:
             A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
@@ -260,8 +267,15 @@ def train_G(A, B):
 @tf.function
 def train_D(A, A2B2A):
     with tf.GradientTape() as t:
-        A_d_logits = D_A(A, training=True)
-        A2B2A_d_logits = D_A(A2B2A, training=True)
+        if args.cGAN:
+            A_ref = A[:,:3,:,:,:]
+            A_r = A[:,3:,:,:,:]
+            A_f = A2B2A[:,3:,:,:,:]
+            A_d_logits = D_A([A_r,A_ref], training=True)
+            A2B2A_d_logits = D_A([A_f,A_ref], training=True)
+        else:
+            A_d_logits = D_A(A, training=True)
+            A2B2A_d_logits = D_A(A2B2A, training=True)
         
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
         
