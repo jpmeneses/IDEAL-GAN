@@ -125,6 +125,7 @@ def CriticZ(input_shape,
 
 
 def PatchGAN(input_shape,
+            cGAN=False,
             multi_echo=False,
             dim=64,
             n_downsamplings=3,
@@ -137,6 +138,9 @@ def PatchGAN(input_shape,
 
     # 0
     h = inputs = keras.Input(shape=input_shape)
+    if cGAN:
+        h2 = inputs2 = keras.Input(shape=input_shape)
+        h = keras.layers.concatenate([h, h2])
     if multi_echo:
         h = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(h)
 
@@ -167,7 +171,10 @@ def PatchGAN(input_shape,
     conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(1, n_kernel, strides=1, padding='same', kernel_initializer='glorot_normal'))
     h = conv2d(h)
 
-    return keras.Model(inputs=inputs, outputs=h)
+    if cGAN:
+        return keras.Model(inputs=[inputs, inputs2], outputs=h)
+    else:
+        return keras.Model(inputs=inputs, outputs=h)
 
 
 # ==============================================================================
