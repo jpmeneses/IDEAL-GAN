@@ -226,8 +226,8 @@ def train_G(A, B):
         ############## Discriminative Losses ##############
         if args.adv_train:
             if args.cGAN:
-                A_ref = A[:,:3,:,:,:]
-                A_g = A2B2A_L[:,3:,:,:,:]
+                A_ref = A[:,0::2,:,:,:]
+                A_g = A2B2A_L[:,1::2,:,:,:]
                 A2B2A_d_logits = D_A([A_g,A_ref], training=False)
             else:
                 A2B2A_d_logits = D_A(A2B2A_L, training=False)
@@ -268,8 +268,8 @@ def train_G(A, B):
 def train_D(A, A2B2A):
     with tf.GradientTape() as t:
         if args.cGAN:
-            A_ref = A[:,:3,:,:,:]
-            A_r = A[:,3:,:,:,:]
+            A_ref = A[:,0::2,:,:,:]
+            A_r = A[:,1::2,:,:,:]
             A_f = A2B2A[:,3:,:,:,:]
             A_d_logits = D_A([A_r,A_ref], training=True)
             A2B2A_d_logits = D_A([A_f,A_ref], training=True)
@@ -335,8 +335,8 @@ def sample(A, B):
     # Discriminative Losses
     if args.adv_train:
         if args.cGAN:
-            A_ref = A[:,:3,:,:,:]
-            A_g = A2B2A[:,3:,:,:,:]
+            A_ref = A[:,0::2,:,:,:]
+            A_g = A2B2A[:,1::2,:,:,:]
             A2B2A_d_logits = D_A([A_g,A_ref], training=False)
         else:
             A2B2A_d_logits = D_A(A2B2A, training=False)
