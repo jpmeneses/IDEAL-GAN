@@ -22,7 +22,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--field', type=float)
+py.arg('--field', type=float, default=1.5)
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
@@ -450,6 +450,11 @@ for ep in range(args.epochs):
             B = tf.image.random_flip_up_down(B)
 
             B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+
+            # Random off-resonance field-map scaling factor
+            B_FM = B[:,2:,:,:,:1] * tf.random.normal(1.0,0.25)
+            B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
+            B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
         # ==============================================================================
 
         # ==============================================================================
