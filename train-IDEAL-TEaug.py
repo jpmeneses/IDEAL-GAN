@@ -452,9 +452,9 @@ for ep in range(args.epochs):
             B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
 
             # Random off-resonance field-map scaling factor
-            B_FM = B[:,2:,:,:,:1] * tf.random.normal(1.0,0.25)
-            B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
-            B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
+            # B_FM = B[:,2:,:,:,:1] * tf.random.normal(1.0,0.25,dtype='single')
+            # B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
+            # B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
         # ==============================================================================
 
         # ==============================================================================
