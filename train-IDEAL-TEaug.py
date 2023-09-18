@@ -229,8 +229,8 @@ def train_G(B, te=None):
             B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
             # Split A2B param maps
-            B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
-            B2A2B_FM = B2A2B_PM[:,:,:,:,:1]
+            B2A2B_R2 = B2A2B_PM[:,0,:,:,1:]
+            B2A2B_FM = B2A2B_PM[:,0,:,:,:1]
 
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
@@ -277,8 +277,8 @@ def train_G(B, te=None):
 
         ############### Splited losses ####################
         WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
-        R2_loss = sup_loss_fn(B[:,2:,:,:,1:], B2A2B_R2)
-        FM_loss = sup_loss_fn(B[:,2:,:,:,:1], B2A2B_FM)
+        R2_loss = sup_loss_fn(B[:,2,:,:,1:], B2A2B_R2)
+        FM_loss = sup_loss_fn(B[:,2,:,:,:1], B2A2B_FM)
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_R2)) * args.R2_TV_weight
