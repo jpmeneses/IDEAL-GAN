@@ -34,6 +34,8 @@ py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpo
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
+py.arg('--FM_aug', type=bool, default=False)
+py.arg('--FM_mean', type=float, default=1.0)
 py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--R2_L1_weight', type=float, default=0.0)
@@ -452,9 +454,10 @@ for ep in range(args.epochs):
             B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
 
             # Random off-resonance field-map scaling factor
-            # B_FM = B[:,2:,:,:,:1] * tf.random.normal(1.0,0.25,dtype='single')
-            # B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
-            # B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
+            if args.FM_aug:
+                B_FM = B[:,2:,:,:,:1] * tf.random.normal(args.FM_mean,0.25,dtype='single')
+                B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
+                B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
         # ==============================================================================
 
         # ==============================================================================
