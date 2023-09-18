@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-TEaug.py --dataset 'TEaug-106' --field 3.0 --out_vars 'PM' --epochs 100 --epoch_ckpt 20
+python train-IDEAL-TEaug.py --dataset 'TEaug-106' --field 3.0 --out_vars 'PM' --epochs 100 --epoch_ckpt 20 --FM_aug True --FM_mean 2.0
