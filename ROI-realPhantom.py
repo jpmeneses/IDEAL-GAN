@@ -1,9 +1,9 @@
 import tensorflow as tf
 import numpy as np
 
+import tf2lib as tl
 import DLlib as dl
 import pylib as py
-import tf2lib as tl
 import wflib as wf
 import data
 from utils import *
@@ -17,6 +17,7 @@ from matplotlib.ticker import PercentFormatter
 from time import process_time
 
 py.arg('--experiment_dir',default='output/WF-sep')
+py.arg('--dataset', type=str, default='phantom_1p5', choices=['phantom_1p5','phantom_3p0'])
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--batch_size', type=int, default=1)
@@ -34,18 +35,16 @@ r2_sc,fm_sc = 200.0,300.0
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
-dataset_hdf5 = 'phantom_GC_192_complex_2D.hdf5'
+dataset_hdf5 = args.dataset + '_GC_192_complex_2D.hdf5'
 testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
-                                    acqs_data=True, te_data=True,
-                                    complex_data=(args.G_model=='complex'),
-                                    MEBCRN=(args.G_model=='MEBCRN'))
+                                    acqs_data=True, te_data=True, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
 # Overall dataset statistics
-len_dataset,hgt,wdt,n_out = np.shape(testY)
+len_dataset,n_out,hgt,wdt,n_ch = np.shape(testY)
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',args.n_echoes)
@@ -54,6 +53,7 @@ print('Output Maps:',n_out)
 # Input and output dimensions (testing data)
 print('Testing input shape:',testX.shape)
 print('Testing output shape:',testY.shape)
+print('TEs shape:',TEs.shape)
 
 A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,testY,TEs))
 A_B_dataset_test.batch(1)
@@ -73,12 +73,12 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                               R2_self_attention=args.D2_SelfAttention,
                               FM_self_attention=args.D3_SelfAttention)
   else:
-    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,ech_idx),
-                          filters=args.n_G_filters,
-                          te_input=args.te_input,
-                          te_shape=(args.n_echoes,),
-                          R2_self_attention=args.D1_SelfAttention,
-                          FM_self_attention=args.D2_SelfAttention)
+    G_A2B = dl.PM_Generator(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+                            te_input=args.te_input,
+                            te_shape=(args.n_echoes,),
+                            filters=args.n_G_filters,
+                            R2_self_attention=args.D1_SelfAttention,
+                            FM_self_attention=args.D2_SelfAttention)
 elif args.G_model == 'U-Net':
   if args.out_vars == 'WF-PM':
     n_out = 4
@@ -108,24 +108,10 @@ tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).re
 
 @tf.function
 def sample(A, B, TE=None):
-  indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                      tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-  indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                          tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-  indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                      tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
   # Split B
-  B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-  B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
-  B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-  # Magnitude of water/fat images
-  B_WF_real = B_WF[:,:,:,0::2]
-  B_WF_imag = B_WF[:,:,:,1::2]
-  B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
-  # Split B param maps
-  B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
-  B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
-  B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+  B_WF = B[:,:2,:,:,:]
+  B_PM = B[:,2:,:,:,:]
+  B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
   # Estimate A2B
   if args.out_vars == 'WF':
     if args.te_input:
@@ -148,19 +134,15 @@ def sample(A, B, TE=None):
       A2B_PM = G_A2B([A,TE], training=False)
     else:
       A2B_PM = G_A2B(A, training=False)
-    A2B_PM = tf.where(A[:,:,:,:2]!=0.0,A2B_PM,0.0)
-    A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-    A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-    A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+    A2B_PM = tf.where(A[:,:1,:,:,:]!=0.0,A2B_PM,0.0)
+    A2B_R2 = A2B_PM[:,:,:,:,1:]
+    A2B_FM = A2B_PM[:,:,:,:,:1]
     if args.G_model=='U-Net' or args.G_model=='MEBCRN':
       A2B_FM = (A2B_FM - 0.5) * 2
-      A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
+      A2B_FM = tf.where(A[:,:1,:,:,1:]!=0.0,A2B_FM,0.0)
       A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    A2B_WF = wf.get_rho(A,A2B_PM,TE)
-    A2B_WF_real = A2B_WF[:,:,:,0::2]
-    A2B_WF_imag = A2B_WF[:,:,:,1::2]
-    A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
-    A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+    A2B_WF = wf.get_rho(A, A2B_PM, field=args.field, te=TE)
+    A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
   elif args.out_vars == 'WF-PM':
     B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
     if args.te_input:
@@ -179,9 +161,9 @@ def sample(A, B, TE=None):
       A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,A2B_FM,0.0)
       A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
 
-  return A2B_abs
+  return A2B
 
-all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
+all_test_ans = np.zeros((len_dataset,n_out,hgt,wdt,n_ch))
 i = 0
 
 t1 = process_time()
@@ -192,21 +174,29 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   A2B = sample(A,B,TE)
   # A2B = tf.expand_dims(A2B,axis=0)
 
-  all_test_ans[i,:,:,:] = A2B
+  all_test_ans[i,:,:,:,:] = A2B
   i += 1
 
 t2 = process_time()
 print("Elapsed time during the whole program in seconds:",t2-t1) 
 print("Time per slice:",(t2-t1)/len_dataset)
 
-w_all_ans = all_test_ans[:,:,:,0]
-f_all_ans = all_test_ans[:,:,:,1]
-r2_all_ans = all_test_ans[:,:,:,2]*r2_sc
+wf_ans_abs = np.sqrt(np.sum(np.square(all_test_ans[:,:2,:,:,:]),axis=-1,keepdims=False))
+wf_ans_abs = np.transpose(wf_ans_abs,axes=(0,2,3,1))
+w_all_ans = wf_ans_abs[:,:,:,0]
+f_all_ans = wf_ans_abs[:,:,:,1]
+
+pm_ans = all_test_ans[:,2,:,:,:]
+r2_all_ans = pm_ans[:,:,:,1]*r2_sc
 
 # Ground truth
-w_all_gt = np.abs(tf.complex(testY[:,:,:,0],testY[:,:,:,1]))
-f_all_gt = np.abs(tf.complex(testY[:,:,:,2],testY[:,:,:,3]))
-r2_all_gt = testY[:,:,:,4]*r2_sc
+wf_gt_abs = np.sqrt(np.sum(np.square(testY[:,:2,:,:,:]),axis=-1,keepdims=False))
+wf_gt_abs = np.transpose(wf_gt_abs,axes=(0,2,3,1))
+w_all_gt = wf_gt_abs[:,:,:,0]
+f_all_gt = wf_gt_abs[:,:,:,1]
+
+pm_gt = testY[:,2,:,:,:]
+r2_all_gt = pm_gt[:,:,:,1]*r2_sc
 
 #################################################################################
 #################################################################################
@@ -234,8 +224,13 @@ elif args.map == 'Water':
 else:
   raise TypeError('The selected map is not available')
 
+if args.dataset == 'phantom_1p5':
+  npy_file = 'phantom_slices_crops.npy'
+elif args.dataset == 'phantom_3p0':
+  npy_file = 'phantom_slices_crops_3p0.npy'
+
 fig, ax = plt.subplots(1, 1)
-tracker = IndexTracker_phantom(fig, ax, X, bool_PDFF, lims, 'phantom_slices_crops.npy')
+tracker = IndexTracker_phantom(fig, ax, X, bool_PDFF, lims, npy_file)
 
 fig.canvas.mpl_connect('scroll_event', tracker.onscroll)
 fig.canvas.mpl_connect('button_press_event', tracker.button_press)
@@ -243,7 +238,7 @@ fig.canvas.mpl_connect('key_press_event', tracker.key_press)
 plt.show()
 
 # Save slices indexes and crops coordinates
-with open('phantom_slices_crops.npy', 'wb') as f:
+with open(npy_file, 'wb') as f:
   np.save(f,np.array(tracker.frms))
   np.save(f,np.array(tracker.crops_1))
   np.save(f,np.array(tracker.crops_2))
