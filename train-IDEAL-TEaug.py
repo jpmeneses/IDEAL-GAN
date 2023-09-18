@@ -455,7 +455,7 @@ for ep in range(args.epochs):
 
             # Random off-resonance field-map scaling factor
             if args.FM_aug:
-                B_FM = B[:,2:,:,:,:1] * tf.random.normal(args.FM_mean,0.25,dtype='single')
+                B_FM = B[:,2:,:,:,:1] * tf.random.normal(args.FM_mean,0.25,dtype=tf.float32)
                 B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
                 B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
         # ==============================================================================
