@@ -4,6 +4,7 @@ __pycache__/
 /deprecated/
 /output/
 DiscTest.py
+PM-scaling.ipynb
 metrics-test.ipynb
 submit_metrics.sh
 test_h5py.py
