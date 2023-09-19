@@ -67,7 +67,7 @@ D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=12, self_attention=False)
 # metric_model.add(metric_vgg)
 # b = metric_model(tf.random.normal((1,hgt,wdt,3),dtype=tf.float32))
 
-IDEAL_op = wf.IDEAL_Layer(ne,MEBCRN=True)
+IDEAL_op = wf.IDEAL_Layer()
 LWF_op = wf.LWF_Layer(ne,MEBCRN=True)
 F_op = dl.FourierLayer()
 
@@ -82,6 +82,7 @@ A2B2A_pool = data.ItemPool(10)
 
 @tf.function
 def train_G(A, B):
+    te = wf.gen_TEvar(ne,orig=True)
     with tf.GradientTape(persistent=True) as t:
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
@@ -89,7 +90,7 @@ def train_G(A, B):
         A2Z2B_f = dec_f(A2Z, training=True)
         A2Z2B_xi= dec_xi(A2Z, training=True)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
-        A2B2A = IDEAL_op(A2B, training=False)
+        A2B2A = IDEAL_op(A2B, te, training=False)
 
         # A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
         # A2B2A_L = LWF_op(A2B_L)

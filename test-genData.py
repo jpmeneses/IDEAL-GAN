@@ -70,7 +70,7 @@ if args.G_model == 'encod-decod':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
+IDEAL_op = wf.IDEAL_Layer()
 
 tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
 
@@ -185,7 +185,7 @@ for k in range(args.n_samples):
 	fig.delaxes(axs[1,0])
 	fig.delaxes(axs[1,5])
 
-	fig.suptitle('TE1/dTE: '+str([TE[0,0].numpy(),np.mean(np.diff(TE[0,:]))]), fontsize=16)
+	fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE, axis=1))]), fontsize=16)
 
 	# plt.show()
 	plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
