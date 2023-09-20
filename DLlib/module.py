@@ -72,16 +72,16 @@ def _conv2d_block(
     return c
 
 
-def _residual_block(x, norm):
+def _residual_block(x, norm, groups=1):
     Norm = _get_norm_layer(norm)
     dim = x.shape[-1]
     h = x
 
-    h = keras.layers.Conv2D(dim, 3, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
+    h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
     h = Norm()(h)
     h = tf.nn.leaky_relu(h)
 
-    h = keras.layers.Conv2D(dim, 3, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
+    h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
     h = Norm()(h)
 
     return keras.layers.add([x, h])
@@ -648,7 +648,7 @@ def encoder(
 def decoder(
     encoded_dims,
     output_2D_shape,
-    n_species=2,
+    n_groups=1,
     filters=36,
     num_layers=4,
     num_res_blocks=2,
@@ -671,20 +671,20 @@ def decoder(
     # pm_init = keras.initializers.VarianceScaling(scale=1e-6,mode='fan_out',distribution='uniform')
     filt_iter = filt_ini
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
-    x = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    x = keras.layers.Conv2D(filt_iter,3,padding="same",groups=n_groups,activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
     if NL_self_attention:
-        x = _residual_block(x, norm=norm)
+        x = _residual_block(x, norm=norm, groups=n_groups)
         x = SelfAttention(ch=filt_ini)(x)
-        x = _residual_block(x, norm=norm)
+        x = _residual_block(x, norm=norm, groups=n_groups)
     for cont in range(num_layers):
         filt_iter //= 2  # decreasing number of filters with each layer
         x = _upsample(filt_iter, (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(x)
         for n_res in range(num_res_blocks):
-            x = _residual_block(x, norm=norm)
+            x = _residual_block(x, norm=norm, groups=n_groups)
 
     x = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
     x = Norm()(x)
-    output = keras.layers.Conv2D(2,3,padding="same",activation=output_activation,kernel_initializer=output_initializer)(x)
+    output = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
