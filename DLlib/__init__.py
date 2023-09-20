@@ -6,3 +6,4 @@ from DLlib.mebcrn import *
 from DLlib.metrics import *
 from DLlib.module import *
 from DLlib.utils import *
+from DLlib.VectorQuantizer import *
