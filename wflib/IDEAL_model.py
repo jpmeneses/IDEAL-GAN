@@ -330,7 +330,7 @@ def get_Ps_norm(acqs,param_maps,te=None):
     return L2_norm
 
 
-def get_rho(acqs, param_maps, field, te=None):
+def get_rho(acqs, param_maps, field=1.5, te=None):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
