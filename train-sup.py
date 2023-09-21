@@ -4,16 +4,15 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 
-import DLlib as dl
-import pylib as py
 import tensorflow as tf
 import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
+import DLlib as dl
+import pylib as py
 import wflib as wf
 
 import data
-from keras_unet.models import custom_unet
 
 from itertools import cycle
 
@@ -30,7 +29,7 @@ py.arg('--batch_size', type=int, default=32)
 py.arg('--epochs', type=int, default=100)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
 py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpoint
-py.arg('--lr', type=float, default=0.001)
+py.arg('--lr', type=float, default=0.0005)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.9999)
 py.arg('--R2_TV_weight', type=float, default=0.0)
@@ -61,73 +60,49 @@ r2_sc,fm_sc = 200.0,300.0
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
+
+dataset_hdf5_1 = 'INTA_GC_192_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
+dataset_hdf5_2 = 'INTArest_GC_192_complex_2D.hdf5'
 acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+dataset_hdf5_3 = 'Volunteers_GC_192_complex_2D.hdf5'
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
-
-dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                            acqs_data=True, te_data=False,
-                            complex_data=(args.G_model=='complex'),
-                            MEBCRN=(args.G_model=='MEBCRN'))
+dataset_hdf5_4 = 'Attilio_GC_192_complex_2D.hdf5'
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
 ################################################################################
 ############################# DATASET PARTITIONS ###############################
 ################################################################################
 
-# n1_div = 248
-# n3_div = 0
-# n4_div = 434
-
-trainX  = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
 valX    = acqs_1
 
-trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
 valY    = out_maps_1
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,n_out = np.shape(trainY)
 echoes = args.n_echoes
-if args.G_model == 'complex':
-    d_ech = echoes
-else:
-    d_ech = echoes*2
+d_ech = echoes*2
 
 print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',echoes)
-print('Output Maps:',n_out)
+print('Echoes:', echoes)
+print('Output Maps:', n_out)
 
 # Input and output dimensions (training data)
-print('Training input shape:',trainX.shape)
-print('Training output shape:',trainY.shape)
+print('Training input shape:', trainX.shape)
+print('Training output shape:', trainY.shape)
 
 # Input and output dimensions (validations data)
-print('Validation input shape:',valX.shape)
-print('Validation output shape:',valY.shape)
-
-# Input and output dimensions (testing data)
-# print('Testing input shape:',testX.shape)
-# print('Testing output shape:',testY.shape)
+print('Validation input shape:', valX.shape)
+print('Validation output shape:', valY.shape)
 
 A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
@@ -154,15 +129,21 @@ if args.G_model == 'multi-decod':
                                 FM_self_attention=args.D2_SelfAttention)
 
 elif args.G_model == 'U-Net':
-    if args.out_vars == 'WF-PM':
+    if args.out_vars == 'WFc':
         n_out = 4
+        out_activ = 'tanh'
+    elif args.out_vars == 'WF-PM':
+        n_out = 4
+        out_activ = 'relu'
     else:
         n_out = 2
+        out_activ = 'relu'
     G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
                     n_out=n_out,
                     filters=args.n_G_filters,
+                    output_activation=out_activ,
                     self_attention=args.D1_SelfAttention)
-    if not(args.out_vars == 'WF'):
+    if args.out_vars == 'WF':
         trainY[:,:,:,-1]    = 0.5*trainY[:,:,:,-1] + 0.5
         valY[:,:,:,-1]      = 0.5*valY[:,:,:,-1] + 0.5
         testY[:,:,:,-1]     = 0.5*testY[:,:,:,-1] + 0.5
@@ -196,31 +177,10 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(A, B):
-    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-
-    indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                            tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-
-    indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-
+    B_WF = B[:,:,:,:4]
+    B_PM = B[:,:,:,4:]
+    B_WF_abs = tf.abs(tf.complex(B_WF[:,:,:,0::2],B_WF[:,:,:,1::2]))
     with tf.GradientTape() as t:
-        # Split B outputs
-        B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-        B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
-        B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-
-        # Magnitude of water/fat images
-        B_WF_real = B_WF[:,:,:,0::2]
-        B_WF_imag = B_WF[:,:,:,1::2]
-        B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
-
-        # Split B param maps
-        B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
-        B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
-        B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
-
         if args.out_vars == 'WF':
             # Compute model's output
             A2B_WF_abs = G_A2B(A, training=True)
@@ -312,11 +272,11 @@ def train_G(A, B):
 
         ############### Splited losses ####################
         WF_abs_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
-        R2_loss = sup_loss_fn(B_R2, A2B_R2)
-        FM_loss = sup_loss_fn(B_FM, A2B_FM)
+        R2_loss = sup_loss_fn(B_PM[:,:,:,:1], A2B_R2)
+        FM_loss = sup_loss_fn(B_PM[:,:,:,1:], A2B_FM)
 
         ################ Regularizers #####################
-        if not(args.out_vars=='WF'):
+        if not(args.out_vars=='WF' or args.out_vars=='WFc'):
             R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2)) * args.R2_TV_weight
             FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM)) * args.FM_TV_weight
             R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
@@ -350,24 +310,9 @@ def train_step(A, B):
 
 @tf.function
 def sample(A, B):
-    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-    indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                            tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-    indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-    # Split B
-    B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-    B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
-    B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-    # Magnitude of water/fat images
-    B_WF_real = B_WF[:,:,:,0::2]
-    B_WF_imag = B_WF[:,:,:,1::2]
-    B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
-    # Split B param maps
-    B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
-    B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
-    B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+    B_WF = B[:,:,:,:4]
+    B_PM = B[:,:,:,4:]
+    B_WF_abs = tf.abs(tf.complex(B_WF[:,:,:,0::2],B_WF[:,:,:,1::2]))
     # Estimate A2B
     if args.out_vars == 'WF':
         A2B_WF_abs = G_A2B(A, training=True)
@@ -426,8 +371,8 @@ def sample(A, B):
 
     ############### Splited losses ####################
     WF_abs_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
-    R2_loss = sup_loss_fn(B_R2, A2B_R2)
-    FM_loss = sup_loss_fn(B_FM, A2B_FM)
+    R2_loss = sup_loss_fn(B_PM[:,:,:,:1], A2B_R2)
+    FM_loss = sup_loss_fn(B_PM[:,:,:,1:], A2B_FM)
 
     return A2B_abs,{'sup_loss': val_sup_loss,
                     'WF_loss': WF_abs_loss,
