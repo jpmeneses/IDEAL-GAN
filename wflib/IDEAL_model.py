@@ -213,8 +213,7 @@ class LWF_Layer(tf.keras.layers.Layer):
             te = gen_TEvar(ne)
         te_complex = tf.complex(0.0,te) # (1,ne)
         
-        M = gen_M(te,get_Mpinv=False) # (ne,ns)
-        M = tf.squeeze(M,axis=0)
+        M = gen_M(te,get_Mpinv=False) # (nb,ne,ns)
 
         # Generate complex water/fat signals
         real_rho = tf.transpose(out_maps[:,:,:,:,0],perm=[0,2,3,1])
@@ -247,8 +246,7 @@ def IDEAL_mag(out_WF_abs, out_PM, ne=6):
     te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
     te_complex = tf.complex(0.0,te) # (1,ne)
     
-    M = gen_M(te,get_Mpinv=False) # (ne,ns)
-    M = tf.squeeze(M,axis=0)
+    M = gen_M(te,get_Mpinv=False) # (nb,ne,ns)
 
     # Generate complex water/fat signals
     rho = tf.complex(out_WF_abs,0.0) * rho_sc
@@ -342,9 +340,7 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
     
     te_complex = tf.complex(0.0,te) # (nb,ne,1)
     
-    M, M_pinv = gen_M(te, field=field) # M shape: (ne,ns)
-    M = tf.squeeze(M,axis=0)
-    M_pinv = tf.squeeze(M_pinv,axis=0)
+    M, M_pinv = gen_M(te, field=field) # M shape: (nb,ne,ns)
 
     # Generate complex signal
     if MEBCRN:
