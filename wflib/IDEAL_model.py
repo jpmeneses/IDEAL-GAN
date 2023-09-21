@@ -330,8 +330,12 @@ def get_Ps_norm(acqs,param_maps,te=None):
     return L2_norm
 
 
-def get_rho(acqs, param_maps, field=1.5, te=None):
-    n_batch,ne,hgt,wdt,n_ch = acqs.shape
+def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
+    if MEBCRN:
+        n_batch,ne,hgt,wdt,n_ch = acqs.shape
+    else:
+        n_batch,hgt,wdt,ech_idx = acqs.shape
+        ne = ech_idx//2
 
     if te is None:
         te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
@@ -343,14 +347,21 @@ def get_rho(acqs, param_maps, field=1.5, te=None):
     M_pinv = tf.squeeze(M_pinv,axis=0)
 
     # Generate complex signal
-    S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
+    if MEBCRN:
+        S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
+    else:
+        S = tf.complex(acqs[:,:,:,0::2],acqs[:,:,:,1::2]) # (nb,ne,hgt,wdt)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # (nb,ne,nv)
 
-    r2s = param_maps[:,:,:,:,1:] * r2_sc
-    phi = param_maps[:,:,:,:,:1] * fm_sc
+    if MEBCRN:
+        r2s = param_maps[:,:,:,:,1:] * r2_sc
+        phi = param_maps[:,:,:,:,:1] * fm_sc
+    else:
+        r2s = param_maps[:,:,:,1:] * r2_sc
+        phi = param_maps[:,:,:,:1] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
@@ -365,11 +376,23 @@ def get_rho(acqs, param_maps, field=1.5, te=None):
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
-    rho_hat = tf.expand_dims(tf.reshape(MWmS, [n_batch,ns,hgt,wdt]), -1) / rho_sc
+    rho_hat = tf.reshape(MWmS, [n_batch,ns,hgt,wdt]) / rho_sc
 
-    Re_rho = tf.math.real(rho_hat)
-    Im_rho = tf.math.imag(rho_hat)
-    res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
+    if MEBCRN:
+        rho_hat = tf.expand_dims(rho_hat, -1)
+        Re_rho = tf.math.real(rho_hat)
+        Im_rho = tf.math.imag(rho_hat)
+        res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
+    else:
+        rho_hat = tf.transpose(rho_hat, perm=[0,2,3,1])
+        Re_rho = tf.math.real(rho_hat)
+        Im_rho = tf.math.imag(rho_hat)
+        zero_fill = tf.zeros_like(Re_rho)
+        re_stack = tf.stack([Re_rho,zero_fill],4)
+        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
+        im_stack = tf.stack([zero_fill,Im_rho],4)
+        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
+        res_rho = re_aux + im_aux
     
     return res_rho
 
