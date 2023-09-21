@@ -124,6 +124,7 @@ if args.G_model == 'multi-decod':
                                 FM_self_attention=args.D3_SelfAttention)
     else:
         G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+                                ME_layer=False,
                                 filters=args.n_G_filters,
                                 R2_self_attention=args.D1_SelfAttention,
                                 FM_self_attention=args.D2_SelfAttention)
