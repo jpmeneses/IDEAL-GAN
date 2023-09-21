@@ -357,8 +357,8 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
         r2s = param_maps[:,:,:,:,1:] * r2_sc
         phi = param_maps[:,:,:,:,:1] * fm_sc
     else:
-        r2s = param_maps[:,:,:,1:] * r2_sc
-        phi = param_maps[:,:,:,:1] * fm_sc
+        r2s = param_maps[:,:,:,:1] * r2_sc
+        phi = param_maps[:,:,:,1:] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
