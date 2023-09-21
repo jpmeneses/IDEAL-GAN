@@ -492,9 +492,11 @@ def PM_Generator(
     x2 = keras.layers.Conv2D(1, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
     x3 = keras.layers.Conv2D(1, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
     
-    outputs = keras.layers.concatenate([x3,x2])
     if ME_layer:
+        outputs = keras.layers.concatenate([x3,x2])
         outputs = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(outputs)
+    else:
+        outputs = keras.layers.concatenate([x2,x3])
 
     if te_input:
         return keras.Model(inputs=[inputs,inputs2], outputs=outputs)
