@@ -147,7 +147,6 @@ elif args.G_model == 'U-Net':
     if args.out_vars == 'WF':
         trainY[:,:,:,-1]    = 0.5*trainY[:,:,:,-1] + 0.5
         valY[:,:,:,-1]      = 0.5*valY[:,:,:,-1] + 0.5
-        testY[:,:,:,-1]     = 0.5*testY[:,:,:,-1] + 0.5
 
 elif args.G_model == 'MEBCRN':
     if args.out_vars=='WFc':
