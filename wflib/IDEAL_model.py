@@ -346,7 +346,8 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
     if MEBCRN:
         S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
     else:
-        S = tf.complex(acqs[:,:,:,0::2],acqs[:,:,:,1::2]) # (nb,ne,hgt,wdt)
+        S = tf.complex(acqs[:,:,:,0::2],acqs[:,:,:,1::2]) # (nb,hgt,wdt,ne)
+        S = tf.transpose(S, perm=[0,3,1,2]) # (nb,ne,hgt,wdt)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
