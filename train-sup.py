@@ -191,9 +191,8 @@ def train_G(A, B):
             A2B_PM = tf.zeros_like(A2B_WF_abs)
 
             # Split A2B param maps
-            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            A2B_R2 = A2B_PM[:,:,:,:1]
+            A2B_FM = A2B_PM[:,:,:,1:]
 
             # Compute loss
             sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
@@ -212,9 +211,8 @@ def train_G(A, B):
             A2B_PM = tf.zeros_like(A2B_WF_abs)
 
             # Split A2B param maps
-            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            A2B_R2 = A2B_PM[:,:,:,:1]
+            A2B_FM = A2B_PM[:,:,:,1:]
 
             # Compute loss
             sup_loss = sup_loss_fn(B_WF, A2B_WF)
@@ -225,9 +223,8 @@ def train_G(A, B):
             A2B_PM = tf.where(B[:,:,:,:2]!=0.0,A2B_PM,0.0)
 
             # Split A2B param maps
-            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            A2B_R2 = A2B_PM[:,:,:,:1]
+            A2B_FM = A2B_PM[:,:,:,1:]
 
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
@@ -253,14 +250,12 @@ def train_G(A, B):
             A2B_abs = tf.where(B[:,:,:,:4]!=0.0,A2B_abs,0.0)
 
             # Split A2B outputs
-            A2B_WF_abs, A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
-            A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
-            A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
+            A2B_WF = A2B_abs[:,:,:,:2]
+            A2B_PM = A2B_abs[:,:,:,2:]
 
             # Split A2B param maps
-            A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-            A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-            A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+            A2B_R2 = A2B_PM[:,:,:,:1]
+            A2B_FM = A2B_PM[:,:,:,1:]
 
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
@@ -320,9 +315,8 @@ def sample(A, B):
         A2B_WF_abs = tf.where(B[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
         A2B_PM = tf.zeros_like(B_PM)
         # Split A2B param maps
-        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+        A2B_R2 = A2B_PM[:,:,:,:1]
+        A2B_FM = A2B_PM[:,:,:,1:]
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
         val_sup_loss = sup_loss_fn(B_WF_abs, A2B_WF_abs)
     elif args.out_vars == 'WFc':
@@ -333,17 +327,15 @@ def sample(A, B):
         A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
         A2B_PM = tf.zeros_like(B_PM)
         # Split A2B param maps
-        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+        A2B_R2 = A2B_PM[:,:,:,:1]
+        A2B_FM = A2B_PM[:,:,:,1:]
         A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
         val_sup_loss = sup_loss_fn(B_WF, A2B_WF)
     elif args.out_vars == 'PM':
         A2B_PM = G_A2B(A, training=True)
         A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
-        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+        A2B_R2 = A2B_PM[:,:,:,:1]
+        A2B_FM = A2B_PM[:,:,:,1:]
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
             A2B_FM = (A2B_FM - 0.5) * 2
             A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
@@ -358,12 +350,12 @@ def sample(A, B):
         B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
         A2B_abs = G_A2B(A, training=True)
         A2B_abs = tf.where(B_abs!=0.0,A2B_abs,0.0)
-        A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
-        A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
-        A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
-        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+        # Split A2B outputs
+        A2B_WF = A2B_abs[:,:,:,:2]
+        A2B_PM = A2B_abs[:,:,:,2:]
+        # Split A2B param maps
+        A2B_R2 = A2B_PM[:,:,:,:1]
+        A2B_FM = A2B_PM[:,:,:,1:]
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
             A2B_FM = (A2B_FM - 0.5) * 2
             A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,A2B_FM,0.0)
