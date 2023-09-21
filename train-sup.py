@@ -249,7 +249,7 @@ def train_G(A, B):
             A2B_abs = tf.where(B[:,:,:,:4]!=0.0,A2B_abs,0.0)
 
             # Split A2B outputs
-            A2B_WF = A2B_abs[:,:,:,:2]
+            A2B_WF_abs = A2B_abs[:,:,:,:2]
             A2B_PM = A2B_abs[:,:,:,2:]
 
             # Split A2B param maps
