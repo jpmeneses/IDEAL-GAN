@@ -25,7 +25,7 @@ py.arg('--n_echoes', type=int, default=6)
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
 py.arg('--n_G_filters', type=int, default=72)
-py.arg('--batch_size', type=int, default=32)
+py.arg('--batch_size', type=int, default=8)
 py.arg('--epochs', type=int, default=100)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
 py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpoint
