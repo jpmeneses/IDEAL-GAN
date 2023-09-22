@@ -169,7 +169,7 @@ def PatchGAN(input_shape,
         h = SelfAttention(ch=dim)(h)
 
     # 3
-    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(1, n_kernel, strides=1, padding='same', groups=n_groups, kernel_initializer='glorot_normal'))
+    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(1, n_kernel, strides=1, padding='same', kernel_initializer='glorot_normal'))
     h = conv2d(h)
 
     if cGAN:
