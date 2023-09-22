@@ -29,6 +29,7 @@ py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
 py.arg('--n_groups_PM', type=int, default=1)
 py.arg('--n_D_filters', type=int, default=64)
+py.arg('--n_groups_D', type=int, default=1)
 py.arg('--encoded_size', type=int, default=256)
 py.arg('--frac_labels', type=bool, default=False)
 py.arg('--batch_size', type=int, default=1)
@@ -171,6 +172,7 @@ else:
 D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), 
                 cGAN=args.cGAN,
                 multi_echo=True,
+                n_groups=args.n_groups_D,
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
 
