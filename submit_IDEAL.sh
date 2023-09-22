@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-sup.py --dataset 'Sup-101' --n_echoes 3 --out_vars 'WF' --G_model 'U-Net' --epoch_ckpt 20
+python train-sup.py --dataset 'Sup-104' --n_echoes 3 --out_vars 'WF' --G_model 'U-Net' --epoch_ckpt 20
