@@ -6,7 +6,7 @@ vgg = keras.applications.vgg19.VGG19()
 
 def perceptual_metric(input_shape, layers=[2,5,8,13,18], pad=(16,16)):
     inputs = keras.Input(input_shape)
-    aux_idxs = [1 for i in range(len(x.shape)-1)]
+    aux_idxs = [1 for i in range(len(input_shape))]
     aux_idxs.append(3)
     x = keras.layers.Lambda(lambda x: tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)))(inputs)
     x = keras.layers.Lambda(lambda x: 255.0*tf.tile(x,aux_idxs))(x)
