@@ -604,6 +604,7 @@ def encoder(
     num_layers=4,
     num_res_blocks=2,
     dropout=0.0,
+    sd_out=True,
     kl_reg = True,
     ls_reg_weight=1.0,
     NL_self_attention=True,
@@ -630,20 +631,24 @@ def encoder(
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
     _,ls_hgt,ls_wdt,ls_dims = x.shape
 
-    x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
-    x_mean = keras.layers.Flatten()(x_mean)
+    if sd_out:
+        x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+        x_mean = keras.layers.Flatten()(x_mean)
 
-    x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
-    x_std = keras.layers.Flatten()(x_std)
+        x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
+        x_std = keras.layers.Flatten()(x_std)
+        
+        x = keras.layers.concatenate([x_mean,x_std],axis=-1)
     
-    x = keras.layers.concatenate([x_mean,x_std],axis=-1)
-    
-    prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,ls_dims)), scale=1))
-    if kl_reg:
-        output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
-                    activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
+        prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,ls_dims)), scale=1))
+        if kl_reg:
+            output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
+                        activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
+        else:
+            output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims])(x)
+
     else:
-        output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims])(x)
+        output = keras.layers.Conv2D(encoded_dims,1,padding="same")(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
