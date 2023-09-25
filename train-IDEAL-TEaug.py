@@ -21,6 +21,9 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
+py.arg('--DL_gen', type=bool, default=False)
+py.arg('--DL_experiment_dir', default='output/GAN-238')
+py.arg('--n_per_epoch', type=int, default=10000)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--field', type=float, default=1.5)
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
@@ -52,6 +55,9 @@ py.mkdir(output_dir)
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
+if args.DL_gen:
+    DL_args = py.args_from_yaml(py.join(args.DL_experiment_dir, 'settings.yml'))
+
 
 # ==============================================================================
 # =                                    data                                    =
@@ -63,26 +69,27 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../datasets/'
+dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, end=10,
                             acqs_data=False, te_data=False, MEBCRN=True)
 
-dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                            acqs_data=False, te_data=False, MEBCRN=True)
+if not(args.DL_gen):
+    dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
+    out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
-dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                            acqs_data=False, te_data=False, MEBCRN=True)
+    dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
+    out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
-dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                            acqs_data=False, te_data=False, MEBCRN=True)
+    dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
+    out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
-dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                            acqs_data=False, te_data=False, MEBCRN=True)
+    dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
+    out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -92,21 +99,22 @@ out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
 # n3_div = 0
 # n4_div = 434
 
-trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+if args.DL_gen:
+    trainY = np.zeros((args.n_per_epoch,1,1,1,1),dtype=np.float32)
+else:
+    trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
 valY    = out_maps_1
 
 # Overall dataset statistics
-len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
+len_dataset,_,_,_,_ = np.shape(trainY)
+_,n_out,hgt,wdt,n_ch = np.shape(valY)
 echoes = args.n_echoes
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
 
-# Input and output dimensions (training data)
-print('Training output shape:',trainY.shape)
-
 # Input and output dimensions (validations data)
-print('Validation output shape:',valY.shape)
+print('Output shape:',valY.shape)
 
 B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
 B_dataset = B_dataset.batch(args.batch_size).shuffle(len(trainY))
@@ -162,6 +170,31 @@ elif args.G_model == 'MEBCRN':
                     self_attention=args.D1_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
+
+if args.DL_gen:
+    dec_w =  dl.decoder(encoded_dims=DL_args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        filters=DL_args.n_G_filters,
+                        num_layers=DL_args.n_downsamplings,
+                        num_res_blocks=DL_args.n_res_blocks,
+                        NL_self_attention=DL_args.NL_SelfAttention
+                        )
+    dec_f =  dl.decoder(encoded_dims=DL_args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        filters=DL_args.n_G_filters,
+                        num_layers=DL_args.n_downsamplings,
+                        num_res_blocks=DL_args.n_res_blocks,
+                        NL_self_attention=DL_args.NL_SelfAttention
+                        )
+    dec_xi = dl.decoder(encoded_dims=DL_args.encoded_size,
+                        output_2D_shape=(hgt,wdt),
+                        n_groups=DL_args.n_groups_PM,
+                        filters=DL_args.n_G_filters,
+                        num_layers=DL_args.n_downsamplings,
+                        num_res_blocks=DL_args.n_res_blocks,
+                        NL_self_attention=DL_args.NL_SelfAttention
+                        )
+    tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
 
 IDEAL_op = wf.IDEAL_Layer(field=args.field)
 
@@ -226,7 +259,8 @@ def train_G(B, te=None):
                 B2A2B_PM = G_A2B([B2A,te], training=True)
             else:
                 B2A2B_PM = G_A2B(B2A, training=True)
-            B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
+            if not(args.DL_gen):
+                B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
             # Split A2B param maps
             B2A2B_R2 = B2A2B_PM[:,0,:,:,1:]
@@ -235,7 +269,8 @@ def train_G(B, te=None):
             # Restore field-map when necessary
             if args.G_model=='U-Net' or args.G_model=='MEBCRN':
                 B2A2B_FM = (B2A2B_FM - 0.5) * 2
-                B2A2B_FM = tf.where(B[:,:,:,:1]!=0.0,B2A2B_FM,0.0)
+                if not(args.DL_gen):
+                    B2A2B_FM = tf.where(B[:,:,:,:1]!=0.0,B2A2B_FM,0.0)
                 B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
 
             # Compute water/fat
@@ -396,6 +431,15 @@ def validation_step(B, TE):
     B2A, B2A2B_abs, val_B2A2B_dict = sample(B, TE)
     return B2A, B2A2B_abs, val_B2A2B_dict
 
+if args.DL_gen:
+    @tf.function
+    def gen_sample(Z,TE=None):
+        # Z2B2A Cycle
+        Z2B_w = dec_w(Z, training=False)
+        Z2B_f = dec_f(Z, training=False)
+        Z2B_xi= dec_xi(Z, training=False)
+        Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
+        return Z2B
 
 # ==============================================================================
 # =                                    run                                     =
@@ -435,6 +479,12 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for B in B_dataset:
+        if args.DL_gen:
+            hls = hgt//(2**(DL_args.n_downsamplings))
+            wls = wdt//(2**(DL_args.n_downsamplings))
+            z_shape = (1,hls,wls,DL_args.encoded_size)
+            Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
+            B = gen_sample(Z)
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
