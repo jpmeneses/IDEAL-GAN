@@ -69,9 +69,9 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
+dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, end=10,
+out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, 
                             acqs_data=False, te_data=False, MEBCRN=True)
 
 if not(args.DL_gen):
