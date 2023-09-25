@@ -28,10 +28,10 @@ py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
 py.arg('--n_groups_PM', type=int, default=1)
+py.arg('--VQ_encoder', type=bool, default=False)
 py.arg('--n_D_filters', type=int, default=64)
 py.arg('--n_groups_D', type=int, default=1)
 py.arg('--encoded_size', type=int, default=256)
-py.arg('--frac_labels', type=bool, default=False)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=200)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
@@ -101,11 +101,7 @@ acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx, MEBCRN=
 trainX  = np.concatenate((acqs_1,acqs_3,acqs_4,acqs_5),axis=0)
 valX    = acqs_2
 
-if args.frac_labels:
-    n1_div,n3_div,n4_div = 384,730,888
-else:
-    n1_div,n3_div,n4_div = 0,0,0
-trainY  = np.concatenate((out_maps_1[n1_div:,:,:,:],out_maps_3[n3_div:,:,:,:],out_maps_4[n4_div:,:,:,:],out_maps_5),axis=0)
+trainY  = np.concatenate((out_maps_1,out_maps_3,out_maps_4,out_maps_5),axis=0)
 valY    = out_maps_2
 
 # Overall dataset statistics
@@ -141,6 +137,7 @@ if args.G_model == 'encod-decod':
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
+                    sd_out=not(args.VQ_encoder),
                     ls_reg_weight=args.ls_reg_weight,
                     NL_self_attention=args.NL_SelfAttention
                     )
@@ -181,6 +178,8 @@ metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
 IDEAL_op = wf.IDEAL_Layer()
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
+if args.VQ_encoder:
+    vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
 if args.main_loss == 'MSE':
@@ -207,6 +206,11 @@ def train_G(A, B):
     with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
+        if args.VQ_encoder:
+            vq_dict = vq_op(A2Z)
+            A2Z = vq_dict['quantize']
+        else:
+            vq_dict = {'loss': tf.constant(0.0,dtype=tf.float32)}
         A2Z2B_w = dec_w(A2Z, training=True)
         A2Z2B_f = dec_f(A2Z, training=True)
         A2Z2B_xi= dec_xi(A2Z, training=True)
@@ -252,7 +256,10 @@ def train_G(A, B):
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
-        activ_reg = tf.add_n(enc.losses)
+        if enc.losses:
+            activ_reg = tf.add_n(enc.losses)
+        else:
+            activ_reg = tf.constant(0.0,dtype=tf.float32)
         
         G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + A2B2A_g_loss
         G_loss += activ_reg
@@ -265,7 +272,8 @@ def train_G(A, B):
                     'A2B2A_cycle_loss': A2B2A_cycle_loss,
                     'B2A2B_cycle_loss': B2A2B_cycle_loss,
                     'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
-                    'LS_reg': activ_reg/args.ls_reg_weight}
+                    'LS_reg': activ_reg/args.ls_reg_weight,
+                    'VQ_loss': vq_dict['loss']}
 
 
 @tf.function
@@ -322,6 +330,9 @@ def train_step(A, B):
 def sample(A, B):
     # A2B2A Cycle
     A2Z = enc(A, training=False)
+    if args.VQ_encoder:
+        vq_dict = vq_op(A2Z)
+        A2Z = vq_dict['quantize']
     A2Z2B_w = dec_w(A2Z, training=True)
     A2Z2B_f = dec_f(A2Z, training=True)
     A2Z2B_xi= dec_xi(A2Z, training=True)
