@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v108-TEaug
-#SBATCH --output=out_TEaug_108.txt
+#SBATCH --job-name=v242-GAN
+#SBATCH --output=out_GAN_242.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-TEaug.py --dataset 'TEaug-108' --DL_gen True --out_vars 'PM' --epochs 100 --epoch_ckpt 20 --FM_aug True
+python train-IDEAL-GAN.py --dataset 'GAN-242' --adv_train True --cGAN True --n_G_filters 36 --n_downsamplings 4 --n_res_blocks 2 --n_groups_PM 2 --VQ_encoder True --n_D_filters 72 --encoded_size 24 --epochs 100 --epoch_decay 100 --epoch_ckpt 20 --data_aug_p 0.0 --perceptual_loss True --cycle_loss_weight 1e-2 --B2A2B_weight 1e1 --Fourier_reg_weight 0.0 --NL_SelfAttention True
