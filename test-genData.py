@@ -40,12 +40,6 @@ hgt,wdt,n_ch = 192,192,2
 # ==============================================================================
 
 if args.G_model == 'encod-decod':
-    enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
-    				encoded_dims=args.encoded_size,
-                    filters=args.n_G_filters,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    NL_self_attention=args.NL_SelfAttention)
     dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                         output_2D_shape=(hgt,wdt),
                         filters=args.n_G_filters,
