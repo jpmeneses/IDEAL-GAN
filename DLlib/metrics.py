@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow_probability as tfp
@@ -6,10 +7,9 @@ vgg = keras.applications.vgg19.VGG19()
 
 def perceptual_metric(input_shape, layers=[2,5,8,13,18], pad=(16,16)):
     inputs = keras.Input(input_shape)
-    aux_idxs = [1 for i in range(len(input_shape))]
-    aux_idxs.append(3)
-    x = keras.layers.Lambda(lambda x: tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)))(inputs)
-    x = keras.layers.Lambda(lambda x: 255.0*tf.tile(x,aux_idxs))(x)
+    x = keras.layers.Lambda(lambda x: tf.complex(x[:,:,:,:,:1],x[:,:,:,:,1:]))(inputs)
+    x = keras.layers.Lambda(lambda x: tf.concat([tf.abs(x),tf.abs(x),tf.where(tf.math.angle(x)<0.0,tf.math.angle(x)+2*np.pi,tf.math.angle(x))/(2*np.pi)],axis=-1))(x)
+    x = keras.layers.Lambda(lambda x: 255.0*x)(x)
     x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(x)
     x = keras.layers.ZeroPadding2D(padding=pad)(x)
     x = keras.applications.vgg19.preprocess_input(x)
