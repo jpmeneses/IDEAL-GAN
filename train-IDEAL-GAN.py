@@ -264,6 +264,8 @@ def train_G(A, B):
         G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + A2B2A_g_loss
         G_loss += activ_reg
         G_loss += A2B2A_f_cycle_loss * args.Fourier_reg_weight
+        if args.VQ_encoder:
+            G_loss += vq_dict['loss']
         
     G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
