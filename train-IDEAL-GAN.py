@@ -20,40 +20,37 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
-py.arg('--adv_train', type=bool, default=False)
-py.arg('--cGAN', type=bool, default=False)
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='encod-decod', choices=['multi-decod','encod-decod','U-Net','MEBCRN'])
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
-py.arg('--n_groups_PM', type=int, default=1)
-py.arg('--VQ_encoder', type=bool, default=False)
-py.arg('--n_D_filters', type=int, default=64)
-py.arg('--n_groups_D', type=int, default=1)
+py.arg('--n_groups_PM', type=int, default=2)
 py.arg('--encoded_size', type=int, default=256)
+py.arg('--VQ_encoder', type=bool, default=False)
+py.arg('--adv_train', type=bool, default=False)
+py.arg('--cGAN', type=bool, default=False)
+py.arg('--n_D_filters', type=int, default=72)
+py.arg('--n_groups_D', type=int, default=1)
 py.arg('--batch_size', type=int, default=1)
-py.arg('--epochs', type=int, default=200)
+py.arg('--epochs', type=int, default=100)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
-py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpoint
+py.arg('--epoch_ckpt', type=int, default=20)  # num. of epochs to save a checkpoint
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--D_lr_factor', type=int, default=1)
 py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
-py.arg('--data_aug_p', type=float, default=0.4)
+py.arg('--data_aug_p', type=float, default=0.0)
 py.arg('--critic_train_steps', type=int, default=1)
 py.arg('--adversarial_loss_mode', default='wgan', choices=['gan', 'hinge_v1', 'hinge_v2', 'lsgan', 'wgan'])
-py.arg('--gradient_penalty_mode', default='none', choices=['none', 'dragan', 'wgan-gp'])
-py.arg('--gradient_penalty_weight', type=float, default=10.0)
 py.arg('--R1_reg_weight', type=float, default=0.2)
 py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE'])
 py.arg('--perceptual_loss', type=bool, default=True)
-py.arg('--cycle_loss_weight', type=float, default=10.0)
-py.arg('--B2A2B_weight', type=float, default=1.0)
+py.arg('--A_loss_weight', type=float, default=0.01)
+py.arg('--B_loss_weight', type=float, default=0.1)
 py.arg('--ls_reg_weight', type=float, default=1.0)
-py.arg('--Fourier_reg_weight', type=float, default=1e-5)
-py.arg('--NL_SelfAttention',type=bool, default=False)
+py.arg('--Fourier_reg_weight', type=float, default=0.0)
+py.arg('--NL_SelfAttention',type=bool, default=True)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
 args = py.args()
 
@@ -131,40 +128,37 @@ A_B_dataset_val.batch(1)
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
-if args.G_model == 'encod-decod':
-    enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
-                    encoded_dims=args.encoded_size,
+enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+                encoded_dims=args.encoded_size,
+                filters=args.n_G_filters,
+                num_layers=args.n_downsamplings,
+                num_res_blocks=args.n_res_blocks,
+                sd_out=not(args.VQ_encoder),
+                ls_reg_weight=args.ls_reg_weight,
+                NL_self_attention=args.NL_SelfAttention
+                )
+dec_w =  dl.decoder(encoded_dims=args.encoded_size,
+                    output_2D_shape=(hgt,wdt),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
-                    sd_out=not(args.VQ_encoder),
-                    ls_reg_weight=args.ls_reg_weight,
                     NL_self_attention=args.NL_SelfAttention
                     )
-    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
-                        n_groups=args.n_groups_PM,
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-else:
-    raise(NameError('Unrecognized Generator Architecture'))
+dec_f =  dl.decoder(encoded_dims=args.encoded_size,
+                    output_2D_shape=(hgt,wdt),
+                    filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_xi = dl.decoder(encoded_dims=args.encoded_size,
+                    output_2D_shape=(hgt,wdt),
+                    n_groups=args.n_groups_PM,
+                    filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    NL_self_attention=args.NL_SelfAttention
+                    )
 
 D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), 
                 cGAN=args.cGAN,
@@ -261,11 +255,8 @@ def train_G(A, B):
         else:
             activ_reg = tf.constant(0.0,dtype=tf.float32)
         
-        G_loss = (A2B2A_cycle_loss + args.B2A2B_weight*B2A2B_cycle_loss)*args.cycle_loss_weight + A2B2A_g_loss
-        G_loss += activ_reg
-        G_loss += A2B2A_f_cycle_loss * args.Fourier_reg_weight
-        if args.VQ_encoder:
-            G_loss += vq_dict['loss']
+        G_loss = args.A_loss_weight * A2B2A_cycle_loss + args.B_loss_weight * B2A2B_cycle_loss + A2B2A_g_loss
+        G_loss += activ_reg + A2B2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss']
         
     G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
@@ -292,8 +283,6 @@ def train_D(A, A2B2A):
             A2B2A_d_logits = D_A(A2B2A, training=True)
         
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
-        
-        # D_A_gp = gan.gradient_penalty(functools.partial(D_A, training=True), A, A2B2A, mode=args.gradient_penalty_mode)
 
         if args.cGAN:
             D_A_r1 = gan.R1_regularization(functools.partial(D_A, training=True), [A_r,A_ref])
