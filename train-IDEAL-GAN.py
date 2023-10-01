@@ -41,14 +41,13 @@ py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
 py.arg('--data_aug_p', type=float, default=0.0)
 py.arg('--critic_train_steps', type=int, default=1)
-py.arg('--adversarial_loss_mode', default='wgan', choices=['gan', 'hinge_v1', 'hinge_v2', 'lsgan', 'wgan'])
 py.arg('--R1_reg_weight', type=float, default=0.2)
 py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE'])
 py.arg('--perceptual_loss', type=bool, default=True)
 py.arg('--A_loss_weight', type=float, default=0.01)
 py.arg('--B_loss_weight', type=float, default=0.1)
-py.arg('--ls_reg_weight', type=float, default=1.0)
+py.arg('--ls_reg_weight', type=float, default=1e-7)
 py.arg('--Fourier_reg_weight', type=float, default=0.0)
 py.arg('--NL_SelfAttention',type=bool, default=True)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
@@ -142,6 +141,7 @@ dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_f =  dl.decoder(encoded_dims=args.encoded_size,
@@ -149,6 +149,7 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
@@ -157,6 +158,7 @@ dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
 
@@ -175,7 +177,7 @@ F_op = dl.FourierLayer()
 if args.VQ_encoder:
     vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
 
-d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn(args.adversarial_loss_mode)
+d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 if args.main_loss == 'MSE':
     cycle_loss_fn = tf.losses.MeanSquaredError()
 elif args.main_loss == 'MAE':
