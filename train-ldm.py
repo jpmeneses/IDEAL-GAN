@@ -74,45 +74,43 @@ A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 # =                                   models                                   =
 # ==============================================================================
 
-if args.G_model == 'encod-decod':
-    enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
-                    encoded_dims=args.encoded_size,
+enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+                encoded_dims=args.encoded_size,
+                filters=args.n_G_filters,
+                num_layers=args.n_downsamplings,
+                num_res_blocks=args.n_res_blocks,
+                kl_reg=False,
+                NL_self_attention=args.NL_SelfAttention
+                )
+dec_w =  dl.decoder(encoded_dims=args.encoded_size,
+                    output_2D_shape=(hgt,wdt),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
-                    kl_reg=False,
                     NL_self_attention=args.NL_SelfAttention
                     )
-    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-else:
-    raise(NameError('Unrecognized Generator Architecture'))
+dec_f =  dl.decoder(encoded_dims=args.encoded_size,
+                    output_2D_shape=(hgt,wdt),
+                    filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_xi = dl.decoder(encoded_dims=args.encoded_size,
+                    output_2D_shape=(hgt,wdt),
+                    filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    NL_self_attention=args.NL_SelfAttention
+                    )
 
 # create our unet model
 unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
 
 IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
+vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
 
-tl.Checkpoint(dict(enc=enc, dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 ################################################################################
 ########################### DIFFUSION TIMESTEPS ################################
@@ -138,13 +136,14 @@ loss_fn = tf.losses.MeanSquaredError()
 # create our optimizer, we will use adam with a Learning rate of 1e-4
 opt = tf.keras.optimizers.Adam(learning_rate=args.lr)
 
-def train_step(A, Z_std):
+def train_step(A, Z_std=1.0):
     rng, tsrng = np.random.randint(0, 100000, size=(2,))
     timestep_values = dm.generate_timestamp(tsrng, A.shape[0], args.n_timesteps)
 
     with tf.GradientTape() as t:
         A2Z = enc(A, training=False)
-        A2Z = tf.math.divide_no_nan(A2Z,Z_std)
+        if not(args.VQ_encoder):
+            A2Z = tf.math.divide_no_nan(A2Z,Z_std)
         A2Z_std = tf.math.reduce_std(A2Z) # For monitoring only
         Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
         pred_noise = unet(Z_n, timestep_values)
@@ -156,13 +155,17 @@ def train_step(A, Z_std):
 
     return {'Loss': loss_value, 'A2Z_std': A2Z_std}
 
-def validation_step(Z, Z_std):
+def validation_step(Z, Z_std=1.0):
     for i in range(args.n_timesteps-1):
         t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
         pred_noise = unet(Z, t)
         Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
-    Z = tf.math.multiply_no_nan(Z,Z_std)
+    if args.VQ_encoder:
+        vq_dict = vq_op(Z)
+        Z = vq_dict['quantize']
+    else:
+        Z = tf.math.multiply_no_nan(Z,Z_std)
     Z2B_w = dec_w(Z, training=False)
     Z2B_f = dec_f(Z, training=False)
     Z2B_xi= dec_xi(Z, training=False)
