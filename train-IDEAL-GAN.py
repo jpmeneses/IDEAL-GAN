@@ -174,8 +174,7 @@ metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
 IDEAL_op = wf.IDEAL_Layer()
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
-if args.VQ_encoder:
-    vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
+vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 if args.main_loss == 'MSE':
@@ -385,6 +384,7 @@ checkpoint = tl.Checkpoint(dict(enc=enc,
                                 dec_f=dec_f,
                                 dec_xi=dec_xi,
                                 D_A=D_A,
+                                vq_op=vq_op,
                                 G_optimizer=G_optimizer,
                                 D_optimizer=D_optimizer,
                                 ep_cnt=ep_cnt),
