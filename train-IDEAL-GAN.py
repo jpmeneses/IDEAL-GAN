@@ -234,7 +234,7 @@ def train_G(A, B):
             B2Y = metric_model(B[:,:2,:,:,:], training=False)
             A2B2Y = metric_model(A2B[:,:2,:,:,:], training=False)
             A2B2A_cycle_loss = cosine_loss(B2Y[0], A2B2Y[0])/len(B2Y)
-            for l in range(1,len(A2Y)):
+            for l in range(1,len(B2Y)):
                 A2B2A_cycle_loss += cosine_loss(B2Y[l], A2B2Y[l])/len(B2Y)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
@@ -344,11 +344,11 @@ def sample(A, B):
     
     # Validation losses
     if args.perceptual_loss:
-        A2Y = metric_model(A, training=False)
-        A2B2A2Y = metric_model(A2B2A, training=False)
-        val_A2B2A_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
-        for l in range(1,len(A2Y)):
-            val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
+        B2Y = metric_model(B[:,:2,:,:,:], training=False)
+        A2B2Y = metric_model(A2B[:,:2,:,:,:], training=False)
+        val_A2B2A_loss = cosine_loss(B2Y[0], A2B2Y[0])/len(B2Y)
+        for l in range(1,len(B2Y)):
+            val_A2B2A_loss += cosine_loss(B2Y[l], A2B2Y[l])/len(B2Y)
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B[:,2,:,:,:], A2B[:,2,:,:,:])
