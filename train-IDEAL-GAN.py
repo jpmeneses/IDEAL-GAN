@@ -209,18 +209,12 @@ def train_G(A, B):
         A2Z2B_w = dec_w(A2Z, training=True)
         A2Z2B_f = dec_f(A2Z, training=True)
         A2Z2B_xi= dec_xi(A2Z, training=True)
+        
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
-
-        # if args.adv_train:
-        #     A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
-        #     A2B2A_L = LWF_op(A2B_L, training=False)
-        # else:
-        A2B2A_L = A2B2A
-
-        ##################### B Cycle #####################
-        # B2A = IDEAL_op(B, training=False)
-        # B2A2B = G_A2B(B2A, training=True)
+        
+        A2B_rho = tf.concat([A2Z2B_w,A2Z2B_f,B[:,2:,:,:,:]],axis=1)
+        A2B2A_rho = IDEAL_op(A2B_rho, training=False)
 
         ############# Fourier Regularization ##############
         A_f = F_op(A, training=False)
@@ -230,10 +224,10 @@ def train_G(A, B):
         if args.adv_train:
             if args.cGAN:
                 A_ref = A[:,0::2,:,:,:]
-                A_g = A2B2A_L[:,1::2,:,:,:]
+                A_g = A2B2A[:,1::2,:,:,:]
                 A2B2A_d_logits = D_A([A_g,A_ref], training=False)
             else:
-                A2B2A_d_logits = D_A(A2B2A_L, training=False)
+                A2B2A_d_logits = D_A(A2B2A, training=False)
             A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         else:
             A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
@@ -241,13 +235,13 @@ def train_G(A, B):
         ############ Cycle-Consistency Losses #############
         if args.perceptual_loss:
             A2Y = metric_model(A, training=False)
-            A2B2A2Y = metric_model(A2B2A, training=False)
+            A2B2A2Y = metric_model(A2B2A_rho, training=False)
             A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
             for l in range(1,len(A2Y)):
                 A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
         else:
-            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
+            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A_rho)
+        B2A2B_cycle_loss = cycle_loss_fn(B[:,2:,:,:,:], A2Z2B_xi)
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
@@ -262,7 +256,7 @@ def train_G(A, B):
     G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
 
-    return A2B2A_L,{'A2B2A_g_loss': A2B2A_g_loss,
+    return A2B2A,  {'A2B2A_g_loss': A2B2A_g_loss,
                     'A2B2A_cycle_loss': A2B2A_cycle_loss,
                     'B2A2B_cycle_loss': B2A2B_cycle_loss,
                     'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
