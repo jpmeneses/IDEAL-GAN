@@ -79,6 +79,7 @@ enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
                 filters=args.n_G_filters,
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
+                sd_out=not(args.VQ_encoder),
                 kl_reg=False,
                 NL_self_attention=args.NL_SelfAttention
                 )
