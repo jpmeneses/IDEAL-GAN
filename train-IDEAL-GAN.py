@@ -420,23 +420,9 @@ for ep in range(args.epochs):
         # ==============================================================================
         p = np.random.rand()
         if p <= args.data_aug_p:
-            A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,args.n_echoes*n_ch])
-            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
-
-            # Random 90 deg rotations
-            A = tf.image.rot90(A,k=np.random.randint(3))
-            B = tf.image.rot90(B,k=np.random.randint(3))
-
-            # Random horizontal reflections
-            A = tf.image.random_flip_left_right(A)
-            B = tf.image.random_flip_left_right(B)
-
-            # Random vertical reflections
-            A = tf.image.random_flip_up_down(A)
-            B = tf.image.random_flip_up_down(B)
-
-            A = tf.transpose(tf.reshape(A,[A.shape[0],hgt,wdt,args.n_echoes,n_ch]),[0,3,1,2,4])
-            B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+            B_FM = B[:,2:,:,:,:1] * np.random.normal(1,0.25)
+            B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
+            B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
         # ==============================================================================
 
         # ==============================================================================
