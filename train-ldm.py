@@ -88,6 +88,7 @@ dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_f =  dl.decoder(encoded_dims=args.encoded_size,
@@ -95,20 +96,23 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                     output_2D_shape=(hgt,wdt),
+                    n_groups=args.n_groups_PM,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
 
 # create our unet model
 unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
 
-IDEAL_op = wf.IDEAL_Layer(args.n_echoes,MEBCRN=True)
+IDEAL_op = wf.IDEAL_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
 
 tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
