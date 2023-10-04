@@ -212,9 +212,6 @@ def train_G(A, B):
         
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
-        
-        A2B_rho = tf.concat([A2Z2B_w,A2Z2B_f,B[:,2:,:,:,:]],axis=1)
-        A2B2A_rho = IDEAL_op(A2B_rho, training=False)
 
         ############# Fourier Regularization ##############
         A_f = F_op(A, training=False)
@@ -234,13 +231,13 @@ def train_G(A, B):
         
         ############ Cycle-Consistency Losses #############
         if args.perceptual_loss:
-            A2Y = metric_model(A, training=False)
-            A2B2A2Y = metric_model(A2B2A_rho, training=False)
-            A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
+            B2Y = metric_model(B[:,:2,:,:,:], training=False)
+            A2B2Y = metric_model(A2B[:,:2,:,:,:], training=False)
+            A2B2A_cycle_loss = cosine_loss(B2Y[0], A2B2Y[0])/len(B2Y)
             for l in range(1,len(A2Y)):
-                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
+                A2B2A_cycle_loss += cosine_loss(B2Y[l], A2B2Y[l])/len(B2Y)
         else:
-            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A_rho)
+            A2B2A_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
         B2A2B_cycle_loss = cycle_loss_fn(B[:,2:,:,:,:], A2Z2B_xi)
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
