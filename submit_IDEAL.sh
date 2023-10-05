@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-sup.py --dataset 'Sup-999' --out_vars 'PM' --n_G_filters 36 --batch_size 1 --lr 0.0001
+python train-sup.py --dataset 'Sup-999' --out_vars 'PM' --n_G_filters 36 --batch_size 1 --epochs 20 --epoch_decay 20 --lr 0.0001
