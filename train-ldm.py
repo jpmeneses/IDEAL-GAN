@@ -215,7 +215,7 @@ else:
         A2Z = enc(A, training=False)
         z_std_list.append(tf.math.reduce_std(A2Z,axis=(1,2,3)))
     z_std_list = tf.concat(z_std_list,axis=0)
-    z_std.assign_add(tf.math.sqrt(tf.reduce_sum(tf.square(z_std_list))))
+    z_std.assign_add(2*tf.math.sqrt(tf.reduce_sum(tf.square(z_std_list))))
         
 
 # main loop
