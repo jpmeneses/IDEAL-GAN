@@ -84,7 +84,7 @@ acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
 trainX  = acqs_4 #np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
 valX    = acqs_4 #1
 
-trainY  = acqs_4 #np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
+trainY  = out_maps_4 #np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
 valY    = out_maps_4 #1
 
 # Overall dataset statistics
