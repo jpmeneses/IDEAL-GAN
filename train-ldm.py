@@ -147,8 +147,7 @@ def train_step(A, Z_std=1.0):
 
     with tf.GradientTape() as t:
         A2Z = enc(A, training=False)
-        if not(args.VQ_encoder):
-            A2Z = tf.math.divide_no_nan(A2Z,Z_std)
+        A2Z = tf.math.divide_no_nan(A2Z,Z_std)
         A2Z_std = tf.math.reduce_std(A2Z) # For monitoring only
         Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
         pred_noise = unet(Z_n, timestep_values)
@@ -169,8 +168,7 @@ def validation_step(Z, Z_std=1.0):
     if args.VQ_encoder:
         vq_dict = vq_op(Z)
         Z = vq_dict['quantize']
-    else:
-        Z = tf.math.multiply_no_nan(Z,Z_std)
+    Z = tf.math.multiply_no_nan(Z,Z_std)
     Z2B_w = dec_w(Z, training=False)
     Z2B_f = dec_f(Z, training=False)
     Z2B_xi= dec_xi(Z, training=False)
@@ -210,11 +208,14 @@ r2_sc = 2*np.pi*fm_sc
 
 # Calculate scaling factor (for unitary std dev)
 z_std_list = []
-for A in A_dataset:
-    A2Z = enc(A, training=False)
-    z_std_list.append(tf.math.reduce_std(A2Z,axis=(1,2,3)))
-z_std_list = tf.concat(z_std_list,axis=0)
-z_std.assign_add(tf.math.sqrt(tf.reduce_sum(tf.square(z_std_list))))
+if args.VQ_encoder:
+    z_std.assign_add(10.0)
+else:
+    for A in A_dataset:
+        A2Z = enc(A, training=False)
+        z_std_list.append(tf.math.reduce_std(A2Z,axis=(1,2,3)))
+    z_std_list = tf.concat(z_std_list,axis=0)
+    z_std.assign_add(tf.math.sqrt(tf.reduce_sum(tf.square(z_std_list))))
         
 
 # main loop
