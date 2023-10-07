@@ -1,10 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=v238-DDPM
-#SBATCH --output=out_DDPM_238.txt
+#SBATCH --job-name=v000-sGAN
+#SBATCH --output=out_sGAN_000.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-ldm.py --experiment_dir 'GAN-238' --batch_size 32 --epochs_ldm 200 --lr 5e-4
+python train-singleGAN.py --K_sc 3
+python train-singleGAN.py --K_sc 2
+python train-singleGAN.py --K_sc 1
+python train-singleGAN.py --K_sc 0
