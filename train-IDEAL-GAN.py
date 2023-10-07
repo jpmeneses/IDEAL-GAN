@@ -39,12 +39,11 @@ py.arg('--lr', type=float, default=0.0002)
 py.arg('--D_lr_factor', type=int, default=1)
 py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
-py.arg('--data_aug_p', type=float, default=0.0)
 py.arg('--critic_train_steps', type=int, default=1)
 py.arg('--R1_reg_weight', type=float, default=0.2)
 py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE'])
-py.arg('--perceptual_loss', type=bool, default=True)
+py.arg('--A_loss', default='VGG', choices=['pix-wise', 'VGG', 'sinGAN'])
 py.arg('--A_loss_weight', type=float, default=0.01)
 py.arg('--B_loss_weight', type=float, default=0.1)
 py.arg('--ls_reg_weight', type=float, default=1e-7)
@@ -169,8 +168,6 @@ D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2),
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
 
-metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
-
 IDEAL_op = wf.IDEAL_Layer()
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
@@ -183,7 +180,19 @@ elif args.main_loss == 'MAE':
     cycle_loss_fn = tf.losses.MeanAbsoluteError()
 else:
     raise(NameError('Unrecognized Main Loss Function'))
-cosine_loss = tf.losses.CosineSimilarity()
+
+if args.A_loss == 'VGG':
+    metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
+
+if args.A_loss == 'sinGAN':
+    cosine_loss = tf.losses.CosineSimilarity()
+    D_0 = dl.WDisc(input_shape=(None,None,n_out))
+    D_1 = dl.WDisc(input_shape=(None,None,n_out))
+    D_2 = dl.WDisc(input_shape=(None,None,n_out))
+    D_3 = dl.WDisc(input_shape=(None,None,n_out))
+    tl.Checkpoint(dict(D_0=D_0,D_1=D_1,D_2=D_2,D_3=D_3), py.join('output','sinGAN','checkpoints')).restore()
+    D_list = [D_0, D_1, D_2, D_3]
+    batch_op = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 D_lr_scheduler = dl.LinearDecay(args.lr*args.D_lr_factor,
@@ -230,15 +239,24 @@ def train_G(A, B):
             A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
         
         ############ Cycle-Consistency Losses #############
-        if args.perceptual_loss:
-            B2Y = metric_model(B[:,:2,:,:,:], training=False)
-            A2B2Y = metric_model(A2B[:,:2,:,:,:], training=False)
-            A2B2A_cycle_loss = cosine_loss(B2Y[0], A2B2Y[0])/len(B2Y)
-            for l in range(1,len(B2Y)):
-                A2B2A_cycle_loss += cosine_loss(B2Y[l], A2B2Y[l])/len(B2Y)
+        if args.A_loss == 'VGG':
+            A2Y = metric_model(A, training=False)
+            A2B2A2Y = metric_model(A2B2A, training=False)
+            A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
+            for l in range(1,len(A2Y)):
+                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
+        elif args.A_loss == 'sinGAN':
+            A2B2A_cycle_loss = 0.0
+            for D in D_list:
+                A_prep = batch_op(A, training=False)
+                A2Y = D(A_prep, training=False)
+                A2B2A_prep = batch_op(A2B2A, training=False)
+                A2B2A2Y = D(A2B2A_prep, training=False)
+                for l in range(1,len(A2Y)):
+                    A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
         else:
-            A2B2A_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-        B2A2B_cycle_loss = cycle_loss_fn(B[:,2:,:,:,:], A2Z2B_xi)
+            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
@@ -322,10 +340,6 @@ def sample(A, B):
     A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     A2B2A = IDEAL_op(A2B, training=False)
 
-    # B2A2B Cycle
-    # B2A = IDEAL_op(B, training=False)
-    # B2A2B = G_A2B(B2A, training=False)
-
     # Fourier regularization
     A_f = F_op(A, training=False)
     A2B2A_f = F_op(A2B2A, training=False)
@@ -343,20 +357,29 @@ def sample(A, B):
         val_A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
     
     # Validation losses
-    if args.perceptual_loss:
-        B2Y = metric_model(B[:,:2,:,:,:], training=False)
-        A2B2Y = metric_model(A2B[:,:2,:,:,:], training=False)
-        val_A2B2A_loss = cosine_loss(B2Y[0], A2B2Y[0])/len(B2Y)
-        for l in range(1,len(B2Y)):
-            val_A2B2A_loss += cosine_loss(B2Y[l], A2B2Y[l])/len(B2Y)
+    if args.A_loss == 'VGG':
+        A2Y = metric_model(A, training=False)
+        A2B2A2Y = metric_model(A2B2A, training=False)
+        val_A2B2A_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
+        for l in range(1,len(A2Y)):
+            val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
+    elif args.A_loss == 'sinGAN':
+        val_A2B2A_loss = 0.0
+        for D in D_list:
+            A_prep = batch_op(A, training=False)
+            A2Y = D(A_prep, training=False)
+            A2B2A_prep = batch_op(A2B2A, training=False)
+            A2B2A2Y = D(A2B2A_prep, training=False)
+            for l in range(1,len(A2Y)):
+                val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
-    val_B2A2B_loss = cycle_loss_fn(B[:,2,:,:,:], A2B[:,2,:,:,:])
+    val_B2A2B_loss = cycle_loss_fn(B, A2B)
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
                         'B2A2B_cycle_loss': val_B2A2B_loss,
-                        'A2B2A_f_cycle_loss': val_A2B2A_f_loss,}
+                        'A2B2A_f_cycle_loss': val_A2B2A_f_loss}
 
 def validation_step(A, B):
     A2B, A2B2A, val_loss_dict = sample(A, B)
@@ -406,20 +429,6 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
-        # ==============================================================================
-        # =                             DATA AUGMENTATION                              =
-        # ==============================================================================
-        p = np.random.rand()
-        if p <= args.data_aug_p:
-            B_FM = B[:,2:,:,:,:1] * np.random.normal(1,0.25)
-            B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
-            B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
-        # ==============================================================================
-
-        # ==============================================================================
-        # =                                RANDOM TEs                                  =
-        # ==============================================================================
-        
         G_loss_dict, D_loss_dict = train_step(A, B)
 
         # summary
