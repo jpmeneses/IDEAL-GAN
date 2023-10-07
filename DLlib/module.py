@@ -178,6 +178,40 @@ def PatchGAN(input_shape,
         return keras.Model(inputs=inputs, outputs=h)
 
 
+def WGen(input_shape,
+        num_filters=32,
+        num_layers=5):
+    x = inputs = keras.Input(shape=input_shape)
+    for _ in range(num_layers-1):
+        x = keras.layers.Conv2D(num_filters, 3, padding='same', kernel_initializer='he_normal')(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = tf.nn.leaky_relu(x)
+    x = keras.layers.Conv2D(input_shape[-1], 3, padding='same')(x)
+    output = keras.layers.add([inputs,x])
+    return keras.Model(inputs=inputs, outputs=output)
+
+
+def WDisc(input_shape,
+        n_out_ch=1,
+        num_filters=32,
+        num_layers=5,
+        kernel_size=3,
+        ):
+    h = inputs = keras.Input(shape=input_shape)
+    h = keras.layers.Conv2D(num_filters, kernel_size, kernel_initializer='he_normal')(h)
+    h = keras.layers.BatchNormalization()(h)
+    x_h = h = tf.nn.leaky_relu(h)
+    for _ in range(num_layers-2):
+        num_filters /= 2
+        h = keras.layers.Conv2D(num_filters, kernel_size, kernel_initializer='he_normal')(h)
+        h = keras.layers.BatchNormalization()(h)
+        h = tf.nn.leaky_relu(h)
+    x_t = keras.layers.Conv2D(num_filters, kernel_size, kernel_initializer='he_normal')(h)
+    x_t = keras.layers.BatchNormalization()(x_t)
+    x_t = tf.nn.leaky_relu(x_t)
+    return keras.Model(inputs=inputs, outputs=[x_h, h, x_t])
+
+
 # ==============================================================================
 # =                               Custom CNNs                                  =
 # ==============================================================================
@@ -185,6 +219,7 @@ def PatchGAN(input_shape,
 def UNet(
     input_shape,
     n_out=1,
+    skip_con=True,
     bayesian=False,
     ME_layer=False,
     te_input=False,
@@ -238,7 +273,8 @@ def UNet(
         x = _upsample(filters, (2, 2), strides=(2, 2), padding="same")(x)
 
         # Water/Fat decoder
-        x = keras.layers.concatenate([x, conv])
+        if skip_con:
+            x = keras.layers.concatenate([x, conv])
         if self_attention and cont == 0:
             x = SelfAttention(ch=2*filters)(x)
         x = _conv2d_block(
