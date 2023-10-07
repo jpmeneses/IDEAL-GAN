@@ -186,10 +186,10 @@ if args.A_loss == 'VGG':
 
 if args.A_loss == 'sinGAN':
     cosine_loss = tf.losses.CosineSimilarity()
-    D_0 = dl.WDisc(input_shape=(None,None,n_out))
-    D_1 = dl.WDisc(input_shape=(None,None,n_out))
-    D_2 = dl.WDisc(input_shape=(None,None,n_out))
-    D_3 = dl.WDisc(input_shape=(None,None,n_out))
+    D_0 = dl.WDisc(input_shape=(None,None,n_ch))
+    D_1 = dl.WDisc(input_shape=(None,None,n_ch))
+    D_2 = dl.WDisc(input_shape=(None,None,n_ch))
+    D_3 = dl.WDisc(input_shape=(None,None,n_ch))
     tl.Checkpoint(dict(D_0=D_0,D_1=D_1,D_2=D_2,D_3=D_3), py.join('output','sinGAN','checkpoints')).restore()
     D_list = [D_0, D_1, D_2, D_3]
     batch_op = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))
