@@ -112,8 +112,8 @@ def train_G(A, G, D):
     	# A_res = tf.where(A!=0.0,A_res,0.0)
     	DC_loss = cycle_loss_fn(A, A_res)
     	
-    	_,_,A2A_d_logits = D(A_res, training=False)
-    	D_loss = g_loss_fn(A2A_d_logits)
+    	A2A_d_logits = D(A_res, training=False)
+    	D_loss = g_loss_fn(A2A_d_logits[-1])
 
     	G_loss = args.DC_loss_weight * DC_loss + D_loss
         
