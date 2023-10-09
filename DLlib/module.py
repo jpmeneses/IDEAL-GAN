@@ -186,15 +186,14 @@ def sGAN(input_shape,
         ):
     x = inputs = keras.Input(shape=input_shape)
     h = list()
-    for _ in range(num_layers-1):
+    for _ in range(num_layers):
         x = keras.layers.Conv2D(num_filters, 3, padding='same', kernel_initializer='he_normal')(x)
         x = keras.layers.BatchNormalization()(x)
         x = tf.nn.leaky_relu(x)
         h.append(x)
-    x = keras.layers.Conv2D(input_shape[-1], 3, padding='same')(x)
-    h.append(x)
-    output = keras.layers.add([inputs,x])
     if gen_mode:
+        x = keras.layers.Conv2D(input_shape[-1], 3, padding='same')(x)
+        output = keras.layers.add([inputs,x])
         return keras.Model(inputs=inputs, outputs=output)
     else:
         return keras.Model(inputs=inputs, outputs=h)
