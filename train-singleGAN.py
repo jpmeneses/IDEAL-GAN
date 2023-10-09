@@ -89,15 +89,15 @@ print('Num. Channels:', n_out)
 # =                                   models                                   =
 # ==============================================================================
 
-G_0 = dl.WGen(input_shape=(hgt//(2**0),wdt//(2**0),n_out))
-G_1 = dl.WGen(input_shape=(hgt//(2**1),wdt//(2**1),n_out))
-G_2 = dl.WGen(input_shape=(hgt//(2**2),wdt//(2**2),n_out))
-G_3 = dl.WGen(input_shape=(hgt//(2**3),wdt//(2**3),n_out))
+G_0 = dl.sGAN(input_shape=(hgt//(2**0),wdt//(2**0),n_out),gen_mode=True)
+G_1 = dl.sGAN(input_shape=(hgt//(2**1),wdt//(2**1),n_out),gen_mode=True)
+G_2 = dl.sGAN(input_shape=(hgt//(2**2),wdt//(2**2),n_out),gen_mode=True)
+G_3 = dl.sGAN(input_shape=(hgt//(2**3),wdt//(2**3),n_out),gen_mode=True)
 
-D_0 = dl.WDisc(input_shape=(None,None,n_out))
-D_1 = dl.WDisc(input_shape=(None,None,n_out))
-D_2 = dl.WDisc(input_shape=(None,None,n_out))
-D_3 = dl.WDisc(input_shape=(None,None,n_out))
+D_0 = dl.sGAN(input_shape=(None,None,n_out))
+D_1 = dl.sGAN(input_shape=(None,None,n_out))
+D_2 = dl.sGAN(input_shape=(None,None,n_out))
+D_3 = dl.sGAN(input_shape=(None,None,n_out))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -125,10 +125,10 @@ def train_G(A, G, D):
 @tf.function
 def train_D(A_real, A_fake, D):
     with tf.GradientTape() as t:
-        _,_,A_d_logits = D(A_real, training=True)
-        _,_,A2A_d_logits = D(A_fake, training=True)
+        A_d_logits = D(A_real, training=True)
+        A2A_d_logits = D(A_fake, training=True)
         
-        A_d_loss, A2A_d_loss = d_loss_fn(A_d_logits, A2A_d_logits)
+        A_d_loss, A2A_d_loss = d_loss_fn(A_d_logits[-1], A2A_d_logits[-1])
 
         D_A_r1 = gan.R1_regularization(functools.partial(D, training=True), A_real)
         D_A_r2 = gan.R1_regularization(functools.partial(D, training=True), A_fake)
