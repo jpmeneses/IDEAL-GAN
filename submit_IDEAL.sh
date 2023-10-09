@@ -7,7 +7,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-singleGAN.py --dataset 'sinGAN-wMsk' --K_sc 3
-python train-singleGAN.py --dataset 'sinGAN-wMsk' --K_sc 2
-python train-singleGAN.py --dataset 'sinGAN-wMsk' --K_sc 1
-python train-singleGAN.py --dataset 'sinGAN-wMsk' --K_sc 0
+python train-singleGAN.py --dataset 'sinGAN-wMsk-v2' --K_sc 3 --DC_loss_weight 50.0
+python train-singleGAN.py --dataset 'sinGAN-wMsk-v2' --K_sc 2 --DC_loss_weight 50.0
+python train-singleGAN.py --dataset 'sinGAN-wMsk-v2' --K_sc 1 --DC_loss_weight 50.0
+python train-singleGAN.py --dataset 'sinGAN-wMsk-v2' --K_sc 0 --DC_loss_weight 50.0
