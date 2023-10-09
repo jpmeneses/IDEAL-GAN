@@ -563,8 +563,7 @@ for ep in range(args.epochs):
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
-            A = next(val_iter)
-            B = next(val_iter)
+            A, B = next(val_iter)
             A = tf.expand_dims(A, axis=0)
             B = tf.expand_dims(B, axis=0)
             B_WF = B[:,:2,:,:,:]
