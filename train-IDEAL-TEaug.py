@@ -668,7 +668,7 @@ for ep in range(args.epochs):
             fig.colorbar(W_unet, ax=axs[2,1])
             axs[2,1].axis('off')
 
-            fn_aux = np.squeeze(B2A2B_WF_abs[:,1,:,:,:])
+            fn_aux = np.squeeze(B_WF_abs[:,1,:,:,:])
             F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_unet, ax=axs[2,2])
