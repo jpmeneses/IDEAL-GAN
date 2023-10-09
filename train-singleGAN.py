@@ -107,7 +107,7 @@ D_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1, b
 def train_G(A, G, D):
     with tf.GradientTape() as t:
     	A_res = G(A, training=True)
-    	A_res = tf.where(A!=0.0,A_res,0.0)
+    	# A_res = tf.where(A!=0.0,A_res,0.0)
     	DC_loss = cycle_loss_fn(A, A_res)
     	
     	_,_,A2A_d_logits = D(A_res, training=False)
@@ -151,7 +151,7 @@ def train_step(A, G, D, A_ref=None):
 
 def upscale(A, G):
 	A_res = G(A, training=False)
-	A_res = tf.where(A!=0.0,A_res,0.0)
+	# A_res = tf.where(A!=0.0,A_res,0.0)
 	A_res = np.squeeze(A_res, axis=0)
 	A_real = Image.fromarray(A_res[:,:,0], mode="F").resize((2*A_res.shape[-3],2*A_res.shape[-2]),resample=Image.LANCZOS)
 	A_imag = Image.fromarray(A_res[:,:,1], mode="F").resize((2*A_res.shape[-3],2*A_res.shape[-2]),resample=Image.LANCZOS)
