@@ -222,19 +222,24 @@ for ep in range(args.epochs):
 				A_res, G_loss_dict, D_loss_dict = train_step(A, G_2, D_2, A_ref=A_ref)
 		elif args.K_sc == 3:
 			A_res, G_loss_dict, D_loss_dict = train_step(A, G_3, D_3)
+			A_ref = A
 		with train_summary_writer.as_default():
 			tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
 			tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
 		if ep % 300 == 0:
-			fig, axs = plt.subplots(figsize=(6, 3), ncols=2)
+			fig, axs = plt.subplots(figsize=(9, 3), ncols=3)
 			A_abs = np.squeeze(np.abs(tf.complex(A[:,:,:,0],A[:,:,:,1])))
 			acq_in = axs[0].imshow(A_abs, cmap='gist_earth', vmin=0, vmax=1)
 			axs[0].set_title('Input')
 			axs[0].axis('off')
 			A_res_abs = np.squeeze(np.abs(tf.complex(A_res[:,:,:,0],A_res[:,:,:,1])))
-			acq_ech2 = axs[1].imshow(A_res_abs, cmap='gist_earth', vmin=0, vmax=1)
+			acq_out = axs[1].imshow(A_res_abs, cmap='gist_earth', vmin=0, vmax=1)
 			axs[1].set_title('Output')
 			axs[1].axis('off')
+			A_ref_abs = np.squeeze(np.abs(tf.complex(A_ref[:,:,:,0],A_ref[:,:,:,1])))
+			acq_ref = axs[2].imshow(A_ref_abs, cmap='gist_earth', vmin=0, vmax=1)
+			axs[2].set_title('Ref')
+			axs[2].axis('off')
 			plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
 			tl.make_space_above(axs,topmargin=0.8)
 			plt.savefig(py.join(sample_dir, 'iter-%09d.png' % G_optimizer.iterations.numpy()), bbox_inches = 'tight', pad_inches = 0)
