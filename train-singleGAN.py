@@ -209,8 +209,8 @@ for ep in range(args.epochs):
 			A_2 = tf.image.rot90(A_2,k=np.random.randint(3))
 			A_2 = tf.image.random_flip_left_right(A_2)
 			A_2 = tf.image.random_flip_up_down(A_2)
-			A = A_2[:,:,:,:1]
-			A_ref = A_2[:,:,:,1:]
+			A = A_2[:,:,:,:2]
+			A_ref = A_2[:,:,:,2:]
 		if args.K_sc == 0:
 			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_0, D_0)
 		elif args.K_sc == 1:
