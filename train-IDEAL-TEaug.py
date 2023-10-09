@@ -56,7 +56,7 @@ py.mkdir(output_dir)
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
-if args.DL_gen:
+if args.DL_gen or args.DL_aug:
     DL_args = py.args_from_yaml(py.join(args.DL_experiment_dir, 'settings.yml'))
 
 
