@@ -232,6 +232,7 @@ def train_G(A, B, te=None):
             A2Z2B_f = dec_f(A2Z, training=False)
             A2Z2B_xi= dec_xi(A2Z, training=False)
             B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
+            B2A = IDEAL_op(B, te=te, training=False)
 
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
         B_PM = B[:,2:,:,:,:]
