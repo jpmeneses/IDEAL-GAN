@@ -46,6 +46,7 @@ py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE'])
 py.arg('--A_loss', default='VGG', choices=['pix-wise', 'VGG', 'sinGAN'])
 py.arg('--A_loss_weight', type=float, default=0.01)
 py.arg('--B_loss_weight', type=float, default=0.1)
+py.arg('--FM_loss_weight', type=float, default=1.0)
 py.arg('--ls_reg_weight', type=float, default=1e-7)
 py.arg('--Fourier_reg_weight', type=float, default=0.0)
 py.arg('--NL_SelfAttention',type=bool, default=True)
@@ -256,7 +257,8 @@ def train_G(A, B):
                     A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
+        B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
+        B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
