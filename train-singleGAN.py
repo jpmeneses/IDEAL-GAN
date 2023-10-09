@@ -77,6 +77,8 @@ for ch in range(n_out):
 trainX_mx = np.expand_dims(trainX_mx, axis=0)
 if args.K_sc < K_max:
 	trainX_k = np.expand_dims(trainX_k, axis=0)
+else:
+	trainX_k = trainX_mx
 
 print('Original Dimensions:', hgt, wdt)
 print('Max K Dimensions:', hgt_mx, wdt_mx)
@@ -137,15 +139,12 @@ def train_D(A_real, A_fake, D):
     D_optimizer.apply_gradients(zip(D_grad, D.trainable_variables))
     return {'D_loss': A_d_loss + A2A_d_loss, 'D_A_r1': D_A_r1, 'D_A_r2': D_A_r2}
 
-def train_step(A, G, D, A_ref=None):
+def train_step(A, A_ref, G, D):
     A_res, G_loss_dict = train_G(A, G, D)
 
     # cannot autograph `A2B_pool`
     # A_res = A2A_pool(A_res)
-    if A_ref is None:
-    	D_loss_dict = train_D(A, A_res, D)
-    else:
-    	D_loss_dict = train_D(A_ref, A_res, D)
+    D_loss_dict = train_D(A_ref, A_res, D)
 
     return A_res, G_loss_dict, D_loss_dict
 
@@ -194,9 +193,7 @@ if args.K_sc <= 1:
 if args.K_sc <= 0:
 	trainX_mx = upscale(trainX_mx, G_1)
 print('Upsampled input shape:', trainX_mx.shape)
-A_dataset = tf.data.Dataset.from_tensor_slices(trainX_mx).batch(1)
-if args.K_sc < K_max:
-	A_ref_dataset = tf.data.Dataset.from_tensor_slices(trainX_k).batch(1)
+A_dataset = tf.data.Dataset.from_tensor_slices((trainX_mx,trainX_k)).batch(1)
 
 # main loop
 for ep in range(args.epochs):
@@ -205,24 +202,23 @@ for ep in range(args.epochs):
 	# update epoch counter
 	ep_cnt.assign_add(1)
 	# train for an epoch
-	for A in A_dataset:
+	for A, A_ref in A_dataset:
 		p = np.random.rand()
 		if p <= args.data_aug_p:
-			A = tf.image.rot90(A,k=np.random.randint(3))
-			A = tf.image.random_flip_left_right(A)
-			A = tf.image.random_flip_up_down(A)
+			A_2 = tf.concat([A,A_ref], axis=-1)
+			A_2 = tf.image.rot90(A_2,k=np.random.randint(3))
+			A_2 = tf.image.random_flip_left_right(A_2)
+			A_2 = tf.image.random_flip_up_down(A_2)
+			A = A_2[:,:,:,:1]
+			A_ref = A_2[:,:,:,1:]
 		if args.K_sc == 0:
-			for A_ref in A_ref_dataset:
-				A_res, G_loss_dict, D_loss_dict = train_step(A, G_0, D_0, A_ref=A_ref)
+			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_0, D_0)
 		elif args.K_sc == 1:
-			for A_ref in A_ref_dataset:
-				A_res, G_loss_dict, D_loss_dict = train_step(A, G_1, D_1, A_ref=A_ref)
+			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_1, D_1)
 		elif args.K_sc == 2:
-			for A_ref in A_ref_dataset:
-				A_res, G_loss_dict, D_loss_dict = train_step(A, G_2, D_2, A_ref=A_ref)
+			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_2, D_2)
 		elif args.K_sc == 3:
-			A_res, G_loss_dict, D_loss_dict = train_step(A, G_3, D_3)
-			A_ref = A
+			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_3, D_3)
 		with train_summary_writer.as_default():
 			tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
 			tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
