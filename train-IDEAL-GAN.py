@@ -182,11 +182,11 @@ elif args.main_loss == 'MAE':
 else:
     raise(NameError('Unrecognized Main Loss Function'))
 
+cosine_loss = tf.losses.CosineSimilarity()
 if args.A_loss == 'VGG':
     metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
 
 if args.A_loss == 'sinGAN':
-    cosine_loss = tf.losses.CosineSimilarity()
     D_0 = dl.WDisc(input_shape=(None,None,n_ch))
     D_1 = dl.WDisc(input_shape=(None,None,n_ch))
     D_2 = dl.WDisc(input_shape=(None,None,n_ch))
