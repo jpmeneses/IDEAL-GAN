@@ -187,12 +187,12 @@ if args.A_loss == 'VGG':
     metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
 
 if args.A_loss == 'sinGAN':
-    D_0 = dl.sGAN(input_shape=(None,None,n_ch))
+    # D_0 = dl.sGAN(input_shape=(None,None,n_ch))
     D_1 = dl.sGAN(input_shape=(None,None,n_ch))
     D_2 = dl.sGAN(input_shape=(None,None,n_ch))
     D_3 = dl.sGAN(input_shape=(None,None,n_ch))
-    tl.Checkpoint(dict(D_0=D_0,D_1=D_1,D_2=D_2,D_3=D_3), py.join('output','sinGAN-wMsk','checkpoints')).restore()
-    D_list = [D_0, D_1, D_2, D_3]
+    tl.Checkpoint(dict(D_1=D_1,D_2=D_2,D_3=D_3), py.join('output','sinGAN-wMsk','checkpoints')).restore()
+    D_list = [D_1, D_2, D_3]
     batch_op = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
