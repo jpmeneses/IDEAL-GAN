@@ -110,10 +110,10 @@ G_1 = dl.UNet(input_shape=(hgt//(2**1),wdt//(2**1),n_ch),n_out=n_out,filters=32,
 G_2 = dl.UNet(input_shape=(hgt//(2**2),wdt//(2**2),n_ch),n_out=n_out,filters=32,self_attention=True)
 G_3 = dl.UNet(input_shape=(hgt//(2**3),wdt//(2**3),n_ch),n_out=n_out,filters=32,self_attention=True)
 
-D_0 = dl.sGAN(input_shape=(None,None,n_ch))
-D_1 = dl.sGAN(input_shape=(None,None,n_ch))
-D_2 = dl.sGAN(input_shape=(None,None,n_ch))
-D_3 = dl.sGAN(input_shape=(None,None,n_ch))
+D_0 = dl.sGAN(input_shape=(None,None,2))
+D_1 = dl.sGAN(input_shape=(None,None,2))
+D_2 = dl.sGAN(input_shape=(None,None,2))
+D_3 = dl.sGAN(input_shape=(None,None,2))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -125,7 +125,14 @@ IDEAL_op = wf.IDEAL_Layer()
 B_reshape = keras.layers.Lambda(lambda x:tf.concat([tf.expand_dims(x[:,:,:,:2],1),
 													tf.expand_dims(x[:,:,:,2:4],1),
 													tf.expand_dims(x[:,:,:,4:],1)],axis=1))
-A_reshape = keras.layers.Lambda(lambda x: tf.reshape(tf.transpose(x,perm=[0,2,3,1,4]),[x.shape[0],x.shape[2],x.shape[3],-1]))
+A_reshape = keras.layers.Lambda(lambda x:tf.concat([tf.expand_dims(x[:,:,:,:2],1),
+													tf.expand_dims(x[:,:,:,2:4],1),
+													tf.expand_dims(x[:,:,:,4:6],1),
+													tf.expand_dims(x[:,:,:,6:8],1),
+													tf.expand_dims(x[:,:,:,8:10],1),
+													tf.expand_dims(x[:,:,:,10:],1)],axis=1))
+A_reshape_2 = keras.layers.Lambda(lambda x: tf.reshape(tf.transpose(x,perm=[0,2,3,1,4]),[x.shape[0],x.shape[2],x.shape[3],-1]))
+batch_op = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))
 
 @tf.function
 def train_G(A, B, G, D):
@@ -136,7 +143,7 @@ def train_G(A, B, G, D):
 
     	A2B = B_reshape(A2B, training=False)
     	A2B2A = IDEAL_op(A2B, training=False)
-    	A2B2A = A_reshape(A2B2A, training=False)
+    	A2B2A = batch_op(A2B2A, training=False)
     	
     	A2A_d_logits = D(A2B2A, training=False)
     	D_loss = g_loss_fn(A2A_d_logits[-1])
@@ -150,20 +157,22 @@ def train_G(A, B, G, D):
 
 @tf.function
 def train_D(A_real, A_fake, D):
-    with tf.GradientTape() as t:
-        A_d_logits = D(A_real, training=True)
-        A2A_d_logits = D(A_fake, training=True)
-        
-        A_d_loss, A2A_d_loss = d_loss_fn(A_d_logits[-1], A2A_d_logits[-1])
+	A_real = A_reshape(A_real)
+	A_real = batch_op(A_real)
+	with tf.GradientTape() as t:
+		A_d_logits = D(A_real, training=True)
+		A2A_d_logits = D(A_fake, training=True)
 
-        D_A_r1 = gan.R1_regularization(functools.partial(D, training=True), A_real)
-        D_A_r2 = gan.R1_regularization(functools.partial(D, training=True), A_fake)
+		A_d_loss, A2A_d_loss = d_loss_fn(A_d_logits[-1], A2A_d_logits[-1])
 
-        D_loss = (A_d_loss + A2A_d_loss) + (D_A_r1 * args.R1_reg_weight) + (D_A_r2 * args.R2_reg_weight)
+		D_A_r1 = gan.R1_regularization(functools.partial(D, training=True), A_real)
+		D_A_r2 = gan.R1_regularization(functools.partial(D, training=True), A_fake)
 
-    D_grad = t.gradient(D_loss, D.trainable_variables)
-    D_optimizer.apply_gradients(zip(D_grad, D.trainable_variables))
-    return {'D_loss': A_d_loss + A2A_d_loss, 'D_A_r1': D_A_r1, 'D_A_r2': D_A_r2}
+		D_loss = (A_d_loss + A2A_d_loss) + (D_A_r1 * args.R1_reg_weight) + (D_A_r2 * args.R2_reg_weight)
+
+	D_grad = t.gradient(D_loss, D.trainable_variables)
+	D_optimizer.apply_gradients(zip(D_grad, D.trainable_variables))
+	return {'D_loss': A_d_loss + A2A_d_loss, 'D_A_r1': D_A_r1, 'D_A_r2': D_A_r2}
 
 def train_step(A, B, A_ref, G, D):
     A_res, G_loss_dict = train_G(A, B, G, D)
@@ -178,7 +187,7 @@ def upscale(A, G):
 	A2B = G(A, training=False)
 	A2B = B_reshape(A2B, training=False)
 	A_res = IDEAL_op(A2B, training=False)
-	A_res = A_reshape(A_res, training=False)
+	A_res = A_reshape_2(A_res, training=False)
 	# A_res = tf.where(A!=0.0,A_res,0.0)
 	A_res = np.squeeze(A_res, axis=0)
 	hgt_ups, wdt_ups = (2*A_res.shape[-3],2*A_res.shape[-2])
@@ -260,7 +269,7 @@ for ep in range(args.epochs):
 			acq_in = axs[0].imshow(A_abs, cmap='gist_earth', vmin=0, vmax=1)
 			axs[0].set_title('Input')
 			axs[0].axis('off')
-			A_res_abs = np.squeeze(np.abs(tf.complex(A_res[:,:,:,0],A_res[:,:,:,1])))
+			A_res_abs = np.squeeze(np.abs(tf.complex(A_res[0,:,:,0],A_res[0,:,:,1])))
 			acq_out = axs[1].imshow(A_res_abs, cmap='gist_earth', vmin=0, vmax=1)
 			axs[1].set_title('Output')
 			axs[1].axis('off')
