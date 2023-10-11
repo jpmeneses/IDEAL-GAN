@@ -63,12 +63,15 @@ dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                     )
 
 IDEAL_op = wf.IDEAL_Layer()
+vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
 
-tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 
 @tf.function
 def sample(Z,TE=None):
+	if args.VQ_encoder:
+		Z = vq_op.quantize(Z)
 	# Z2B2A Cycle
 	Z2B_w = dec_w(Z, training=False)
 	Z2B_f = dec_f(Z, training=False)
@@ -95,7 +98,10 @@ z_shape = (1,hls,wls,args.encoded_size)
 TE = wf.gen_TEvar(args.n_echoes,orig=False)
 
 for k in range(args.n_samples):
-	Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
+	if args.VQ_encoder:
+		Z = tf.random.uniform(z_shape[:-1],minval=0,maxval=255,seed=0,dtype=tf.int32)
+	else:
+		Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
 	Z2B, Z2B2A = sample(Z)
 
 	w_aux = np.squeeze(Z2B[:,:,:,0])
