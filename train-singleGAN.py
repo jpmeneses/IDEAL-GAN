@@ -46,58 +46,74 @@ r2_sc = 200.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../datasets/'
+dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
 
 dataset_hdf5_4 = 'Attilio_GC_384_complex_2D_nMsk.hdf5'
 acqs, out_maps = data.load_hdf5(dataset_dir, dataset_hdf5_4, 12, end=20,
-								acqs_data=True, te_data=False, MEBCRN=True)
+								acqs_data=True, te_data=False)
 
 ################################################################################
 ############################# DATASET PARTITIONS ###############################
 ################################################################################
 
-trainX = np.squeeze(acqs[9,0,:,:,:])
+trainX = np.squeeze(acqs[9,:,:,:])
+hgt,wdt,n_ch = np.shape(trainX)
 
-# Overall dataset statistics
-hgt,wdt,n_out = np.shape(trainX)
+trainY = np.squeeze(out_maps[9,:,:,:])
+_,_,n_out = np.shape(trainY)
 
 # Re-scale images
 K_max = 3
 hgt_mx = hgt//(2**K_max)
 wdt_mx = wdt//(2**K_max)
-trainX_mx = np.zeros((hgt_mx,wdt_mx,n_out),dtype='float32')
+trainX_mx = np.zeros((hgt_mx,wdt_mx,n_ch),dtype='float32')
+trainY_mx = np.zeros((hgt_mx,wdt_mx,n_out),dtype='float32')
 if args.K_sc < K_max:
 	hgt_ds = hgt//(2**args.K_sc)
 	wdt_ds = wdt//(2**args.K_sc)
-	trainX_k = np.zeros((hgt_ds,wdt_ds,n_out),dtype='float32')
-for ch in range(n_out):
+	trainX_k = np.zeros((hgt_ds,wdt_ds,n_ch),dtype='float32')
+	trainY_k = np.zeros((hgt_ds,wdt_ds,n_out),dtype='float32')
+for ch in range(n_ch):
 	trainX_mx[:,:,ch] = Image.fromarray(trainX[:,:,ch], mode="F").resize((hgt_mx,wdt_mx),resample=Image.LANCZOS)
 	if args.K_sc < K_max:
 		trainX_k[:,:,ch] = Image.fromarray(trainX[:,:,ch], mode="F").resize((hgt_ds,wdt_ds),resample=Image.LANCZOS)
 trainX_mx = np.expand_dims(trainX_mx, axis=0)
+for ot in range(n_out):
+	trainY_mx[:,:,ot] = Image.fromarray(trainY[:,:,ot], mode="F").resize((hgt_mx,wdt_mx),resample=Image.LANCZOS)
+	if args.K_sc < K_max:
+		trainY_k[:,:,ot] = Image.fromarray(trainY[:,:,ot], mode="F").resize((hgt_ds,wdt_ds),resample=Image.LANCZOS)
+trainY_mx = np.expand_dims(trainY_mx, axis=0)
 if args.K_sc < K_max:
 	trainX_k = np.expand_dims(trainX_k, axis=0)
+	trainY_k = np.expand_dims(trainY_k, axis=0)
 else:
 	trainX_k = trainX_mx
+	trainY_k = trainY_mx
 
 print('Original Dimensions:', hgt, wdt)
 print('Max K Dimensions:', hgt_mx, wdt_mx)
 print('Echoes:', acqs.shape[1])
-print('Num. Channels:', n_out)
+print('Num. Channels:', n_ch)
+print('Num. Outputs:', n_out)
 
 # ==============================================================================
 # =                                   models                                   =
 # ==============================================================================
 
-G_0 = dl.sGAN(input_shape=(hgt//(2**0),wdt//(2**0),n_out),gen_mode=True)
-G_1 = dl.sGAN(input_shape=(hgt//(2**1),wdt//(2**1),n_out),gen_mode=True)
-G_2 = dl.sGAN(input_shape=(hgt//(2**2),wdt//(2**2),n_out),gen_mode=True)
-G_3 = dl.sGAN(input_shape=(hgt//(2**3),wdt//(2**3),n_out),gen_mode=True)
+# G_0 = dl.sGAN(input_shape=(hgt//(2**0),wdt//(2**0),n_ch),gen_mode=True)
+# G_1 = dl.sGAN(input_shape=(hgt//(2**1),wdt//(2**1),n_ch),gen_mode=True)
+# G_2 = dl.sGAN(input_shape=(hgt//(2**2),wdt//(2**2),n_ch),gen_mode=True)
+# G_3 = dl.sGAN(input_shape=(hgt//(2**3),wdt//(2**3),n_ch),gen_mode=True)
 
-D_0 = dl.sGAN(input_shape=(None,None,n_out))
-D_1 = dl.sGAN(input_shape=(None,None,n_out))
-D_2 = dl.sGAN(input_shape=(None,None,n_out))
-D_3 = dl.sGAN(input_shape=(None,None,n_out))
+G_0 = dl.UNet(input_shape=(hgt//(2**0),wdt//(2**0),n_ch),n_out=n_out,filters=32,self_attention=True)
+G_1 = dl.UNet(input_shape=(hgt//(2**1),wdt//(2**1),n_ch),n_out=n_out,filters=32,self_attention=True)
+G_2 = dl.UNet(input_shape=(hgt//(2**2),wdt//(2**2),n_ch),n_out=n_out,filters=32,self_attention=True)
+G_3 = dl.UNet(input_shape=(hgt//(2**3),wdt//(2**3),n_ch),n_out=n_out,filters=32,self_attention=True)
+
+D_0 = dl.sGAN(input_shape=(None,None,n_ch))
+D_1 = dl.sGAN(input_shape=(None,None,n_ch))
+D_2 = dl.sGAN(input_shape=(None,None,n_ch))
+D_3 = dl.sGAN(input_shape=(None,None,n_ch))
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -105,14 +121,24 @@ cycle_loss_fn = tf.losses.MeanSquaredError()
 G_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1, beta_2=args.beta_2)
 D_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1, beta_2=args.beta_2)
 
+IDEAL_op = wf.IDEAL_Layer()
+B_reshape = keras.layers.Lambda(lambda x:tf.concat([tf.expand_dims(x[:,:,:,:2],1),
+													tf.expand_dims(x[:,:,:,2:4],1),
+													tf.expand_dims(x[:,:,:,4:],1)],axis=1))
+A_reshape = keras.layers.Lambda(lambda x: tf.reshape(tf.transpose(x,perm=[0,2,3,1,4]),[x.shape[0],x.shape[2],x.shape[3],-1]))
+
 @tf.function
-def train_G(A, G, D):
+def train_G(A, B, G, D):
     with tf.GradientTape() as t:
-    	A_res = G(A, training=True)
+    	A2B = G(A, training=True)
     	# A_res = tf.where(A!=0.0,A_res,0.0)
-    	DC_loss = cycle_loss_fn(A, A_res)
+    	DC_loss = cycle_loss_fn(B, A2B)
+
+    	A2B = B_reshape(A2B, training=False)
+    	A2B2A = IDEAL_op(A2B, training=False)
+    	A2B2A = A_reshape(A2B2A, training=False)
     	
-    	A2A_d_logits = D(A_res, training=False)
+    	A2A_d_logits = D(A2B2A, training=False)
     	D_loss = g_loss_fn(A2A_d_logits[-1])
 
     	G_loss = args.DC_loss_weight * DC_loss + D_loss
@@ -120,7 +146,7 @@ def train_G(A, G, D):
     G_grad = t.gradient(G_loss, G.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G.trainable_variables))
 
-    return A_res, {'D_loss': D_loss, 'DC_loss': DC_loss}
+    return A2B2A, {'D_loss': D_loss, 'DC_loss': DC_loss}
 
 @tf.function
 def train_D(A_real, A_fake, D):
@@ -139,8 +165,8 @@ def train_D(A_real, A_fake, D):
     D_optimizer.apply_gradients(zip(D_grad, D.trainable_variables))
     return {'D_loss': A_d_loss + A2A_d_loss, 'D_A_r1': D_A_r1, 'D_A_r2': D_A_r2}
 
-def train_step(A, A_ref, G, D):
-    A_res, G_loss_dict = train_G(A, G, D)
+def train_step(A, B, A_ref, G, D):
+    A_res, G_loss_dict = train_G(A, B, G, D)
 
     # cannot autograph `A2B_pool`
     # A_res = A2A_pool(A_res)
@@ -149,12 +175,17 @@ def train_step(A, A_ref, G, D):
     return A_res, G_loss_dict, D_loss_dict
 
 def upscale(A, G):
-	A_res = G(A, training=False)
+	A2B = G(A, training=False)
+	A2B = B_reshape(A2B, training=False)
+	A_res = IDEAL_op(A2B, training=False)
+	A_res = A_reshape(A_res, training=False)
 	# A_res = tf.where(A!=0.0,A_res,0.0)
 	A_res = np.squeeze(A_res, axis=0)
-	A_real = Image.fromarray(A_res[:,:,0], mode="F").resize((2*A_res.shape[-3],2*A_res.shape[-2]),resample=Image.LANCZOS)
-	A_imag = Image.fromarray(A_res[:,:,1], mode="F").resize((2*A_res.shape[-3],2*A_res.shape[-2]),resample=Image.LANCZOS)
-	return np.expand_dims(np.concatenate([np.expand_dims(A_real,-1),np.expand_dims(A_imag,-1)],axis=-1), axis=0)
+	hgt_ups, wdt_ups = (2*A_res.shape[-3],2*A_res.shape[-2])
+	A_ups = np.zeros((hgt_ups,wdt_ups,n_ch),dtype='float32')
+	for ch in range(n_ch):
+		A_ups[:,:,ch] = Image.fromarray(A_res[:,:,ch], mode="F").resize((hgt_ups,wdt_ups),resample=Image.LANCZOS)
+	return np.expand_dims(A_ups, axis=0)
 
 # ==============================================================================
 # =                                    run                                     =
@@ -193,7 +224,7 @@ if args.K_sc <= 1:
 if args.K_sc <= 0:
 	trainX_mx = upscale(trainX_mx, G_1)
 print('Upsampled input shape:', trainX_mx.shape)
-A_dataset = tf.data.Dataset.from_tensor_slices((trainX_mx,trainX_k)).batch(1)
+A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX_mx,trainX_k,trainY_k)).batch(1)
 
 # main loop
 for ep in range(args.epochs):
@@ -202,23 +233,24 @@ for ep in range(args.epochs):
 	# update epoch counter
 	ep_cnt.assign_add(1)
 	# train for an epoch
-	for A, A_ref in A_dataset:
+	for A, A_ref, B in A_B_dataset:
 		p = np.random.rand()
 		if p <= args.data_aug_p:
-			A_2 = tf.concat([A,A_ref], axis=-1)
+			A_2 = tf.concat([A,A_ref,B], axis=-1)
 			A_2 = tf.image.rot90(A_2,k=np.random.randint(3))
 			A_2 = tf.image.random_flip_left_right(A_2)
 			A_2 = tf.image.random_flip_up_down(A_2)
-			A = A_2[:,:,:,:2]
-			A_ref = A_2[:,:,:,2:]
+			A = A_2[:,:,:,:n_ch]
+			A_ref = A_2[:,:,:,n_ch:(2*n_ch)]
+			B = A_2[:,:,:,(2*n_ch):]
 		if args.K_sc == 0:
-			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_0, D_0)
+			A_res, G_loss_dict, D_loss_dict = train_step(A, B, A_ref, G_0, D_0)
 		elif args.K_sc == 1:
-			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_1, D_1)
+			A_res, G_loss_dict, D_loss_dict = train_step(A, B, A_ref, G_1, D_1)
 		elif args.K_sc == 2:
-			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_2, D_2)
+			A_res, G_loss_dict, D_loss_dict = train_step(A, B, A_ref, G_2, D_2)
 		elif args.K_sc == 3:
-			A_res, G_loss_dict, D_loss_dict = train_step(A, A_ref, G_3, D_3)
+			A_res, G_loss_dict, D_loss_dict = train_step(A, B, A_ref, G_3, D_3)
 		with train_summary_writer.as_default():
 			tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
 			tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
