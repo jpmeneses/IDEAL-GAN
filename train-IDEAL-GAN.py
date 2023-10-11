@@ -191,7 +191,7 @@ if args.A_loss == 'sinGAN':
     D_1 = dl.sGAN(input_shape=(None,None,n_ch))
     D_2 = dl.sGAN(input_shape=(None,None,n_ch))
     D_3 = dl.sGAN(input_shape=(None,None,n_ch))
-    tl.Checkpoint(dict(D_1=D_1,D_2=D_2,D_3=D_3), py.join('output','sinGAN-wMsk','checkpoints')).restore()
+    tl.Checkpoint(dict(D_1=D_1,D_2=D_2,D_3=D_3), py.join('output','sinGAN-WF','checkpoints')).restore()
     D_list = [D_1, D_2, D_3]
     batch_op = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))
 
