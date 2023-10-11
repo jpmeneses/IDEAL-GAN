@@ -27,6 +27,8 @@ py.arg('--n_res_blocks', type=int, default=2)
 py.arg('--n_groups_PM', type=int, default=2)
 py.arg('--encoded_size', type=int, default=256)
 py.arg('--VQ_encoder', type=bool, default=False)
+py.arg('--VQ_num_embed', type=int, default=64)
+py.arg('--VQ_commit_cost', type=float, default=0.5)
 py.arg('--adv_train', type=bool, default=False)
 py.arg('--cGAN', type=bool, default=False)
 py.arg('--n_D_filters', type=int, default=72)
@@ -172,7 +174,7 @@ D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2),
 IDEAL_op = wf.IDEAL_Layer()
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
-vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
+vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 if args.main_loss == 'MSE':
