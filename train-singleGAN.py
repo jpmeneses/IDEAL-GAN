@@ -46,7 +46,7 @@ r2_sc = 200.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
+dataset_dir = '../datasets/'
 
 dataset_hdf5_4 = 'Attilio_GC_384_complex_2D_nMsk.hdf5'
 acqs, out_maps = data.load_hdf5(dataset_dir, dataset_hdf5_4, 12, end=20,
