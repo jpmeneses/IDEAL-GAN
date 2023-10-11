@@ -270,7 +270,7 @@ def train_G(A, B):
             activ_reg = tf.constant(0.0,dtype=tf.float32)
         
         G_loss = args.A_loss_weight * A2B2A_cycle_loss + args.B_loss_weight * B2A2B_cycle_loss + A2B2A_g_loss
-        G_loss += activ_reg + A2B2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss']
+        G_loss += activ_reg + A2B2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss'] * args.ls_reg_weight
         
     G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
@@ -378,7 +378,8 @@ def sample(A, B):
                 val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
-    val_B2A2B_loss = cycle_loss_fn(B, A2B)
+    val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
+    val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
