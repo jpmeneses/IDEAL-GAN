@@ -263,7 +263,10 @@ def UNet(
         if skip_con:
             x = keras.layers.concatenate([x, conv])
         if self_attention and cont == 0:
-            x = SelfAttention(ch=2*filters)(x)
+            if skip_con:
+                x = SelfAttention(ch=2*filters)(x)
+            else:
+                x = SelfAttention(ch=filters)(x)
         x = _conv2d_block(
             inputs=x,
             filters=filters,
