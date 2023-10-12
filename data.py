@@ -123,9 +123,10 @@ def group_TEs(A,B,TEs,TE1,dTE,MEBCRN=False):
 
     if MEBCRN:
         len_dataset,ne,hgt,wdt,_ = A.shape
+        _,n_out,_,_,_ = B.shape
     else:
         len_dataset,hgt,wdt,d_ech = A.shape
-    _,_,_,n_out = B.shape
+        _,_,_,n_out = B.shape
 
     num_pat = 0
     all_null_slices = [] # To save the indexes of the set-to-zero slices
@@ -139,11 +140,12 @@ def group_TEs(A,B,TEs,TE1,dTE,MEBCRN=False):
 
     for idx in range(len_dataset+1):
         if idx < len_dataset:
-            TE1_i = np.round(TEs[idx,0],4)
-            dTE_i = np.round(np.mean(np.diff(TEs[idx,:])),4)
+            TE1_i = np.round(TEs[idx,0,0],4)
+            dTE_i = np.round(np.mean(np.diff(TEs[idx:idx+1,:,0])),4)
         else:
             TE1_i = TE1_orig
             dTE_i = dTE_orig
+        # print(TE1_i,TE1_orig,'\t',dTE_i,dTE_orig)
 
         # Check if it corresponds to original TEs
         if TE1_i==TE1_orig and dTE_i==dTE_orig:
@@ -180,15 +182,17 @@ def group_TEs(A,B,TEs,TE1,dTE,MEBCRN=False):
 
     if MEBCRN:
         A[all_null_slices,:,:,:,:] = 0.0
+        B[all_null_slices,:,:,:,:] = 0.0
     else:
         A[all_null_slices,:,:,:] = 0.0
-    B[all_null_slices,:,:,:] = 0.0
+        B[all_null_slices,:,:,:] = 0.0
 
     if MEBCRN:
         A = A[all_sel_slices,:,:,:,:]
+        B = B[all_sel_slices,:,:,:,:]
     else:
         A = A[all_sel_slices,:,:,:]
-    B = B[all_sel_slices,:,:,:]
+        B = B[all_sel_slices,:,:,:]
     TEs = TEs[all_sel_slices,:]
 
     return A, B, TEs
