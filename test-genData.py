@@ -24,6 +24,12 @@ test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
 
+if not(hasattr(args,'VQ_num_embed')):
+	py.arg('--VQ_num_embed', type=bool, default=256)
+	py.arg('--VQ_commit_cost', type=int, default=0.5)
+	VQ_args = py.args()
+	args.__dict__.update(VQ_args.__dict__)
+
 
 # ==============================================================================
 # =                                    data                                    =
