@@ -218,6 +218,7 @@ def train_G(A, B):
             A2Z = vq_dict['quantize']
         else:
             vq_dict = {'loss': tf.constant(0.0,dtype=tf.float32)}
+            vq_dict = {'perplexity': tf.constant(0.0,dtype=tf.float32)}
         A2Z2B_w = dec_w(A2Z, training=True)
         A2Z2B_f = dec_f(A2Z, training=True)
         A2Z2B_xi= dec_xi(A2Z, training=True)
@@ -280,7 +281,8 @@ def train_G(A, B):
                     'B2A2B_cycle_loss': B2A2B_cycle_loss,
                     'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
                     'LS_reg': activ_reg/args.ls_reg_weight,
-                    'VQ_loss': vq_dict['loss']}
+                    'VQ_loss': vq_dict['loss'],
+                    'VQ_perplexity': vq_dict['perplexity']}
 
 
 @tf.function
