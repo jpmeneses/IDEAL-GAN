@@ -217,8 +217,8 @@ def train_G(A, B):
             vq_dict = vq_op(A2Z)
             A2Z = vq_dict['quantize']
         else:
-            vq_dict = {'loss': tf.constant(0.0,dtype=tf.float32)}
-            vq_dict = {'perplexity': tf.constant(0.0,dtype=tf.float32)}
+            vq_dict =  {'loss': tf.constant(0.0,dtype=tf.float32),
+                        'perplexity': tf.constant(0.0,dtype=tf.float32)}
         A2Z2B_w = dec_w(A2Z, training=True)
         A2Z2B_f = dec_f(A2Z, training=True)
         A2Z2B_xi= dec_xi(A2Z, training=True)
