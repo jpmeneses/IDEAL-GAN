@@ -1,9 +1,9 @@
 import tensorflow as tf
 import numpy as np
 
+import tf2lib as tl
 import DLlib as dl
 import pylib as py
-import tf2lib as tl
 import wflib as wf
 import data
 from utils import *
@@ -22,6 +22,7 @@ os.environ['TF_ENABLE_GPU_GARBAGE_COLLECTION'] = 'false'
 py.arg('--experiment_dir',default='output/WF-sep')
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--te_input', type=bool, default=False)
+py.arg('--MEBCRN', type=bool, default=True)
 py.arg('--multi_TE', type=bool, default=True)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -56,15 +57,17 @@ elif args.n_echoes == 6 and args.multi_TE:
 elif args.n_echoes == 3:
   dataset_hdf5 = '3ech_GC_192_complex_2D.hdf5'
 testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
-                                  te_data=True,complex_data=(args.G_model=='complex'),
-                                  remove_zeros=False,MEBCRN=(args.G_model=='MEBCRN'))
+                                  te_data=True,remove_zeros=False,MEBCRN=args.MEBCRN)
 if args.multi_TE:
-  testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=(args.G_model=='MEBCRN'))
+  testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=args.MEBCRN)
   npy_file = 'slices_crops_multiTE.npy'
 else:
   npy_file = 'slices_crops_3ech.npy'
 
-len_dataset,hgt,wdt,n_out = np.shape(testY)
+if args.MEBCRN:
+  len_dataset,n_out,hgt,wdt,n_ch = np.shape(testY)
+else:
+  len_dataset,hgt,wdt,n_out = np.shape(testY)
 r2_sc,fm_sc = 200,300
 
 print('Acquisition Dimensions:', hgt,wdt)
@@ -93,7 +96,11 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                               R2_self_attention=args.D2_SelfAttention,
                               FM_self_attention=args.D3_SelfAttention)
   else:
-    G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,ech_idx),
+    if args.MEBCRN:
+      input_shape = (args.n_echoes,hgt,wdt,n_ch)
+    else:
+      input_shape = (hgt,wdt,ech_idx)
+    G_A2B = dl.PM_Generator(input_shape=input_shape,
                           filters=args.n_G_filters,
                           te_input=args.te_input,
                           te_shape=(args.n_echoes,),
@@ -128,24 +135,24 @@ tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).re
 
 @tf.function
 def sample(A, B, TE=None):
-  indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                      tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-  indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                          tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-  indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                      tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-  # Split B
-  B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-  B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
-  B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-  # Magnitude of water/fat images
-  B_WF_real = B_WF[:,:,:,0::2]
-  B_WF_imag = B_WF[:,:,:,1::2]
-  B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
-  # Split B param maps
-  B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
-  B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
-  B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
+  if args.MEBCRN:
+    # Split B
+    B_WF = B[:,:2,:,:,:]
+    B_PM = B[:,2:,:,:,:]
+    # Magnitude of water/fat images
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
+    # Split B param maps
+    B_R2 = B_PM[:,:,:,:,1:]
+    B_FM = B_PM[:,:,:,:,:1]
+  else:
+    # Split B
+    B_WF = B[:,:,:,:4]
+    B_PM = B[:,:,:,4:]
+    # Magnitude of water/fat images
+    B_WF_abs = tf.abs(tf.complex(B_WF[:,:,:,0::2],B_WF[:,:,:,1::2]))
+    # Split B param maps
+    B_R2 = B_PM[:,:,:,:1]
+    B_FM = B_PM[:,:,:,1:]
   # Estimate A2B
   if args.out_vars == 'WF':
     if args.te_input:
@@ -169,18 +176,21 @@ def sample(A, B, TE=None):
     else:
       A2B_PM = G_A2B(A, training=True)
     A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
-    A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-    A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-    A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+    if args.MEBCRN:
+      A2B_R2 = A2B_PM[:,:,:,:,1:]
+      A2B_FM = A2B_PM[:,:,:,:,:1]
+    else:
+      A2B_R2 = A2B_PM[:,:,:,1:]
+      A2B_FM = A2B_PM[:,:,:,:1]
     if args.G_model=='U-Net' or args.G_model=='MEBCRN':
       A2B_FM = (A2B_FM - 0.5) * 2
-      A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
+      A2B_FM = tf.where(B_FM!=0.0,A2B_FM,0.0)
       A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    A2B_WF = wf.get_rho(A,A2B_PM,te=TE)
-    A2B_WF_real = A2B_WF[:,:,:,0::2]
-    A2B_WF_imag = A2B_WF[:,:,:,1::2]
-    A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
-    A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+    A2B_WF = wf.get_rho(A,A2B_PM,te=TE,MEBCRN=args.MEBCRN)
+    if args.MEBCRN:
+      A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
+    else:
+      A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
   elif args.out_vars == 'WF-PM':
     B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
     if args.te_input:
@@ -199,9 +209,9 @@ def sample(A, B, TE=None):
       A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,A2B_FM,0.0)
       A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
 
-  return A2B_abs
+  return A2B
 
-all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
+all_test_ans = np.zeros((len_dataset,hgt,wdt,3))
 i = 0
 
 for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
@@ -209,7 +219,16 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   B = tf.expand_dims(B,axis=0)
   TE= tf.expand_dims(TE,axis=0)
   A2B = sample(A,B,TE)
-  
+
+  if args.MEBCRN:
+    A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B[:,:2,:,:,:]),axis=-1))
+    A2B_WF_abs = tf.transpose(A2B_WF_abs,perm=[0,2,3,1])
+    A2B_R2 = A2B[:,2,:,:,1:]
+  else:
+    A2B_WF_abs = tf.abs(tf.complex(A2B[:,:,:,0:4:2],A2B[:,:,:,1:4:2]))
+    A2B_R2 = A2B[:,:,:,4:5]
+  A2B = tf.concat([A2B_WF_abs,A2B_R2],axis=-1)
+
   all_test_ans[i,:,:,:] = A2B
   i += 1
 
@@ -218,9 +237,14 @@ f_all_ans = all_test_ans[:,:,:,1]
 r2_all_ans = all_test_ans[:,:,:,2]*r2_sc
 
 # Ground truth
-w_all_gt = np.abs(tf.complex(testY[:,:,:,0],testY[:,:,:,1]))
-f_all_gt = np.abs(tf.complex(testY[:,:,:,2],testY[:,:,:,3]))
-r2_all_gt = testY[:,:,:,4]*r2_sc
+if args.MEBCRN:
+  w_all_gt = np.abs(tf.complex(testY[:,0,:,:,0],testY[:,0,:,:,1]))
+  f_all_gt = np.abs(tf.complex(testY[:,1,:,:,0],testY[:,1,:,:,1]))
+  r2_all_gt = testY[:,2,:,:,1]*r2_sc
+else:
+  w_all_gt = np.abs(tf.complex(testY[:,:,:,0],testY[:,:,:,1]))
+  f_all_gt = np.abs(tf.complex(testY[:,:,:,2],testY[:,:,:,3]))
+  r2_all_gt = testY[:,:,:,4]*r2_sc
 
 #################################################################################
 #################################################################################
