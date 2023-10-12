@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-GAN.py --dataset 'GAN-252' --encoded_size 24 --adv_train True --cGAN True --A_loss 'sinGAN' --B_loss_weight 0.005 --FM_loss_weight 2.0
+python train-IDEAL-GAN.py --dataset 'GAN-253' --encoded_size 24 --adv_train True --cGAN True --A_loss 'sinGAN' --B_loss_weight 0.005 --FM_loss_weight 2.0
