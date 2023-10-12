@@ -110,10 +110,10 @@ G_1 = dl.UNet(input_shape=(hgt//(2**1),wdt//(2**1),n_ch),n_out=n_out,filters=32,
 G_2 = dl.UNet(input_shape=(hgt//(2**2),wdt//(2**2),n_ch),n_out=n_out,filters=32,self_attention=True)
 G_3 = dl.UNet(input_shape=(hgt//(2**3),wdt//(2**3),n_ch),n_out=n_out,filters=32,self_attention=True)
 
-D_0 = dl.sGAN(input_shape=(None,None,2))
-D_1 = dl.sGAN(input_shape=(None,None,2))
-D_2 = dl.sGAN(input_shape=(None,None,2))
-D_3 = dl.sGAN(input_shape=(None,None,2))
+D_0 = dl.sGAN(input_shape=(None,None,2),filters=64)
+D_1 = dl.sGAN(input_shape=(None,None,2),filters=64)
+D_2 = dl.sGAN(input_shape=(None,None,2),filters=64)
+D_3 = dl.sGAN(input_shape=(None,None,2),filters=64)
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
