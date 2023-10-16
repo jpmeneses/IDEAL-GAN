@@ -125,13 +125,13 @@ def R1_regularization(f, real_sample):
     return tf.cast(reg_loss, tf.float32)
 
 
-def VarMeanSquaredError(A, A2B2A, var_map):
+def VarMeanSquaredError(y_true, y_pred, var_map):
     if var_map.shape[-1] > 1:
-        var_map = tf.reduce_sum(var_map,axis=-1,keepdims=True)
+        var_map = tf.reduce_sum(var_map, axis=-1, keepdims=True)
     std_map = tf.math.sqrt(var_map)
     tf.debugging.assert_type(std_map, tf_type=tf.float32, message='Complex values obtained after sqrt op')
-    msd = tf.reduce_mean(tf.math.square(A-A2B2A),axis=-1,keepdims=True)
-    STDw_msd = tf.math.divide_no_nan(msd,std_map)
-    log_std = tf.where(std_map!=0.0,tf.math.log(std_map),0.0)
+    msd = tf.reduce_mean(tf.math.square(y_true - y_pred), axis=-1, keepdims=True)
+    STDw_msd = tf.math.divide_no_nan(msd, std_map)
+    log_std = tf.where(std_map!=0.0, tf.math.log(std_map), 0.0)
     STDw_msd += log_std
-    return STDw_msd
+    return tf.reduce_mean(STDw_msd, axis=[a for a in range(1,len(STDw_msd.shape))])
