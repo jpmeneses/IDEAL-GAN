@@ -224,7 +224,10 @@ def train_G(A, B):
                         'perplexity': tf.constant(0.0,dtype=tf.float32)}
         A2Z2B_w = dec_w(A2Z, training=True)
         A2Z2B_f = dec_f(A2Z, training=True)
-        A2Z2B_xi= dec_xi(A2Z, training=True)
+        if args.PM_bayes_layer:
+            A2Z2B_xi, A2Z2B_xi_var = dec_xi(A2Z, training=True)
+        else:
+            A2Z2B_xi= dec_xi(A2Z, training=True)
         
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, training=False)
@@ -264,7 +267,10 @@ def train_G(A, B):
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-        B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
+        if args.PM_bayes_layer:
+            B2A2B_cycle_loss += gan.VarMeanSquaredError(B[:,2:,:,:,:], A2B[:,2:,:,:,:], A2Z2B_xi_var) * args.FM_loss_weight
+        else:
+            B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
