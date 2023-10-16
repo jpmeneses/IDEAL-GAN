@@ -721,7 +721,7 @@ def decoder(
     x = Norm()(x)
     output = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
     if bayes_layer:
-        output = tfp.layers.Convolution2DFlipout(2,3,padding='same',activation=output_activation,kernel_initializer=output_initializer)(output)
+        output = tfp.layers.Convolution2DFlipout(2,3,padding='same',activation=output_activation)(output)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
