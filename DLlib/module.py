@@ -717,11 +717,11 @@ def decoder(
         for n_res in range(num_res_blocks):
             x = _residual_block(x, norm=norm, groups=n_groups)
 
-    x = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
     x = Norm()(x)
-    output = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+    x = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
     if bayes_layer:
-        output = tfp.layers.Convolution2DFlipout(2,3,padding='same',activation=output_activation)(output)
+        x = tfp.layers.Convolution2DFlipout(2,3,padding='same',activation=output_activation)(x)
+    output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
