@@ -690,6 +690,7 @@ def decoder(
     output_activation='tanh',
     output_initializer='glorot_normal',
     NL_self_attention=True,
+    bayes_layer=False,
     norm='instance_norm'):
     Norm = _get_norm_layer(norm)
 
@@ -719,6 +720,8 @@ def decoder(
     x = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
     x = Norm()(x)
     output = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+    if bayes_layer:
+        output = tfp.layers.Convolution2DFlipout(2,3,padding='same',activation=output_activation,kernel_initializer=output_initializer)(output)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
