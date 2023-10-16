@@ -352,7 +352,10 @@ def sample(A, B):
         A2Z = vq_dict['quantize']
     A2Z2B_w = dec_w(A2Z, training=True)
     A2Z2B_f = dec_f(A2Z, training=True)
-    A2Z2B_xi= dec_xi(A2Z, training=True)
+    if args.PM_bayes_layer:
+        A2Z2B_xi, A2Z2B_xi_var = dec_xi(A2Z, training=True)
+    else:
+        A2Z2B_xi= dec_xi(A2Z, training=True)
     A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     A2B2A = IDEAL_op(A2B, training=False)
 
