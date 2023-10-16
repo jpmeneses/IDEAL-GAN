@@ -26,6 +26,7 @@ py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
 py.arg('--n_groups_PM', type=int, default=2)
 py.arg('--PM_bayes_layer', type=bool, default=False)
+py.arg('--PM_bayes_weight', type=float, default=1e-5)
 py.arg('--encoded_size', type=int, default=256)
 py.arg('--VQ_encoder', type=bool, default=False)
 py.arg('--VQ_num_embed', type=int, default=64)
@@ -267,10 +268,11 @@ def train_G(A, B):
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
+        activ_reg = tf.constant(0.0,dtype=tf.float32)
         if enc.losses:
-            activ_reg = tf.add_n(enc.losses)
-        else:
-            activ_reg = tf.constant(0.0,dtype=tf.float32)
+            activ_reg += tf.add_n(enc.losses)
+        if dec_xi.losses:
+            activ_reg += tf.add_n(dec_xi.losses) * args.PM_bayes_weight
         
         G_loss = args.A_loss_weight * A2B2A_cycle_loss + args.B_loss_weight * B2A2B_cycle_loss + A2B2A_g_loss
         G_loss += activ_reg + A2B2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss'] * args.ls_reg_weight
