@@ -392,6 +392,10 @@ def sample(A, B):
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
     val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
+    if args.PM_bayes_layer:
+        val_B2A2B_loss += gan.VarMeanSquaredError(B[:,2:,:,:,:], A2B[:,2:,:,:,:], A2Z2B_xi_var) * args.FM_loss_weight
+    else:
+        val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
