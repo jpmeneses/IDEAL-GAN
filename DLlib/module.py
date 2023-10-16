@@ -718,23 +718,22 @@ def decoder(
             x = _residual_block(x, norm=norm, groups=n_groups)
 
     x = Norm()(x)
-    x = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+    x = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
     if bayes_layer:
         # x = tfp.layers.Convolution2DFlipout(2,3,padding='same',activation=output_activation)(x)
-        x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
-        x_std = keras.layers.Conv2D(2, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
-        x = tf.concat([x,x_std],axis=-1)
-        x = tfp.layers.DistributionLambda(
+        x_mean = keras.layers.Conv2D(2, 1, padding='same', groups=n_groups, activation=output_activation, kernel_initializer=output_initializer)(x)
+        x_std = keras.layers.Conv2D(16, 1, padding='same', groups=n_groups, activation='relu', kernel_initializer='he_uniform')(x)
+        x_std = keras.layers.Conv2D(2, 1, padding='same', groups=n_groups, activation='sigmoid', kernel_initializer='he_normal')(x_std)
+        x = tf.concat([x_mean,x_std],axis=-1)
+        output = tfp.layers.DistributionLambda(
                     lambda t: tfp.distributions.Normal(
                         loc=t[...,:2],
                         scale=tf.math.sqrt(t[...,2:])),
                     )(x)
         x_std = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x_std)
-    output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
-
-    if bayes_layer:
         return keras.Model(inputs=inputs1, outputs=[output,x_std])
     else:
+        output = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
         return keras.Model(inputs=inputs1, outputs=output)
 
 
