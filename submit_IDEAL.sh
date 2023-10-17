@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v256-GAN
-#SBATCH --output=out_GAN_256.txt
+#SBATCH --job-name=v200-sup
+#SBATCH --output=out_sup_200.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-GAN.py --dataset 'GAN-256' --PM_bayes_layer True --encoded_size 24 --adv_train True --cGAN True --B_loss_weight 0.05 --FM_loss_weight 0.1
+python train-sup.py --dataset Sup-200 --out_vars 'PM' --n_G_filters 36 --batch_size 1 --epoch_ckpt 20 --lr 0.0001
