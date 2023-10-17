@@ -61,17 +61,17 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 
-# dataset_hdf5_1 = 'INTA_GC_192_complex_2D.hdf5'
-# acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-#                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+dataset_hdf5_1 = 'INTA_GC_384_complex_2D.hdf5'
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-# dataset_hdf5_2 = 'INTArest_GC_192_complex_2D.hdf5'
-# acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-#                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+dataset_hdf5_2 = 'INTArest_GC_384_complex_2D.hdf5'
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-# dataset_hdf5_3 = 'Volunteers_GC_192_complex_2D.hdf5'
-# acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
-#                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+dataset_hdf5_3 = 'Volunteers_GC_384_complex_2D.hdf5'
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
 dataset_hdf5_4 = 'Attilio_GC_384_complex_2D.hdf5'
 acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
@@ -81,11 +81,11 @@ acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
 ############################# DATASET PARTITIONS ###############################
 ################################################################################
 
-trainX  = acqs_4 #np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
-valX    = acqs_4 #1
+trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
+valX    = acqs_1
 
-trainY  = out_maps_4 #np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
-valY    = out_maps_4 #1
+trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
+valY    = out_maps_1
 
 # Overall dataset statistics
 len_dataset,hgt,wdt,n_out = np.shape(trainY)
