@@ -72,16 +72,22 @@ def _conv2d_block(
     return c
 
 
-def _residual_block(x, norm, groups=1):
+def _residual_block(x, norm, groups=1, Bayes=False):
     Norm = _get_norm_layer(norm)
     dim = x.shape[-1]
     h = x
 
-    h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
+    if Bayes:
+        h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
+    else:
+        h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
     h = Norm()(h)
     h = tf.nn.leaky_relu(h)
 
-    h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
+    if Bayes:
+        h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
+    else:
+        h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
     h = Norm()(h)
 
     return keras.layers.add([x, h])
@@ -690,7 +696,6 @@ def decoder(
     output_activation='tanh',
     output_initializer='glorot_normal',
     NL_self_attention=True,
-    bayes_layer=False,
     norm='instance_norm'):
     Norm = _get_norm_layer(norm)
 
@@ -718,23 +723,56 @@ def decoder(
             x = _residual_block(x, norm=norm, groups=n_groups)
 
     x = Norm()(x)
-    x = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
-    if bayes_layer:
-        # x = tfp.layers.Convolution2DFlipout(2,3,padding='same',activation=output_activation)(x)
-        x_mean = keras.layers.Conv2D(2, 1, padding='same', groups=n_groups, activation=output_activation, kernel_initializer=output_initializer)(x)
-        x_std = keras.layers.Conv2D(16, 1, padding='same', groups=n_groups, activation='relu', kernel_initializer='he_uniform')(x)
-        x_std = keras.layers.Conv2D(2, 1, padding='same', groups=n_groups, activation='sigmoid', kernel_initializer='he_normal')(x_std)
-        x = tf.concat([x_mean,x_std],axis=-1)
-        output = tfp.layers.DistributionLambda(
-                    lambda t: tfp.distributions.Normal(
-                        loc=t[...,:2],
-                        scale=tf.math.sqrt(t[...,2:])),
-                    )(x)
-        x_std = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x_std)
-        return keras.Model(inputs=inputs1, outputs=[output,x_std])
-    else:
-        output = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
-        return keras.Model(inputs=inputs1, outputs=output)
+    x = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+    output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
+
+    return keras.Model(inputs=inputs1, outputs=output)
+
+def Bayes_decoder(
+    encoded_dims,
+    output_2D_shape,
+    filters=36,
+    num_layers=4,
+    num_res_blocks=2,
+    dropout=0.0,
+    output_activation=None,
+    output_initializer='glorot_normal',
+    NL_self_attention=True,
+    norm='instance_norm'):
+    Norm = _get_norm_layer(norm)
+
+    hgt,wdt = output_2D_shape
+    hls = hgt//(2**(num_layers))
+    wls = wdt//(2**(num_layers))
+    filt_ini = filters*(2**num_layers)
+    input_shape = (hls,wls,encoded_dims)
+    
+    x = inputs1 = keras.Input(input_shape)
+
+    x = tfp.layers.Convolution2DFlipout(encoded_dims,3,padding='same',activation=tf.nn.leaky_relu)(x)
+    x_r = keras.layers.Lambda(lambda z: z[...,:encoded_dims//2])(x)
+    x_i = keras.layers.Lambda(lambda z: z[...,encoded_dims//2:])(x)
+    x_list_in = [x_r,x_i]
+    x_list_out = list()
+    for __x in x_list_in:
+        filt_iter = filt_ini
+        _x = tfp.layers.Convolution2DFlipout(filt_iter,3,padding='same',activation=tf.nn.leaky_relu)(__x)
+        if NL_self_attention:
+            _x = _residual_block(_x, norm=norm, Bayes=True)
+            _x = SelfAttention(ch=filt_ini)(_x)
+            _x = _residual_block(_x, norm=norm, Bayes=True)
+        for cont in range(num_layers):
+            filt_iter //= 2  # decreasing number of filters with each layer
+            _x = _upsample(filt_iter, (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(_x)
+            for n_res in range(num_res_blocks):
+                _x = _residual_block(_x, norm=norm, Bayes=True)
+        _x = Norm()(_x)
+        _x = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(_x)
+        x_list_out.append(_x)
+    x = keras.layers.concatenate(x_list_out)
+    output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
+
+    return keras.Model(inputs=inputs1, outputs=output)
 
 
 # ==============================================================================
