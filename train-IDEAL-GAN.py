@@ -156,7 +156,7 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
-if PM_bayes_layer:
+if args.PM_bayes_layer:
     dec_xi=dl.Bayes_decoder(encoded_dims=args.encoded_size,
                             output_2D_shape=(hgt,wdt),
                             filters=args.n_G_filters,
