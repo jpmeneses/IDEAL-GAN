@@ -695,6 +695,7 @@ def decoder(
     dropout=0.0,
     output_activation='tanh',
     output_initializer='glorot_normal',
+    bayes_layer=False,
     NL_self_attention=True,
     norm='instance_norm'):
     Norm = _get_norm_layer(norm)
@@ -723,10 +724,19 @@ def decoder(
             x = _residual_block(x, norm=norm, groups=n_groups)
 
     x = Norm()(x)
-    x = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+    if bayes_layer:
+        x = keras.layers.Conv2D(filters,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+        x_r = keras.layers.Lambda(lambda z: z[...,:filters//2])(x)
+        x_i = keras.layers.Lambda(lambda z: z[...,filters//2:])(x)
+        x_r = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(x_r)
+        x_i = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(x_i)
+        x = keras.layers.concatenate([x_r,x_i])
+    else:
+        x = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
     output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
+
 
 def Bayes_decoder(
     encoded_dims,

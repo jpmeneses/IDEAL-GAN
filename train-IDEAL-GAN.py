@@ -26,7 +26,7 @@ py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
 py.arg('--n_groups_PM', type=int, default=2)
 py.arg('--PM_bayes_layer', type=bool, default=False)
-py.arg('--PM_bayes_weight', type=float, default=1e-10)
+py.arg('--PM_bayes_weight', type=float, default=1e-5)
 py.arg('--encoded_size', type=int, default=256)
 py.arg('--VQ_encoder', type=bool, default=False)
 py.arg('--VQ_num_embed', type=int, default=64)
@@ -156,25 +156,16 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
-if args.PM_bayes_layer:
-    dec_xi=dl.Bayes_decoder(encoded_dims=args.encoded_size,
-                            output_2D_shape=(hgt,wdt),
-                            filters=args.n_G_filters,
-                            num_layers=args.n_downsamplings,
-                            num_res_blocks=args.n_res_blocks,
-                            output_activation=None,
-                            NL_self_attention=args.NL_SelfAttention,
-                            )
-else:
-    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
-                        n_groups=args.n_groups_PM,
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention,
-                        )
+dec_xi = dl.decoder(encoded_dims=args.encoded_size,
+                    output_2D_shape=(hgt,wdt),
+                    n_groups=args.n_groups_PM,
+                    filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
+                    NL_self_attention=args.NL_SelfAttention,
+                    bayes_layer=args.PM_bayes_layer
+                    )
 
 D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), 
                 cGAN=args.cGAN,
@@ -394,7 +385,6 @@ def sample(A, B):
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-    val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
