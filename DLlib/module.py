@@ -94,15 +94,18 @@ def _residual_block(x, norm, groups=1, Bayes=False):
 
 
 class FourierLayer(tf.keras.layers.Layer):
-    def __init__(self):
+    def __init__(self, multi_echo=True):
         super(FourierLayer, self).__init__()
+        self.multi_echo = multi_echo
 
     def call(self, x, training=None):
-        n_batch,ne,hgt,wdt,_ = x.shape
-
         # Generate complex x
-        real_x = x[:,:2,:,:,0]
-        imag_x = x[:,:2,:,:,1]
+        if self.multi_echo:
+            real_x = x[:,:2,:,:,0]
+            imag_x = x[:,:2,:,:,1]
+        else:
+            real_x = x[:,:,:,0]
+            imag_x = x[:,:,:,1]
         x_complex = tf.complex(real_x,imag_x)
 
         x_fourier = tf.signal.fft2d(x_complex)
@@ -632,6 +635,7 @@ def PM_complex(
 def encoder(
     input_shape,
     encoded_dims,
+    multi_echo=True,
     filters=36,
     num_layers=4,
     num_res_blocks=2,
@@ -644,7 +648,8 @@ def encoder(
 
     x = inputs1 = keras.Input(input_shape)
 
-    x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    if multi_echo:
+        x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
     x = keras.layers.Conv2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
     for l in range(num_layers):
@@ -688,6 +693,7 @@ def encoder(
 def decoder(
     encoded_dims,
     output_2D_shape,
+    multi_echo=True,
     n_groups=1,
     filters=36,
     num_layers=4,
@@ -730,10 +736,11 @@ def decoder(
         x_i = keras.layers.Lambda(lambda z: z[...,filters//2:])(x)
         x_r = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(x_r)
         x_i = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(x_i)
-        x = keras.layers.concatenate([x_r,x_i])
+        output = keras.layers.concatenate([x_r,x_i])
     else:
-        x = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
-    output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(x)
+        output = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+    if multi_echo:
+        output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
