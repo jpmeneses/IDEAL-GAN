@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-VAE.py --dataset VAE-000 --ls_reg_weight 1e-8
+python train-IDEAL-VAE.py --dataset VAE-000 --encoded_size 24
