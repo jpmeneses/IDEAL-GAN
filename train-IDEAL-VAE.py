@@ -150,6 +150,7 @@ else:
     raise(NameError('Unrecognized Main Loss Function'))
 
 cosine_loss = tf.losses.CosineSimilarity()
+MSLE = tf.losses.MeanSquaredLogarithmicError()
 if args.A_loss == 'VGG':
     metric_model = dl.perceptual_metric(input_shape=(hgt,wdt,n_ch), multi_echo=False)
 
@@ -202,10 +203,10 @@ def train_G(A):
             A2Y = metric_model(A, training=False)
             A2Z2A2Y = metric_model(A2Z2A, training=False)
             # A2Z2A_cycle_loss = cosine_loss(A2Y[0], A2Z2A2Y[0])/len(A2Y)
-            A2Z2A_cycle_loss = cycle_loss_fn(A2Y[0], A2Z2A2Y[0])/len(A2Y)
+            A2Z2A_cycle_loss = MSLE(A2Y[0], A2Z2A2Y[0])/len(A2Y)
             for l in range(1,len(A2Y)):
                 # A2Z2A_cycle_loss += cosine_loss(A2Y[l], A2Z2A2Y[l])/len(A2Y)
-                A2Z2A_cycle_loss += cycle_loss_fn(A2Y[l], A2Z2A2Y[l])/len(A2Y)
+                A2Z2A_cycle_loss += MSLE(A2Y[l], A2Z2A2Y[l])/len(A2Y)
         elif args.A_loss == 'sinGAN':
             A2Z2A_cycle_loss = 0.0
             for D in D_list:
@@ -299,10 +300,10 @@ def sample(A):
         A2Y = metric_model(A, training=False)
         A2Z2A2Y = metric_model(A2Z2A, training=False)
         # val_A2Z2A_loss = cosine_loss(A2Y[0], A2Z2A2Y[0])/len(A2Y)
-        val_A2Z2A_loss = cycle_loss_fn(A2Y[0], A2Z2A2Y[0])/len(A2Y)
+        val_A2Z2A_loss = MSLE(A2Y[0], A2Z2A2Y[0])/len(A2Y)
         for l in range(1,len(A2Y)):
             # val_A2Z2A_loss += cosine_loss(A2Y[l], A2Z2A2Y[l])/len(A2Y)
-            val_A2Z2A_loss += cycle_loss_fn(A2Y[l], A2Z2A2Y[l])/len(A2Y)
+            val_A2Z2A_loss += MSLE(A2Y[l], A2Z2A2Y[l])/len(A2Y)
     elif args.A_loss == 'sinGAN':
         val_A2Z2A_loss = 0.0
         for D in D_list:
