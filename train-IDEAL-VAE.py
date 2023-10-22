@@ -201,9 +201,11 @@ def train_G(A):
         if args.A_loss == 'VGG':
             A2Y = metric_model(A, training=False)
             A2Z2A2Y = metric_model(A2Z2A, training=False)
-            A2Z2A_cycle_loss = cosine_loss(A2Y[0], A2Z2A2Y[0])/len(A2Y)
+            # A2Z2A_cycle_loss = cosine_loss(A2Y[0], A2Z2A2Y[0])/len(A2Y)
+            A2Z2A_cycle_loss = cycle_loss_fn(A2Y[0], A2Z2A2Y[0])/len(A2Y)
             for l in range(1,len(A2Y)):
-                A2Z2A_cycle_loss += cosine_loss(A2Y[l], A2Z2A2Y[l])/len(A2Y)
+                # A2Z2A_cycle_loss += cosine_loss(A2Y[l], A2Z2A2Y[l])/len(A2Y)
+                A2Z2A_cycle_loss += cycle_loss_fn(A2Y[l], A2Z2A2Y[l])/len(A2Y)
         elif args.A_loss == 'sinGAN':
             A2Z2A_cycle_loss = 0.0
             for D in D_list:
@@ -296,9 +298,11 @@ def sample(A):
     if args.A_loss == 'VGG':
         A2Y = metric_model(A, training=False)
         A2Z2A2Y = metric_model(A2Z2A, training=False)
-        val_A2Z2A_loss = cosine_loss(A2Y[0], A2Z2A2Y[0])/len(A2Y)
+        # val_A2Z2A_loss = cosine_loss(A2Y[0], A2Z2A2Y[0])/len(A2Y)
+        val_A2Z2A_loss = cycle_loss_fn(A2Y[0], A2Z2A2Y[0])/len(A2Y)
         for l in range(1,len(A2Y)):
-            val_A2Z2A_loss += cosine_loss(A2Y[l], A2Z2A2Y[l])/len(A2Y)
+            # val_A2Z2A_loss += cosine_loss(A2Y[l], A2Z2A2Y[l])/len(A2Y)
+            val_A2Z2A_loss += cycle_loss_fn(A2Y[l], A2Z2A2Y[l])/len(A2Y)
     elif args.A_loss == 'sinGAN':
         val_A2Z2A_loss = 0.0
         for D in D_list:
