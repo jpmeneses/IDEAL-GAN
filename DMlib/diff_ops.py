@@ -10,7 +10,7 @@ def forward_noise(key, x_0, t, alpha_bar):
     set_key(key)
     sqrt_alpha_bar = np.sqrt(alpha_bar)
     one_minus_sqrt_alpha_bar = np.sqrt(1-alpha_bar)
-    noise = np.random.normal(size=x_0.shape)
+    noise = np.random.normal(size=x_0.shape).astype(np.float32)
     reshaped_sqrt_alpha_bar_t = np.reshape(np.take(sqrt_alpha_bar, t), (-1, 1, 1, 1))
     reshaped_one_minus_sqrt_alpha_bar_t = np.reshape(np.take(one_minus_sqrt_alpha_bar, t), (-1, 1, 1, 1))
     noisy_image = reshaped_sqrt_alpha_bar_t  * x_0 + reshaped_one_minus_sqrt_alpha_bar_t  * noise
