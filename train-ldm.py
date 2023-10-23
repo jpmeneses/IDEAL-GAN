@@ -145,11 +145,13 @@ def train_step(A, Z_std=1.0):
     rng, tsrng = np.random.randint(0, 100000, size=(2,))
     timestep_values = dm.generate_timestamp(tsrng, A.shape[0], args.n_timesteps)
 
+    A2Z = enc(A, training=False)
+    A2Z = tf.math.divide_no_nan(A2Z,Z_std)
+    A2Z_std = tf.math.reduce_std(A2Z) # For monitoring only
+
+    Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
+
     with tf.GradientTape() as t:
-        A2Z = enc(A, training=False)
-        A2Z = tf.math.divide_no_nan(A2Z,Z_std)
-        A2Z_std = tf.math.reduce_std(A2Z) # For monitoring only
-        Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
         pred_noise = unet(Z_n, timestep_values)
         
         loss_value = loss_fn(noise, pred_noise)
@@ -215,7 +217,7 @@ else:
         A2Z = enc(A, training=False)
         z_std_list.append(tf.math.reduce_std(A2Z,axis=(1,2,3)))
     z_std_list = tf.concat(z_std_list,axis=0)
-    z_std.assign_add(2*tf.math.sqrt(tf.reduce_sum(tf.square(z_std_list))))
+    z_std.assign_add(tf.math.sqrt(tf.reduce_sum(tf.square(z_std_list))))
         
 
 # main loop
