@@ -150,6 +150,7 @@ def train_step(A, Z_std=1.0):
     A2Z_std = tf.math.reduce_std(A2Z) # For monitoring only
 
     Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
+    noise = tf.convert_to_tensor(noise, dtype=tf.float32)
 
     with tf.GradientTape() as t:
         pred_noise = unet(Z_n, timestep_values)
