@@ -1,3 +1,5 @@
+# Based on: https://medium.com/@vedantjumle/image-generation-with-diffusion-models-using-keras-and-tensorflow-9f60aae72ac
+
 import math
 import numpy as np
 import tensorflow as tf
