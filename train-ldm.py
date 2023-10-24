@@ -146,11 +146,11 @@ def train_step(A, Z_std=1.0):
     timestep_values = dm.generate_timestamp(tsrng, A.shape[0], args.n_timesteps)
 
     A2Z = enc(A, training=False)
-    A2Z = tf.math.divide_no_nan(A2Z,Z_std)
+    # A2Z = A2Z.sample()
+    # A2Z = tf.math.divide_no_nan(A2Z,Z_std)
     A2Z_std = tf.math.reduce_std(A2Z) # For monitoring only
 
     Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
-    noise = tf.convert_to_tensor(noise, dtype=tf.float32)
 
     with tf.GradientTape() as t:
         pred_noise = unet(Z_n, timestep_values)
@@ -171,7 +171,7 @@ def validation_step(Z, Z_std=1.0):
     if args.VQ_encoder:
         vq_dict = vq_op(Z)
         Z = vq_dict['quantize']
-    Z = tf.math.multiply_no_nan(Z,Z_std)
+    # Z = tf.math.multiply_no_nan(Z,Z_std)
     Z2B_w = dec_w(Z, training=False)
     Z2B_f = dec_f(Z, training=False)
     Z2B_xi= dec_xi(Z, training=False)
