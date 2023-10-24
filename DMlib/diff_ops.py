@@ -10,7 +10,7 @@ def forward_noise(key, x_0, t, alpha_bar):
     set_key(key)
     sqrt_alpha_bar = np.sqrt(alpha_bar)
     one_minus_sqrt_alpha_bar = np.sqrt(1-alpha_bar)
-    noise = np.random.normal(size=x_0.shape).astype(np.float32)
+    noise = tf.random.normal(x_0.shape, dtype=tf.float32)
     reshaped_sqrt_alpha_bar_t = np.reshape(np.take(sqrt_alpha_bar, t), (-1, 1, 1, 1))
     reshaped_one_minus_sqrt_alpha_bar_t = np.reshape(np.take(one_minus_sqrt_alpha_bar, t), (-1, 1, 1, 1))
     noisy_image = reshaped_sqrt_alpha_bar_t  * x_0 + reshaped_one_minus_sqrt_alpha_bar_t  * noise
@@ -30,7 +30,7 @@ def ddpm(x_t, pred_noise, t, alpha, alpha_bar, beta):
     mean = (1 / (alpha_t ** .5)) * (x_t - eps_coef * pred_noise)
 
     var = np.take(beta, t)
-    z = np.random.normal(size=x_t.shape)
+    z = tf.random.normal(x_t.shape,dtype=tf.float32)
 
     return mean + (var ** .5) * z
 
