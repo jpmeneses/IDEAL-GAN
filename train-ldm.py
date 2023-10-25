@@ -227,7 +227,7 @@ else:
             A2Z = enc(A, training=False)
             if k == 0:
                 z_mean += tf.reduce_sum(A2Z)
-                z_num += tf.reduce_prod(A2Z.shape)
+                z_num += tf.reduce_prod(tf.cast(A2Z.shape,tf.float32))
             else:
                 z_var += tf.reduce_sum(tf.square(A2Z - z_mean))
         if k == 0:
