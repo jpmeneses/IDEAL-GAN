@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v260-GAN
-#SBATCH --output=out_GAN_260.txt
+#SBATCH --job-name=v238-DDPM
+#SBATCH --output=out_DDPM_238.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-GAN.py --dataset 'GAN-260' --PM_bayes_layer True --encoded_size 24 --adv_train True --cGAN True --A_loss_weight 1e-7 --B_loss_weight 0.05 --FM_loss_weight 1.0 --ls_reg_weight 1.5e-7
+python train-ldm.py --experiment_dir 'GAN-238' --n_timesteps 1000 --batch_size 12 --epochs_ldm 200 --lr 1e-4
