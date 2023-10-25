@@ -106,7 +106,8 @@ dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention
+                    NL_self_attention=args.NL_SelfAttention,
+                    bayes_layer=args.PM_bayes_layer
                     )
 
 # create our unet model
@@ -210,16 +211,24 @@ fm_sc = 300.0
 r2_sc = 2*np.pi*fm_sc
 
 # Calculate scaling factor (for unitary std dev)
-z_list = []
+z_num = 0
+z_mean = 0.0
+z_var = 0.0
 if args.VQ_encoder:
     z_std.assign_add(10.0)
 else:
-    for A in A_dataset:
-        A2Z = enc(A, training=False)
-        z_list.append(tf.reshape(A2Z,[-1]))
-    z_all = tf.concat(z_list,axis=0)
-    z_mean = tf.reduce_mean(z_all)
-    z_var = tf.reduce_sum(tf.square(z_all - z_mean)) / z_all.shape[0]
+    for k in range(2):
+        for A in A_dataset:
+            A2Z = enc(A, training=False)
+            if k == 0:
+                z_mean += tf.reduce_sum(A2Z)
+                z_num += tf.reduce_prod(A2Z.shape)
+            else:
+                z_var += tf.reduce_sum(tf.square(A2Z - z_mean))
+        if k == 0:
+            z_mean /= z_num
+        else:
+            z_var /= z_num
     z_std.assign_add(tf.math.sqrt(z_var))
         
 
