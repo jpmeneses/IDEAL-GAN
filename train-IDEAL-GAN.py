@@ -45,7 +45,6 @@ py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
 py.arg('--critic_train_steps', type=int, default=1)
 py.arg('--R1_reg_weight', type=float, default=0.2)
-py.arg('--R2_reg_weight', type=float, default=0.2)
 py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE'])
 py.arg('--A_loss', default='VGG', choices=['pix-wise', 'VGG', 'sinGAN'])
 py.arg('--A_loss_weight', type=float, default=0.01)
@@ -249,9 +248,9 @@ def train_G(A, B):
         if args.A_loss == 'VGG':
             A2Y = metric_model(A, training=False)
             A2B2A2Y = metric_model(A2B2A, training=False)
-            A2B2A_cycle_loss = cycle_loss_fn(A2Y[0], A2B2A2Y[0])/len(A2Y)
+            A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
             for l in range(1,len(A2Y)):
-                A2B2A_cycle_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/len(A2Y)
+                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
         elif args.A_loss == 'sinGAN':
             A2B2A_cycle_loss = 0.0
             for D in D_list:
@@ -370,9 +369,9 @@ def sample(A, B):
     if args.A_loss == 'VGG':
         A2Y = metric_model(A, training=False)
         A2B2A2Y = metric_model(A2B2A, training=False)
-        val_A2B2A_loss = cycle_loss_fn(A2Y[0], A2B2A2Y[0])/len(A2Y)
+        val_A2B2A_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
         for l in range(1,len(A2Y)):
-            val_A2B2A_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/len(A2Y)
+            val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
     elif args.A_loss == 'sinGAN':
         val_A2B2A_loss = 0.0
         for D in D_list:
