@@ -27,6 +27,11 @@ output_dir = py.join('output',ldm_args.experiment_dir)
 args = py.args_from_yaml(py.join('output', ldm_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(ldm_args.__dict__)
 
+if not(hasattr(args,'PM_bayes_layer')):
+    py.arg('--PM_bayes_layer', type=bool, default=False)
+    bayes_args = py.args()
+    args.__dict__.update(bayes_args.__dict__)
+
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
