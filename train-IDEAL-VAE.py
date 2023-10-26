@@ -376,7 +376,7 @@ for ep in range(args.epochs):
                         step=G_optimizer.iterations, name='D learning rate')
 
         # sample
-        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
+        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200//args.batch_size):
             A = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             A2Z2A, val_loss_dict = validation_step(A)
