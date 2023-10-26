@@ -59,14 +59,25 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     num_res_blocks=args.n_res_blocks,
                     NL_self_attention=args.NL_SelfAttention
                     )
+# if args.PM_bayes_layer:
+# 	dec_xi=dl.Bayes_decoder(encoded_dims=args.encoded_size,
+#                             output_2D_shape=(hgt,wdt),
+#                             filters=args.n_G_filters,
+#                             num_layers=args.n_downsamplings,
+#                             num_res_blocks=args.n_res_blocks,
+#                             output_activation=None,
+#                             NL_self_attention=args.NL_SelfAttention,
+#                             )
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
-                    n_groups=args.n_groups_PM,
-                    filters=args.n_G_filters,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    NL_self_attention=args.NL_SelfAttention
-                    )
+					output_2D_shape=(hgt,wdt),
+					n_groups=args.n_groups_PM,
+					filters=args.n_G_filters,
+					num_layers=args.n_downsamplings,
+					num_res_blocks=args.n_res_blocks,
+					NL_self_attention=args.NL_SelfAttention,
+					bayes_layer=args.PM_bayes_layer
+					)
+
 
 IDEAL_op = wf.IDEAL_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
@@ -102,6 +113,7 @@ wls = wdt//(2**(args.n_downsamplings))
 z_shape = (1,hls,wls,args.encoded_size)
 
 TE = wf.gen_TEvar(args.n_echoes,orig=False)
+# Z = tf.random.normal(z_shape,seed=1,dtype=tf.float32)
 
 for k in range(args.n_samples):
 	if args.VQ_encoder:
