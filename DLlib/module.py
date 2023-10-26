@@ -302,11 +302,14 @@ def UNet(
                             scale=tf.math.sqrt(t[...,n_out:])),
                         )(x_prob)
         else:
+            # Based on: https://en.wikipedia.org/wiki/Rice_distribution#Related_distributions
+            x_prob = tfp.layers.DistributionLambda(
+                        lambda t: tfp.distributions.Poisson(
+                            rate=tf.math.divide_no_nan(tf.square(t[...,:n_out]),2*tf.math.sqrt(t[...,n_out:]))),
+                        )(x_prob)
             out_prob = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.HalfStudentT(
-                            df=1e4,
-                            loc=t[...,:n_out],
-                            scale=tf.math.sqrt(t[...,n_out:])),
+                        lambda t: tfp.distributions.Chi2(
+                            df=2*t+2),
                         )(x_prob)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
@@ -641,7 +644,6 @@ def encoder(
     num_res_blocks=2,
     dropout=0.0,
     sd_out=True,
-    kl_reg = True,
     ls_reg_weight=1.0,
     NL_self_attention=True,
     norm='instance_norm'):
@@ -677,13 +679,10 @@ def encoder(
         
         x = keras.layers.concatenate([x_mean,x_std],axis=-1)
     
-        prior = tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,ls_dims)), scale=1))
-        if kl_reg:
-            output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
-                        activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
-        else:
-            output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims])(x)
-
+        prior=tfp.distributions.Independent(tfp.distributions.Normal(loc=tf.zeros((ls_hgt,ls_wdt,ls_dims)), scale=1),
+                                            reinterpreted_batch_ndims=3)
+        output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
+                    activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
     else:
         output = keras.layers.Conv2D(encoded_dims,1,padding="same")(x)
 
