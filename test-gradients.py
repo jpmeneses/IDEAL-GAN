@@ -15,10 +15,10 @@ import data
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
-dataset_hdf5 = 'INTA_GC_192_complex_2D.hdf5'
+dataset_hdf5 = 'JGalgani_GC_384_complex_2D.hdf5'
 acqs, out_maps = data.load_hdf5(dataset_dir, dataset_hdf5, 12, end=87, MEBCRN=True)
-acqs = acqs[:,:,::4,::4,:]
-out_maps = out_maps[:,:,::4,::4,:]
+acqs = acqs[:,:,::8,::8,:]
+out_maps = out_maps[:,:,::8,::8,:]
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -34,7 +34,7 @@ print('Acquisition Dimensions:', hgt,wdt)
 print('Output Maps:',n_out)
 
 A_B_dataset = tf.data.Dataset.from_tensor_slices((acqs,out_maps))
-A_B_dataset = A_B_dataset.batch(1).shuffle(len_dataset)
+A_B_dataset = A_B_dataset.batch(4).shuffle(len_dataset)
 
 enc= dl.encoder(input_shape=(6,hgt,wdt,n_ch),
                 encoded_dims=64,
@@ -234,25 +234,25 @@ for ep in range(20):
             axs[0,5].axis('off')
             
             # A2B maps in the second row
-            w_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+            w_aux = np.squeeze(np.abs(tf.complex(A2B[0,0,:,:,0],A2B[0,0,:,:,1])))
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            f_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
+            f_aux = np.squeeze(np.abs(tf.complex(A2B[0,1,:,:,0],A2B[0,1,:,:,1])))
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_aux = np.squeeze(A2B[:,2,:,:,1])*2*np.pi
+            r2_aux = np.squeeze(A2B[0,2,:,:,1])*2*np.pi
             r2_ok = axs[1,3].imshow(r2_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc, vmax=fm_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_aux = np.squeeze(A2B[:,2,:,:,0])
+            field_aux = np.squeeze(A2B[0,2,:,:,0])
             field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
@@ -261,25 +261,25 @@ for ep in range(20):
             fig.delaxes(axs[1,5])
 
             # Ground-truth in the third row
-            wn_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+            wn_aux = np.squeeze(np.abs(tf.complex(B[0,0,:,:,0],B[0,0,:,:,1])))
             W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_unet, ax=axs[2,1])
             axs[2,1].axis('off')
 
-            fn_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+            fn_aux = np.squeeze(np.abs(tf.complex(B[0,1,:,:,0],B[0,1,:,:,1])))
             F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_unet, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            r2n_aux = np.squeeze(B[:,2,:,:,1])*2*np.pi
+            r2n_aux = np.squeeze(B[0,2,:,:,1])*2*np.pi
             r2_unet = axs[2,3].imshow(r2n_aux*fm_sc, cmap='twilight',
                                  interpolation='none', vmin=-fm_sc, vmax=fm_sc)
             fig.colorbar(r2_unet, ax=axs[2,3])
             axs[2,3].axis('off')
 
-            fieldn_aux = np.squeeze(B[:,2,:,:,0])
+            fieldn_aux = np.squeeze(B[0,2,:,:,0])
             field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_unet, ax=axs[2,4])
