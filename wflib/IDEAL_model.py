@@ -164,8 +164,8 @@ def IDEAL_model(out_maps, params):
         upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
 
         # Water/fat gradient
-        Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[0,2,1])) # (nb,nv,ne,ne)
-        ds_dp = tf.linalg.matmul(Wp_d,M) * rho_sc ## (nb,nv,ne,ns) I1
+        Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[2,0,1])) # (nv,nb,ne,ne)
+        ds_dp = tf.transpose(tf.linalg.matmul(Wp_d,M),perm=[1,0,2,3]) * rho_sc ## (nb,nv,ne,ns) I1
         
         # Xi gradient, considering Taylor approximation
         dxi = tf.linalg.diag(2*np.pi*tf.squeeze(te_complex,-1)) # (nb,ne,1) --> (nb,ne,ne)
