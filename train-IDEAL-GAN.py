@@ -45,7 +45,7 @@ py.arg('--beta_1', type=float, default=0.5)
 py.arg('--beta_2', type=float, default=0.9)
 py.arg('--critic_train_steps', type=int, default=1)
 py.arg('--R1_reg_weight', type=float, default=0.2)
-py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE'])
+py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE', 'MSLE'])
 py.arg('--A_loss', default='VGG', choices=['pix-wise', 'VGG', 'sinGAN'])
 py.arg('--A_loss_weight', type=float, default=0.01)
 py.arg('--B_loss_weight', type=float, default=0.1)
@@ -183,6 +183,8 @@ if args.main_loss == 'MSE':
     cycle_loss_fn = tf.losses.MeanSquaredError()
 elif args.main_loss == 'MAE':
     cycle_loss_fn = tf.losses.MeanAbsoluteError()
+elif args.main_loss == 'MSLE':
+    cycle_loss_fn = tf.losses.MeanSquaredLogarithmicError()
 else:
     raise(NameError('Unrecognized Main Loss Function'))
 
