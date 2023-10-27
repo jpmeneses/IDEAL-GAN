@@ -691,7 +691,7 @@ def encoder(
 
 def decoder(
     encoded_dims,
-    output_2D_shape,
+    output_shape,
     multi_echo=True,
     n_groups=1,
     filters=36,
@@ -705,7 +705,7 @@ def decoder(
     norm='instance_norm'):
     Norm = _get_norm_layer(norm)
 
-    hgt,wdt = output_2D_shape
+    hgt,wdt,n_out = output_shape
     hls = hgt//(2**(num_layers))
     wls = wdt//(2**(num_layers))
     filt_ini = filters*(2**num_layers)
@@ -737,7 +737,7 @@ def decoder(
         x_i = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(x_i)
         output = keras.layers.concatenate([x_r,x_i])
     else:
-        output = keras.layers.Conv2D(2,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+        output = keras.layers.Conv2D(n_out,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
     if multi_echo:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
 
