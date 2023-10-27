@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-GAN.py --dataset 'GAN-500' --n_groups_PM 1 --encoded_size 24 --adv_train True --cGAN True --batch_size 16 --lr 0.001
+python train-IDEAL-GAN.py --dataset 'GAN-500' --only_mag True --n_groups_PM 1 --encoded_size 24 --adv_train True --cGAN True --batch_size 8 --lr 0.001
