@@ -21,6 +21,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--n_echoes', type=int, default=6)
+py.arg('--only_mag', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
@@ -100,6 +101,10 @@ acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx, MEBCRN=
 trainX  = np.concatenate((acqs_1,acqs_3,acqs_4,acqs_5),axis=0)
 valX    = acqs_2
 
+if args.only_mag:
+    trainX = np.sqrt(np.sum(np.square(trainX),axis=-1,keepdims=True))
+    valX = np.sqrt(np.sum(np.square(valX),axis=-1,keepdims=True))
+
 trainY  = np.concatenate((out_maps_1,out_maps_3,out_maps_4,out_maps_5),axis=0)
 valY    = out_maps_2
 
@@ -130,6 +135,10 @@ A_B_dataset_val.batch(1)
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
+if args.only_mag:
+    out_activ = 'relu'
+else:
+    out_activ = None
 enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
                 filters=args.n_G_filters,
@@ -140,40 +149,43 @@ enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
                 NL_self_attention=args.NL_SelfAttention
                 )
 dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
+                    output_activation=out_activ,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
+                    output_activation=out_activ,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     n_groups=args.n_groups_PM,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
+                    output_activation=out_activ,
                     NL_self_attention=args.NL_SelfAttention,
                     bayes_layer=args.PM_bayes_layer
                     )
 
-D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,2), 
+D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,n_ch), 
                 cGAN=args.cGAN,
                 multi_echo=True,
                 n_groups=args.n_groups_D,
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
 
-IDEAL_op = wf.IDEAL_Layer()
+if args.only_mag:
+    IDEAL_op = wf.IDEAL_mag_Layer()
+else:
+    IDEAL_op = wf.IDEAL_Layer()
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
@@ -190,7 +202,7 @@ else:
 
 cosine_loss = tf.losses.CosineSimilarity()
 if args.A_loss == 'VGG':
-    metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch))
+    metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch), pad=(80,80), only_mag=args.only_mag)
 
 if args.A_loss == 'sinGAN':
     # D_0 = dl.sGAN(input_shape=(None,None,n_ch))
@@ -231,8 +243,12 @@ def train_G(A, B):
         A2B2A = IDEAL_op(A2B, training=False)
 
         ############# Fourier Regularization ##############
-        A_f = F_op(A, training=False)
-        A2B2A_f = F_op(A2B2A, training=False)
+        if args.only_mag:
+            A_f = tf.zeros_like(A,dtype=tf.float32)
+            A2B2A_f = tf.zeros_like(A2B2A,dtype=tf.float32)
+        else:
+            A_f = F_op(A, training=False)
+            A2B2A_f = F_op(A2B2A, training=False)
         
         ############## Discriminative Losses ##############
         if args.adv_train:
@@ -264,8 +280,14 @@ def train_G(A, B):
                     A2B2A_cycle_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-        B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
+        if args.only_mag:
+            B_WF = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
+            B_PM = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,2:,:,:,:]),axis=-1,keepdims=True))
+        else:
+            B_WF = B[:,:2,:,:,:]
+            B_PM = B[:,2:,:,:,:]
+        B2A2B_cycle_loss = cycle_loss_fn(B_WF, A2B[:,:2,:,:,:])
+        B2A2B_cycle_loss += cycle_loss_fn(B_PM, A2B[:,2:,:,:,:]) * args.FM_loss_weight
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
 
         ################ Regularizers #####################
@@ -352,8 +374,12 @@ def sample(A, B):
     A2B2A = IDEAL_op(A2B, training=False)
 
     # Fourier regularization
-    A_f = F_op(A, training=False)
-    A2B2A_f = F_op(A2B2A, training=False)
+    if args.only_mag:
+        A_f = tf.zeros_like(A,dtype=tf.float32)
+        A2B2A_f = tf.zeros_like(A2B2A,dtype=tf.float32)
+    else:
+        A_f = F_op(A, training=False)
+        A2B2A_f = F_op(A2B2A, training=False)
     
     # Discriminative Losses
     if args.adv_train:
@@ -385,8 +411,14 @@ def sample(A, B):
                 val_A2B2A_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
-    val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-    val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
+    if args.only_mag:
+        B_WF = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
+        B_PM = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,2:,:,:,:]),axis=-1,keepdims=True))
+    else:
+        B_WF = B[:,:2,:,:,:]
+        B_PM = B[:,2:,:,:,:]
+    val_B2A2B_loss = cycle_loss_fn(B_WF, A2B[:,:2,:,:,:])
+    val_B2A2B_loss += cycle_loss_fn(B_PM, A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
@@ -466,16 +498,28 @@ for ep in range(args.epochs):
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            im_ech1 = np.squeeze(np.abs(tf.complex(A2B2A[:,0,:,:,0],A2B2A[:,0,:,:,1])))
-            im_ech2 = np.squeeze(np.abs(tf.complex(A2B2A[:,1,:,:,0],A2B2A[:,1,:,:,1])))
-            if args.n_echoes >= 3:
-                im_ech3 = np.squeeze(np.abs(tf.complex(A2B2A[:,2,:,:,0],A2B2A[:,2,:,:,1])))
-            if args.n_echoes >= 4:
-                im_ech4 = np.squeeze(np.abs(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1])))
-            if args.n_echoes >= 5:
-                im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1])))
-            if args.n_echoes >= 6:
-                im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1])))
+            if only_mag:
+                im_ech1 = np.squeeze(A2B2A[:,0,:,:,:])
+                im_ech2 = np.squeeze(A2B2A[:,1,:,:,:])
+                if args.n_echoes >= 3:
+                    im_ech3 = np.squeeze(A2B2A[:,2,:,:,:])
+                if args.n_echoes >= 4:
+                    im_ech4 = np.squeeze(A2B2A[:,3,:,:,:])
+                if args.n_echoes >= 5:
+                    im_ech5 = np.squeeze(A2B2A[:,4,:,:,:])
+                if args.n_echoes >= 6:
+                    im_ech6 = np.squeeze(A2B2A[:,5,:,:,:])
+            else:
+                im_ech1 = np.squeeze(np.abs(tf.complex(A2B2A[:,0,:,:,0],A2B2A[:,0,:,:,1])))
+                im_ech2 = np.squeeze(np.abs(tf.complex(A2B2A[:,1,:,:,0],A2B2A[:,1,:,:,1])))
+                if args.n_echoes >= 3:
+                    im_ech3 = np.squeeze(np.abs(tf.complex(A2B2A[:,2,:,:,0],A2B2A[:,2,:,:,1])))
+                if args.n_echoes >= 4:
+                    im_ech4 = np.squeeze(np.abs(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1])))
+                if args.n_echoes >= 5:
+                    im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1])))
+                if args.n_echoes >= 6:
+                    im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1])))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
@@ -516,13 +560,19 @@ for ep in range(args.epochs):
                 fig.delaxes(axs[0,5])
 
             # A2B maps in the second row
-            w_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+            if args.only_mag:
+                w_aux = np.squeeze(A2B[:,0,:,:,:])
+            else:
+                w_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            f_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
+            if args.only_mag:
+                f_aux = np.squeeze(A2B[:,1,:,:,:])
+            else:
+                f_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
@@ -534,7 +584,10 @@ for ep in range(args.epochs):
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_aux = np.squeeze(A2B[:,2,:,:,0])
+            if args.only_mag:
+                field_aux = np.zeros_like(r2_aux)
+            else:
+                field_aux = np.squeeze(A2B[:,2,:,:,0])
             field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
