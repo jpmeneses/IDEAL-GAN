@@ -239,30 +239,27 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
-def IDEAL_mag(out_WF_abs, out_PM, ne=6):
-    n_batch,_,hgt,wdt,_ = out_WF_abs.shape
+def IDEAL_mag(out_maps, params):
+    n_batch,_,hgt,wdt,_ = out_maps.shape
     
-    te = np.arange(start=1.3e-3,stop=(2*ne)*1e-3,step=2.1e-3)
-    te = tf.expand_dims(tf.convert_to_tensor(te,dtype=tf.float32),0) # (1,ne)
-    te_complex = tf.complex(0.0,te) # (1,ne)
+    te = params[1] # (nb,ne,1)
+    te_complex = tf.complex(0.0,te) 
+    ne = te.shape[1]
     
-    M = gen_M(te,get_Mpinv=False) # (nb,ne,ns)
+    M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
 
     # Generate complex water/fat signals
-    rho = tf.complex(out_WF_abs,0.0) * rho_sc
+    rho = tf.complex(out_maps[:,:2,:,:,:],0.0) * rho_sc
     rho_mtx = tf.reshape(rho, [n_batch, ns, -1]) # (nb,ns,nv)
 
-    r2s = out_PM[:,0,:,:,1] * r2_sc
-    phi = out_PM[:,0,:,:,0] * fm_sc
-    # r2s_pi = tf.nn.relu(r2s_pi)
+    r2s = out_maps[:,2:,:,:,:] * r2_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi,r2s/(2*np.pi))
+    xi = tf.complex(0.0,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
-    xi_rav = tf.expand_dims(xi_rav,-1) # (nb,nv,1)
+    xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
-    Wp = tf.math.exp(tf.linalg.matmul(xi_rav, +2*np.pi * te_complex)) # (nb,nv,ne)
-    Wp = tf.transpose(Wp, perm=[0,2,1]) # (nb,ne,nv)
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # (nb,ne,nv)
 
     # Matrix operations
     Smtx = tf.abs(Wp) * tf.abs(tf.linalg.matmul(M,rho_mtx)) # (nb,ne,nv)
@@ -271,6 +268,17 @@ def IDEAL_mag(out_WF_abs, out_PM, ne=6):
     res_gt = tf.reshape(Smtx,[n_batch,ne,hgt,wdt,1])
     
     return res_gt
+
+
+class IDEAL_mag_Layer(tf.keras.layers.Layer):
+    def __init__(self, field=1.5):
+        super(IDEAL_mag_Layer, self).__init__()
+        self.field = field
+
+    def call(self,out_maps,te=None,training=None):
+        if te is None:
+            te = gen_TEvar(6, out_maps.shape[0], orig=True)
+        return IDEAL_mag(out_maps, [self.field, te])
 
 
 @tf.function
