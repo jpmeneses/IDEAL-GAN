@@ -498,7 +498,7 @@ for ep in range(args.epochs):
             fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
             # Magnitude of recon MR images at each echo
-            if only_mag:
+            if args.only_mag:
                 im_ech1 = np.squeeze(A2B2A[:,0,:,:,:])
                 im_ech2 = np.squeeze(A2B2A[:,1,:,:,:])
                 if args.n_echoes >= 3:
