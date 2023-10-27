@@ -202,7 +202,7 @@ else:
 
 cosine_loss = tf.losses.CosineSimilarity()
 if args.A_loss == 'VGG':
-    metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch), pad=(80,80), only_mag=args.only_mag)
+    metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch), only_mag=args.only_mag)
 
 if args.A_loss == 'sinGAN':
     # D_0 = dl.sGAN(input_shape=(None,None,n_ch))
