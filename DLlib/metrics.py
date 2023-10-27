@@ -5,9 +5,14 @@ import tensorflow_probability as tfp
 
 vgg = keras.applications.vgg19.VGG19()
 
-def perceptual_metric(input_shape, layers=[2,5,8,13,18], pad=(16,16), multi_echo=True):
+def perceptual_metric(input_shape, layers=[2,5,8,13,18], pad=(16,16), multi_echo=True, only_mag=False):
     inputs = keras.Input(input_shape)
-    x = keras.layers.Lambda(lambda x: tf.concat([x[...,:1]*0.5+0.5,tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)),x[...,1:2]*0.5+0.5],axis=-1))(inputs)
+    if only_mag:
+        x = keras.layers.Lambda(lambda x: tf.concat([x,x,x],axis=-1))(inputs)
+    else:
+        x =keras.layers.Lambda(lambda x: tf.concat([x[...,:1]*0.5+0.5,
+                                                    tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)),
+                                                    x[...,1:2]*0.5+0.5],axis=-1))(inputs)
     x = keras.layers.Lambda(lambda x: 255.0*x)(x)
     if multi_echo:
         x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(x)
