@@ -717,11 +717,11 @@ def decoder(
     # pm_init = keras.initializers.VarianceScaling(scale=1e-6,mode='fan_out',distribution='uniform')
     filt_iter = filt_ini
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
-    x = keras.layers.Conv2D(filt_iter,3,padding="same",groups=n_groups,activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    x = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x) # n_groups
     if NL_self_attention:
-        x = _residual_block(x, norm=norm, groups=n_groups)
+        x = _residual_block(x, norm=norm) # n_groups
         x = SelfAttention(ch=filt_ini)(x)
-        x = _residual_block(x, norm=norm, groups=n_groups)
+        x = _residual_block(x, norm=norm) # n_groups
     for cont in range(num_layers):
         filt_iter //= 2  # decreasing number of filters with each layer
         x = _upsample(filt_iter, (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(x)
