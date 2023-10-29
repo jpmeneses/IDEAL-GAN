@@ -52,6 +52,7 @@ py.arg('--A_loss_weight', type=float, default=0.01)
 py.arg('--B_loss_weight', type=float, default=0.1)
 py.arg('--FM_loss_weight', type=float, default=1.0)
 py.arg('--ls_reg_weight', type=float, default=1e-7)
+py.arg('--cov_reg_weight', type=float, default=1e-3)
 py.arg('--Fourier_reg_weight', type=float, default=0.0)
 py.arg('--NL_SelfAttention',type=bool, default=True)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
@@ -189,6 +190,7 @@ else:
 LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
 F_op = dl.FourierLayer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
+Cov_op = dl.CoVar()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 if args.main_loss == 'MSE':
@@ -229,6 +231,7 @@ def train_G(A, B):
     with tf.GradientTape(persistent=args.adv_train) as t:
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
+        A2Z_cov = Cov_op(A2Z, training=False)
         if args.VQ_encoder:
             vq_dict = vq_op(A2Z)
             A2Z = vq_dict['quantize']
@@ -289,6 +292,7 @@ def train_G(A, B):
         B2A2B_cycle_loss = cycle_loss_fn(B_WF, A2B[:,:2,:,:,:])
         B2A2B_cycle_loss += cycle_loss_fn(B_PM, A2B[:,2:,:,:,:]) * args.FM_loss_weight
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
+        A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
 
         ################ Regularizers #####################
         activ_reg = tf.constant(0.0,dtype=tf.float32)
@@ -299,6 +303,7 @@ def train_G(A, B):
         
         G_loss = args.A_loss_weight * A2B2A_cycle_loss + args.B_loss_weight * B2A2B_cycle_loss + A2B2A_g_loss
         G_loss += activ_reg + A2B2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss'] * args.ls_reg_weight
+        G_loss += A2Z_cov_loss * args.cov_reg_weight
         
     G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))

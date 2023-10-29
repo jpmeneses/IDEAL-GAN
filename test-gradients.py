@@ -33,8 +33,9 @@ print('Dataset size:', len_dataset)
 print('Acquisition Dimensions:', hgt,wdt)
 print('Output Maps:',n_out)
 
+bs = 4
 A_B_dataset = tf.data.Dataset.from_tensor_slices((acqs,out_maps))
-A_B_dataset = A_B_dataset.batch(4).shuffle(len_dataset)
+A_B_dataset = A_B_dataset.batch(bs).shuffle(len_dataset)
 
 enc= dl.encoder(input_shape=(6,hgt,wdt,n_ch),
                 encoded_dims=64,
@@ -42,15 +43,15 @@ enc= dl.encoder(input_shape=(6,hgt,wdt,n_ch),
                 ls_reg_weight=1e-5,
                 NL_self_attention=False)
 dec_w  = dl.decoder(encoded_dims=64,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=12,
                     NL_self_attention=False)
 dec_f  = dl.decoder(encoded_dims=64,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=12,
                     NL_self_attention=False)
 dec_xi = dl.decoder(encoded_dims=64,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=12,
                     NL_self_attention=False)
 
@@ -70,6 +71,7 @@ D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=12, self_attention=False)
 IDEAL_op = wf.IDEAL_Layer()
 LWF_op = wf.LWF_Layer(ne,MEBCRN=True)
 F_op = dl.FourierLayer()
+Cov_op = dl.CoVar()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
@@ -86,6 +88,7 @@ def train_G(A, B):
     with tf.GradientTape(persistent=True) as t:
         ##################### A Cycle #####################
         A2Z = enc(A, training=True)
+        A2Z_cov = Cov_op(A2Z)
         A2Z2B_w = dec_w(A2Z, training=True)
         A2Z2B_f = dec_f(A2Z, training=True)
         A2Z2B_xi= dec_xi(A2Z, training=True)
@@ -118,11 +121,13 @@ def train_G(A, B):
         A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
         B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
+        A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
 
         ################ Regularizers #####################
         activ_reg = tf.add_n(enc.losses)
         
         G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + B2A2B_cycle_loss)*1e1 + activ_reg + A2B2A_f_cycle_loss*1e-3
+        G_loss += A2Z_cov_loss*1e-3
         
     G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
@@ -182,7 +187,7 @@ py.mkdir(sample_dir)
 n_div = len_dataset
 A_prev = None
 for ep in range(20):
-    for A, B in tqdm.tqdm(A_B_dataset, desc='Ep. '+str(ep+1), total=len_dataset):
+    for A, B in tqdm.tqdm(A_B_dataset, desc='Ep. '+str(ep+1), total=len_dataset//bs):
         # ==============================================================================
         # =                                RANDOM TEs                                  =
         # ==============================================================================
