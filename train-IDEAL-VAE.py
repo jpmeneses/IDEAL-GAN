@@ -44,6 +44,7 @@ py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE'])
 py.arg('--A_loss', default='VGG', choices=['pix-wise', 'VGG', 'sinGAN'])
 py.arg('--A_loss_weight', type=float, default=0.01)
 py.arg('--ls_reg_weight', type=float, default=1e-7)
+py.arg('--cov_reg_weight', type=float, default=0.0)
 py.arg('--Fourier_reg_weight', type=float, default=0.0)
 py.arg('--NL_SelfAttention',type=bool, default=True)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
@@ -140,6 +141,7 @@ D_A=dl.PatchGAN(input_shape=(hgt,wdt,2),
 
 F_op = dl.FourierLayer(multi_echo=False)
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
+Cov_op = dl.CoVar()
 
 d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 if args.main_loss == 'MSE':
@@ -185,6 +187,7 @@ def train_G(A):
         else:
             vq_dict =  {'loss': tf.constant(0.0,dtype=tf.float32),
                         'perplexity': tf.constant(0.0,dtype=tf.float32)}
+        A2Z_cov = Cov_op(A2Z, training=False)
         A2Z2A = dec(A2Z, training=True)
 
         ############# Fourier Regularization ##############
@@ -217,6 +220,7 @@ def train_G(A):
         else:
             A2Z2A_cycle_loss = cycle_loss_fn(A, A2Z2A)
         A2Z2A_f_cycle_loss = cycle_loss_fn(A_f, A2Z2A_f)
+        A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
 
         ################ Regularizers #####################
         activ_reg = tf.constant(0.0,dtype=tf.float32)
@@ -225,6 +229,7 @@ def train_G(A):
         
         G_loss = args.A_loss_weight * A2Z2A_cycle_loss + A2Z2A_g_loss
         G_loss += activ_reg + A2Z2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss'] * args.ls_reg_weight
+        G_loss += A2Z_cov_loss * args.cov_reg_weight
         
     G_grad = t.gradient(G_loss, enc.trainable_variables + dec.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec.trainable_variables))
