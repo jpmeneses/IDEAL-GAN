@@ -52,7 +52,7 @@ py.arg('--A_loss_weight', type=float, default=0.01)
 py.arg('--B_loss_weight', type=float, default=0.1)
 py.arg('--FM_loss_weight', type=float, default=1.0)
 py.arg('--ls_reg_weight', type=float, default=1e-7)
-py.arg('--cov_reg_weight', type=float, default=1e-3)
+py.arg('--cov_reg_weight', type=float, default=0.0)
 py.arg('--Fourier_reg_weight', type=float, default=0.0)
 py.arg('--NL_SelfAttention',type=bool, default=True)
 py.arg('--pool_size', type=int, default=50)  # pool size to store fake samples
