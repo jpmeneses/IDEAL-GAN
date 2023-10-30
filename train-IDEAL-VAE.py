@@ -238,6 +238,7 @@ def train_G(A):
                     'A2Z2A_cycle_loss': A2Z2A_cycle_loss,
                     'A2Z2A_f_cycle_loss': A2Z2A_f_cycle_loss,
                     'LS_reg': activ_reg/args.ls_reg_weight,
+                    'Cov_reg': A2Z_cov_loss,
                     'VQ_loss': vq_dict['loss'],
                     'VQ_perplexity': vq_dict['perplexity']}
 
