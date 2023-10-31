@@ -42,7 +42,7 @@ hgt,wdt,n_ch = 192,192,2
 # ==============================================================================
 
 dec= dl.decoder(encoded_dims=args.encoded_size,
-                output_2D_shape=(hgt,wdt),
+                output_shape=(hgt,wdt,n_ch),
                 multi_echo=False,
                 filters=args.n_G_filters,
                 num_layers=args.n_downsamplings,
