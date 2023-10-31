@@ -30,16 +30,33 @@ class ItemPool:
         return tf.stack(out_items, axis=0)
 
 
-def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,
-            acqs_data=True,te_data=False,complex_data=False,
+def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,num_slice_list=None,
+            remove_non_central=False,acqs_data=True,te_data=False,complex_data=False,
             remove_zeros=True, MEBCRN=False):
     f = h5py.File(ds_dir + hdf5_file, 'r')
-    if acqs_data:
-        acqs = f['Acquisitions'][start:end]
-    out_maps = f['OutMaps'][start:end]
-    if te_data:
-        TEs = f['TEs'][start:end]
-        TEs = np.expand_dims(TEs,axis=-1)
+    if num_slice_list:
+        ini_end_idxs = np.cumsum(num_slice_list)
+        ini_end_idxs = np.concatenate((np.zeros((1),dtype=int),ini_end_idxs))
+        idxs = list()
+        for k in range(ini_end_idxs[-1]):
+            k_diff = k-ini_end_idxs[0]
+            if np.abs(k_diff) > 4:
+                idxs.append(k)
+            elif k_diff >= 4:
+                ini_end_idxs = np.delete(ini_end_idxs,0)
+        if acqs_data:
+            acqs = f['Acquisitions'][idxs]
+        out_maps = f['OutMaps'][idxs]
+        if te_data:
+            TEs = f['TEs'][idxs]
+            TEs = np.expand_dims(TEs,axis=-1)
+    else:
+        if acqs_data:
+            acqs = f['Acquisitions'][start:end]
+        out_maps = f['OutMaps'][start:end]
+        if te_data:
+            TEs = f['TEs'][start:end]
+            TEs = np.expand_dims(TEs,axis=-1)
     f.close()
 
     if remove_zeros:
