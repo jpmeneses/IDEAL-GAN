@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v011-VAE
-#SBATCH --output=out_VAE_011.txt
+#SBATCH --job-name=v401-GAN
+#SBATCH --output=out_GAN_401.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-VAE.py --dataset VAE-011 --encoded_size 24 --adv_train True --batch_size 64 --lr 0.001 --D_lr_factor 5 --A_loss_weight 1e-2 --ls_reg_weight 1e-3
+python train-IDEAL-GAN.py --dataset 'GAN-401' --encoded_size 24 --adv_train True --cGAN True --batch_size 8 --epochs 160 --epoch_decay 160 --lr 0.001 --ls_reg_weight 1e-6
