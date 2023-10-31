@@ -88,7 +88,7 @@ enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
                 NL_self_attention=args.NL_SelfAttention
                 )
 dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
@@ -96,7 +96,7 @@ dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
@@ -104,7 +104,7 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     n_groups=args.n_groups_PM,
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
