@@ -46,30 +46,21 @@ hgt,wdt,n_ch = 192,192,2
 # ==============================================================================
 
 dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_2D_shape=(hgt,wdt),
+                    output_shape=(hgt,wdt,n_ch),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     NL_self_attention=args.NL_SelfAttention
                     )
-# if args.PM_bayes_layer:
-# 	dec_xi=dl.Bayes_decoder(encoded_dims=args.encoded_size,
-#                             output_2D_shape=(hgt,wdt),
-#                             filters=args.n_G_filters,
-#                             num_layers=args.n_downsamplings,
-#                             num_res_blocks=args.n_res_blocks,
-#                             output_activation=None,
-#                             NL_self_attention=args.NL_SelfAttention,
-#                             )
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-					output_2D_shape=(hgt,wdt),
+					output_shape=(hgt,wdt,n_ch),
 					n_groups=args.n_groups_PM,
 					filters=args.n_G_filters,
 					num_layers=args.n_downsamplings,
