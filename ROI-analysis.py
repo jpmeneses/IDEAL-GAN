@@ -24,6 +24,7 @@ py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--te_input', type=bool, default=False)
 py.arg('--MEBCRN', type=bool, default=True)
 py.arg('--multi_TE', type=bool, default=True)
+py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
 py.arg('--batch_size', type=int, default=1)
@@ -50,19 +51,39 @@ ech_idx = args.n_echoes * 2
 
 dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
 # dataset_dir = '../MRI-Datasets/'
-if args.n_echoes == 6 and not(args.multi_TE):
-  dataset_hdf5 = '6ech_GC_192_origTEs_complex_2D.hdf5'
-elif args.n_echoes == 6 and args.multi_TE:
-  dataset_hdf5 = 'multiTE_GC_192_complex_2D.hdf5'
-elif args.n_echoes == 3:
-  dataset_hdf5 = '3ech_GC_192_complex_2D.hdf5'
-testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
-                                  te_data=True,remove_zeros=False,MEBCRN=args.MEBCRN)
 if args.multi_TE:
-  testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=args.MEBCRN)
-  npy_file = 'slices_crops_multiTE.npy'
+  if args.data_size == 192:
+    dataset_hdf5 = 'multiTE_GC_192_complex_2D.hdf5'
+  else:
+    dataset_hdf5 = 'multiTE_GC_384_complex_2D.hdf5'
+elif args.n_echoes == 3:
+  if args.data_size == 192:
+    dataset_hdf5 = '3ech_GC_192_complex_2D.hdf5'
+  else:
+    dataset_hdf5 = '3ech_GC_384_complex_2D.hdf5'
 else:
-  npy_file = 'slices_crops_3ech.npy'
+  dataset_hdf5 = 'JGalgani_GC_384_complex_2D.hdf5'
+  num_slice_list = [21,20,24,24,21,24,21,21,24,21,21,22,27,23,22,20,24,21,21,22,20]
+
+if args.multi_TE:
+  testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
+                                    te_data=True,remove_zeros=False,MEBCRN=args.MEBCRN)
+  testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=args.MEBCRN)
+  if args.data_size == 192:
+    npy_file = 'slices_crops_multiTE.npy'
+  else:
+    npy_file = 'slices_crops_multiTE_384.npy'
+else:
+  testX, testY = data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=True,
+                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=args.MEBCRN)
+  TEs = np.ones((testX.shape[0],1),dtype=np.float32)
+  if args.n_echoes == 3:
+    if args.data_size == 192:
+      npy_file = 'slices_crops_3ech.npy'
+    else:
+      npy_file = 'slices_crops_3ech_192.npy'
+  else:
+    npy_file = 'slices_crops_Galgani.npy'
 
 if args.MEBCRN:
   len_dataset,n_out,hgt,wdt,n_ch = np.shape(testY)
@@ -101,11 +122,12 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     else:
       input_shape = (hgt,wdt,ech_idx)
     G_A2B = dl.PM_Generator(input_shape=input_shape,
-                          filters=args.n_G_filters,
-                          te_input=args.te_input,
-                          te_shape=(args.n_echoes,),
-                          R2_self_attention=args.D1_SelfAttention,
-                          FM_self_attention=args.D2_SelfAttention)
+                            ME_layer=False,
+                            filters=args.n_G_filters,
+                            te_input=args.te_input,
+                            te_shape=(args.n_echoes,),
+                            R2_self_attention=args.D1_SelfAttention,
+                            FM_self_attention=args.D2_SelfAttention)
 elif args.G_model == 'U-Net':
   if args.out_vars == 'WF-PM':
     n_out = 4
@@ -218,7 +240,10 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   A = tf.expand_dims(A,axis=0)
   B = tf.expand_dims(B,axis=0)
   TE= tf.expand_dims(TE,axis=0)
-  A2B = sample(A,B,TE)
+  if args.multi_TE:
+    A2B = sample(A,B,TE)
+  else:
+    A2B = sample(A,B)
 
   if args.MEBCRN:
     A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B[:,:2,:,:,:]),axis=-1))
