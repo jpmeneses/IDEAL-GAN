@@ -451,7 +451,7 @@ def PM_Generator(
 
     if ME_layer:
         x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
-    elif len(input_shape) > 3:
+    elif len(input_shape) > 3 and te_input == True:
         x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[-3],x.shape[-2],x.shape[-1]]))(x)
         # Fully-connected network for processing the vector with echo-times
         y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
