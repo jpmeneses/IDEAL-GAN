@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-ldm.py --experiment_dir 'GAN-408' --n_timesteps 200 --batch_size 8 --epochs_ldm 400 --lr 5e-5
+python train-ldm.py --experiment_dir 'GAN-408' --n_timesteps 200 --batch_size 8 --epochs_ldm 800 --lr 5e-5
