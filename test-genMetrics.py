@@ -46,41 +46,38 @@ A_dataset_val = A_dataset_val.batch(args.val_batch_size).shuffle(len_dataset)
 # =                                   models                                   =
 # ==============================================================================
 
-if args.G_model == 'encod-decod':
-    enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
-    				encoded_dims=args.encoded_size,
+enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+				encoded_dims=args.encoded_size,
+                filters=args.n_G_filters,
+                num_layers=args.n_downsamplings,
+                num_res_blocks=args.n_res_blocks,
+                kl_reg=False,
+                NL_self_attention=args.NL_SelfAttention)
+dec_w =  dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_ch),
                     filters=args.n_G_filters,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
-                    kl_reg=False,
-                    NL_self_attention=args.NL_SelfAttention)
-    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        n_groups=args.n_groups_PM,
-                        filters=args.n_G_filters,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-else:
-    raise(NameError('Unrecognized Generator Architecture'))
+                    output_activation=None,
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_f =  dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_ch),
+                    filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_xi = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_ch),
+                    n_groups=args.n_groups_PM,
+                    filters=args.n_G_filters,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation=None,
+                    NL_self_attention=args.NL_SelfAttention
+                    )
 
 get_features = dl.get_features((ne,hgt,wdt,n_ch))
 
