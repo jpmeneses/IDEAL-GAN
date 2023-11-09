@@ -32,9 +32,9 @@ py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--n_G_filters', type=int, default=72)
 py.arg('--batch_size', type=int, default=1)
-py.arg('--epochs', type=int, default=200)
+py.arg('--epochs', type=int, default=100)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
-py.arg('--epoch_ckpt', type=int, default=10)  # num. of epochs to save a checkpoint
+py.arg('--epoch_ckpt', type=int, default=20)  # num. of epochs to save a checkpoint
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
@@ -180,25 +180,24 @@ if args.DL_gen or args.DL_aug:
                     filters=DL_args.n_G_filters,
                     num_layers=DL_args.n_downsamplings,
                     num_res_blocks=DL_args.n_res_blocks,
-                    kl_reg=False,
                     NL_self_attention=DL_args.NL_SelfAttention
                     )
     dec_w =  dl.decoder(encoded_dims=DL_args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
+                        output_shape=(hgt,wdt,n_ch),
                         filters=DL_args.n_G_filters,
                         num_layers=DL_args.n_downsamplings,
                         num_res_blocks=DL_args.n_res_blocks,
                         NL_self_attention=DL_args.NL_SelfAttention
                         )
     dec_f =  dl.decoder(encoded_dims=DL_args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
+                        output_shape=(hgt,wdt,n_ch),
                         filters=DL_args.n_G_filters,
                         num_layers=DL_args.n_downsamplings,
                         num_res_blocks=DL_args.n_res_blocks,
                         NL_self_attention=DL_args.NL_SelfAttention
                         )
     dec_xi = dl.decoder(encoded_dims=DL_args.encoded_size,
-                        output_2D_shape=(hgt,wdt),
+                        output_shape=(hgt,wdt,n_ch),
                         n_groups=DL_args.n_groups_PM,
                         filters=DL_args.n_G_filters,
                         num_layers=DL_args.n_downsamplings,
