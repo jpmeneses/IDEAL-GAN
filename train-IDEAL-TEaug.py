@@ -22,7 +22,6 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--DL_gen', type=bool, default=False)
-py.arg('--DL_aug', type=bool, default=False)
 py.arg('--DL_experiment_dir', default='output/GAN-238')
 py.arg('--n_per_epoch', type=int, default=10000)
 py.arg('--n_echoes', type=int, default=6)
@@ -56,7 +55,7 @@ py.mkdir(output_dir)
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
-if args.DL_gen or args.DL_aug:
+if args.DL_gen:
     DL_args = py.args_from_yaml(py.join(args.DL_experiment_dir, 'settings.yml'))
 
 
@@ -78,19 +77,19 @@ acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
 if not(args.DL_gen):
     dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
     acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                acqs_data=True, te_data=False, MEBCRN=True)
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
     dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
     acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                                acqs_data=True, te_data=False, MEBCRN=True)
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
     dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
     acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                                acqs_data=True, te_data=False, MEBCRN=True)
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
     dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
     acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                                acqs_data=True, te_data=False, MEBCRN=True)
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -101,9 +100,8 @@ if not(args.DL_gen):
 # n4_div = 434
 
 if args.DL_gen:
-    trainX = trainY = np.zeros((args.n_per_epoch,1,1,1,1),dtype=np.float32)
+    trainY = np.zeros((args.n_per_epoch,1,1,1,1),dtype=np.float32)
 else:
-    trainX = np.concatenate((acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
     trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
 valX    = acqs_1
 valY    = out_maps_1
@@ -119,8 +117,8 @@ print('Echoes:',echoes)
 # Input and output dimensions (validations data)
 print('Output shape:',valY.shape)
 
-A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
-A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len(trainY))
+B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
+B_dataset = B_dataset.batch(args.batch_size).shuffle(len(trainY))
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
 A_B_dataset_val.batch(1)
 
@@ -174,7 +172,7 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-if args.DL_gen or args.DL_aug:
+if args.DL_gen:
     enc= dl.encoder(input_shape=(DL_args.n_echoes,hgt,wdt,n_ch),
                     encoded_dims=DL_args.encoded_size,
                     filters=DL_args.n_G_filters,
@@ -218,20 +216,11 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 # ==============================================================================
 
 @tf.function
-def train_G(A, B, te=None):
+def train_G(B, te=None):
     with tf.GradientTape() as t:
         ##################### B Cycle #####################
-        if not(args.DL_aug):
-            B2A = IDEAL_op(B, te=te, training=False)
-            B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
-        else:
-            A2Z = enc(A, training=False)
-            A2Z = keras.layers.GaussianNoise(stddev=0.05)(A2Z)
-            A2Z2B_w = dec_w(A2Z, training=False)
-            A2Z2B_f = dec_f(A2Z, training=False)
-            A2Z2B_xi= dec_xi(A2Z, training=False)
-            B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
-            B2A = IDEAL_op(B, te=te, training=False)
+        B2A = IDEAL_op(B, te=te, training=False)
+        B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
 
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
         B_PM = B[:,2:,:,:,:]
@@ -357,21 +346,13 @@ def train_G(A, B, te=None):
             'L1_FM': FM_L1}
 
 
-def train_step(A, B, te=None):
-    G_loss_dict = train_G(A, B, te)
+def train_step(B, te=None):
+    G_loss_dict = train_G(B, te)
     return G_loss_dict
 
 
 @tf.function
 def sample(A, B, te=None):
-    if args.DL_aug:
-        A2Z = enc(A, training=False)
-        A2Z = keras.layers.GaussianNoise(stddev=0.05)(A2Z)
-        A2Z2B_w = dec_w(A2Z, training=False)
-        A2Z2B_f = dec_f(A2Z, training=False)
-        A2Z2B_xi= dec_xi(A2Z, training=False)
-        B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
-
     # Split B
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
     B_PM = B[:,2:,:,:,:]
@@ -506,7 +487,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for A, B in A_B_dataset:
+    for B in B_dataset:
         if args.DL_gen:
             hls = hgt//(2**(DL_args.n_downsamplings))
             wls = wdt//(2**(DL_args.n_downsamplings))
@@ -518,22 +499,17 @@ for ep in range(args.epochs):
         # ==============================================================================
         p = np.random.rand()
         if p <= 0.4:
-            A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,args.n_echoes*n_ch])
             B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
 
             # Random 90 deg rotations
-            A = tf.image.rot90(A,k=np.random.randint(3))
             B = tf.image.rot90(B,k=np.random.randint(3))
 
             # Random horizontal reflections
-            A = tf.image.random_flip_left_right(A)
             B = tf.image.random_flip_left_right(B)
 
             # Random vertical reflections
-            A = tf.image.random_flip_up_down(A)
             B = tf.image.random_flip_up_down(B)
 
-            A = tf.transpose(tf.reshape(A,[A.shape[0],hgt,wdt,args.n_echoes,n_ch]),[0,3,1,2,4])
             B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
 
             # Random off-resonance field-map scaling factor
