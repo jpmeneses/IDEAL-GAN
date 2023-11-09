@@ -15,6 +15,8 @@ import data
 
 py.arg('--experiment_dir', default='GAN-100')
 py.arg('--n_timesteps', type=int, default=200)
+py.arg('--beta_start', type=float, default=0.0001)
+py.arg('--beta_end', type=float, default=0.02)
 py.arg('--n_ldm_filters', type=int, default=64)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs_ldm', type=int, default=100)
@@ -127,7 +129,7 @@ tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi,vq_op=vq_op), p
 ################################################################################
 
 # create a fixed beta schedule
-beta = np.linspace(0.0001, 0.02, args.n_timesteps)
+beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
 
 # this will be used as discussed in the reparameterization trick
 alpha = 1 - beta
