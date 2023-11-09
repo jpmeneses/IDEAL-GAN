@@ -528,7 +528,7 @@ for ep in range(args.epochs):
         else:
             te_var = wf.gen_TEvar(args.n_echoes, bs=B.shape[0])
 
-        G_loss_dict = train_step(A, B, te=te_var)
+        G_loss_dict = train_step(B, te=te_var)
 
         # # summary
         with train_summary_writer.as_default():
