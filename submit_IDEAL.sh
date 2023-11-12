@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v409-GAN
-#SBATCH --output=out_GAN_409.txt
+#SBATCH --job-name=v408-LDM
+#SBATCH --output=out_LDM_408.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-GAN.py --dataset 'GAN-409' --n_downsamplings 3 --encoded_size 3 --adv_train True --cGAN True --batch_size 8 --epochs 140 --epoch_decay 140 --lr 0.001 --ls_reg_weight 2e-6
+python train-ldm.py --experiment_dir 'GAN-408' --n_timesteps 500 --beta_start 0.005 --beta_end 0.1 --batch_size 8 --epochs_ldm 600 --lr 1e-5
