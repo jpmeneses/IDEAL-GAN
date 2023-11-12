@@ -222,7 +222,7 @@ z_mean = 0.0
 z_var = 0.0
 if args.VQ_encoder:
     z_std.assign_add(10.0)
-else:
+elif z_std.numpy == 0.0:
     for k in range(2):
         for A in A_dataset:
             A2Z = enc(A, training=False)
@@ -235,7 +235,7 @@ else:
             z_mean /= z_num
         else:
             z_var /= z_num
-    z_std.assign_add(tf.math.sqrt(z_var))
+    z_std.assign(tf.math.sqrt(z_var))
         
 
 # main loop
