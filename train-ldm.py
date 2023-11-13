@@ -222,7 +222,7 @@ z_mean = 0.0
 z_var = 0.0
 if args.VQ_encoder:
     z_std.assign_add(10.0)
-elif z_std.numpy == 0.0:
+elif z_std.numpy() == 0.0:
     for k in range(2):
         for A in A_dataset:
             A2Z = enc(A, training=False)
