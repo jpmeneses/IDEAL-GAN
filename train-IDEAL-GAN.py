@@ -20,6 +20,7 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
+py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--only_mag', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
@@ -80,19 +81,19 @@ r2_sc = 200.0
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
+dataset_hdf5_1 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx, MEBCRN=True)
 
-dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
+dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, MEBCRN=True)
 
-dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
+dataset_hdf5_3 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx, MEBCRN=True)
 
-dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
+dataset_hdf5_4 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx, MEBCRN=True)
 
-dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
+dataset_hdf5_5 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx, MEBCRN=True)
 
 ################################################################################
