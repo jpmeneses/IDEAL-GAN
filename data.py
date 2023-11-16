@@ -214,3 +214,64 @@ def group_TEs(A,B,TEs,TE1,dTE,MEBCRN=False):
 
     return A, B, TEs
 
+
+def A_from_MEBCRN(A):
+    A_r = A[...,0]
+    A_i = A[...,1]
+
+    A_r = tf.transpose(A_r,perm=[0,2,3,1])
+    A_i = tf.transpose(A_i,perm=[0,2,3,1])
+    nb,hgt,wdt,ne = A_r.shape
+
+    zero_fill = tf.zeros_like(A_r)
+    re_stack_var = tf.stack([A_r,zero_fill],4)
+    re_aux_var = tf.reshape(re_stack_var,[nb,hgt,wdt,2*ne])
+    im_stack_var = tf.stack([zero_fill,A_i],4)
+    im_aux_var = tf.reshape(im_stack_var,[nb,hgt,wdt,2*ne])
+
+    return re_aux_var + im_aux_var
+
+
+def B_from_MEBCRN(B,mode='WF'):
+    if mode == 'WF':
+        B_W = B[:,0,:,:,:]
+        B_F = B[:,1,:,:,:]
+        return tf.concat([B_W,B_F],axis=-1)
+    elif mode == 'PM':
+        B_FM = B[:,2,:,:,:1]
+        B_R2 = B[:,2,:,:,1:]
+        return tf.concat([B_R2,B_FM],axis=-1)
+    elif mode == 'WF-PM':
+        B_W = B[:,0,:,:,:]
+        B_F = B[:,1,:,:,:]
+        B_PM= B[:,2,:,:,:]
+        B_R2= B[:,:,:,1]
+        B_FM= B[:,:,:,0]
+        return tf.concat([B_W,B_F,B_R2,B_FM],axis=-1)
+
+
+def B_to_MEBCRN(B,mode='WF-PM'):
+    if mode == 'WF':
+        B_W = tf.expand_dims(B[:,:,:,:1],axis=1)
+        B_W = tf.concat([B_W,tf.zeros_like(B_W)],axis=-1)
+        B_F = tf.expand_dims(B[:,:,:,1:],axis=1)
+        B_F = tf.concat([B_F,tf.zeros_like(B_F)],axis=-1)
+        return tf.concat([B_W,B_F],axis=1)
+    elif mode == 'PM':
+        B_R2 = tf.expand_dims(B[:,:,:,:1],axis=1)
+        B_PM = tf.expand_dims(B[:,:,:,1:],axis=1)
+        return tf.concat([B_PM,B_R2],axis=-1)
+    elif mode == 'WF-PM':
+        B_W = B[:,:,:,:1]
+        B_W = tf.concat([B_W,tf.zeros_like(B_W)],axis=-1)
+        B_F = B[:,:,:,1:2]
+        B_F = tf.concat([B_F,tf.zeros_like(B_F)],axis=-1)
+        B_R2= B[:,:,:,2:3]
+        B_FM= B[:,:,:,3:]
+        B_PM= tf.concat([B_FM,B_R2],axis=-1)
+
+        B_W = tf.expand_dims(B_W, axis=1)
+        B_F = tf.expand_dims(B_F, axis=1)
+        B_PM= tf.expand_dims(B_PM,axis=1)
+
+        return tf.concat([B_W,B_F,B_PM],axis=1)
