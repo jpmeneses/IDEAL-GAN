@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras as keras
 
 import tf2lib as tl
 import DLlib as dl
@@ -10,7 +9,6 @@ import data
 
 import matplotlib.pyplot as plt
 import tqdm
-import h5py
 import xlsxwriter
 from skimage.metrics import structural_similarity
 
@@ -19,13 +17,22 @@ from skimage.metrics import structural_similarity
 # ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
-py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','phantom_1p5','phantom_3p0'])
+py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani','phantom_1p5','phantom_3p0'])
+py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--te_input', type=bool, default=True)
+py.arg('--ME_layer', type=bool, default=False)
 py.arg('--UQ', type=bool, default=False)
+py.arg('--TE1', type=float, default=0.0013)
+py.arg('--dTE', type=float, default=0.0021)
 py.arg('--n_plot',type=int,default=50)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
+
+if not(hasattr(args,'field')):
+    py.arg('--field', type=float, default=1.5)
+    ds_args = py.args()
+    args.__dict__.update(ds_args.__dict__)
 
 
 # ==============================================================================
@@ -65,10 +72,28 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
-dataset_hdf5 = args.dataset + '_GC_192_complex_2D.hdf5'
-testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
-                                    acqs_data=True, te_data=True, MEBCRN=True)
+dataset_dir = '../datasets/'
+if args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
+    dataset_hdf5 = args.dataset + '_GC_192_128_complex_2D.hdf5'
+else:
+    dataset_hdf5 = args.dataset + '_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+
+if args.dataset == 'JGalgani':
+    num_slice_list = [21,20,24,24,21,24,21,21,24,21,21,22,27,23,22,20,24,21,21,22,20]
+    rnc = True
+else:
+    num_slice_list = None
+    rnc = False
+
+if args.dataset == 'JGalgani' or args.dataset == '3ech':
+    testX, testY=data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=rnc,
+                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True)
+    TEs = np.ones((testX.shape[0],1),dtype=np.float32)
+else:
+    testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
+                                        te_data=True,remove_zeros=not(args.dataset=='multiTE'),MEBCRN=True)
+if args.dataset == 'multiTE':
+    testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -90,9 +115,14 @@ A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,TEs,testY))
 A_B_dataset_test.batch(1)
 
 # model
+if args.ME_layer:
+    input_shape = (args.n_echoes,hgt,wdt,n_ch)
+else:
+    input_shape = (hgt,wdt,ech_idx)
+
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     if args.out_vars == 'WF-PM':
-        G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,ech_idx),
+        G_A2B=dl.MDWF_Generator(input_shape=input_shape,
                                 te_input=args.te_input,
                                 filters=args.n_G_filters,
                                 dropout=0.0,
@@ -100,9 +130,10 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                                 R2_self_attention=args.D2_SelfAttention,
                                 FM_self_attention=args.D3_SelfAttention)
     else:
-        G_A2B = dl.PM_Generator(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+        G_A2B = dl.PM_Generator(input_shape=input_shape,
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
+                                ME_layer=args.ME_layer,
                                 filters=args.n_G_filters,
                                 R2_self_attention=args.D1_SelfAttention,
                                 FM_self_attention=args.D2_SelfAttention)
@@ -143,6 +174,10 @@ tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).re
 
 @tf.function
 def sample(A, B, TE=None):
+    # Back-up A
+    A_ME = A
+    if not(args.ME_layer):
+        A = data.A_from_MEBCRN(A)
     # Split B
     B_WF = B[:,:2,:,:,:]
     B_PM = B[:,2:,:,:,:]
@@ -150,10 +185,11 @@ def sample(A, B, TE=None):
     # Estimate A2B
     if args.out_vars == 'WF':
         if args.te_input:
-            A2B_WF_abs = G_A2B([A,TE], training=True)
+            A2B_WF = G_A2B([A,TE], training=True)
         else:
-            A2B_WF_abs = G_A2B(A, training=True)
-        A2B_WF_abs = tf.where(B_WF_abs!=0.0,A2B_WF_abs,0.0)
+            A2B_WF = G_A2B(A, training=True)
+        A2B_WF = data.B_to_MEBCRN(A2B_WF,mode='WF')
+        A2B_WF = tf.where(B_WF!=0.0,A2B_WF,0.0)
         A2B_PM = tf.zeros_like(B_PM)
         A2B_R2 = A2B_PM[:,:,:,:,1:]
         A2B_FM = A2B_PM[:,:,:,:,:1]
@@ -178,35 +214,36 @@ def sample(A, B, TE=None):
             A2B_PM = G_A2B([A,TE], training=False)
         else:
             A2B_PM = G_A2B(A, training=False)
-        A2B_PM = tf.where(A[:,:1,:,:,:]!=0.0,A2B_PM,0.0)
+        if not(args.ME_layer):
+            A2B_PM = data.B_to_MEBCRN(A2B_PM,mode='PM')
+        A2B_PM = tf.where(A_ME[:,:1,:,:,:]!=0.0,A2B_PM,0.0)
         A2B_R2 = A2B_PM[:,:,:,:,1:]
         A2B_FM = A2B_PM[:,:,:,:,:1]
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
             A2B_FM = (A2B_FM - 0.5) * 2
-            A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
+            A2B_FM = tf.where(A_ME[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
             A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=1)
-        A2B_WF = wf.get_rho(A, A2B_PM, field=args.field, te=TE)
+        A2B_WF = wf.get_rho(A_ME, A2B_PM, field=args.field, te=TE)
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
         A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
         A2B_var = None
-    # elif args.out_vars == 'WF-PM':
-    #     B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
-    #     if args.te_input:
-    #         A2B_abs = G_A2B([A,TE], training=True)
-    #     else:
-    #         A2B_abs = G_A2B(A, training=True)
-    #     A2B_abs = tf.where(B_abs!=0.0,A2B_abs,0.0)
-    #     A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
-    #     A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
-    #     A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
-    #     A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-    #     A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-    #     A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
-    #     if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-    #         A2B_FM = (A2B_FM - 0.5) * 2
-    #         A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,A2B_FM,0.0)
-    #         A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
-    #     A2B_var = None
+    elif args.out_vars == 'WF-PM':
+        if args.te_input:
+            A2B_abs = G_A2B([A,TE], training=True)
+        else:
+            A2B_abs = G_A2B(A, training=True)
+        A2B = data.B_to_MEBCRN(A2B_abs,mode='WF-PM')
+        A2B = tf.where(A_ME[:,:3,:,:,:]!=0.0,A2B,0.0)
+        A2B_WF = A2B[:,:2,:,:,:]
+        A2B_PM = A2B[:,2:,:,:,:]
+        A2B_R2 = A2B_PM[:,:,:,:,1:]
+        A2B_FM = A2B_PM[:,:,:,:,:1]
+        if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+          A2B_FM = (A2B_FM - 0.5) * 2
+          A2B_FM = tf.where(A_ME[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
+          A2B_PM = tf.concat([A2B_FM,A2B_R2],axis=-1)
+          A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
+        A2B_var = None
     # elif args.out_vars == 'FM':
     #     if args.UQ:
     #         _, A2B_FM, A2B_var = G_A2B(A, training=False)
@@ -238,9 +275,18 @@ def sample(A, B, TE=None):
 
 
 # run
-save_dir = py.join(args.experiment_dir, 'samples_testing', args.dataset)
+if args.dataset == 'multiTE':
+    save_dir = py.join(args.experiment_dir, 'samples_testing', args.dataset
+                        + str(int(np.round(args.TE1*1e4))) + '_' + str(int(np.round(args.dTE*1e4))))
+else:
+    save_dir = py.join(args.experiment_dir, 'samples_testing', args.dataset)
 py.mkdir(save_dir)
 i = 0
+
+if args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
+    plot_hgt = 6
+else:
+    plot_hgt = 9
 
 for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
     A = tf.expand_dims(A,axis=0)
@@ -249,7 +295,10 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     B_WF = B[:,:2,:,:,:]
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
     
-    A2B, A2B_var = sample(A, B, TE_smp)
+    if args.te_input:
+        A2B, A2B_var = sample(A, B, TE_smp)
+    else:
+        A2B, A2B_var = sample(A, B)
     A2B_WF = A2B[:,:2,:,:,:]
     A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
 
@@ -274,42 +323,45 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     PDFFn_aux = fn_aux/(wn_aux+fn_aux)
     PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
     
-    if i%args.n_plot == 0 or args.dataset != 'multiTE':
-        fig,axs=plt.subplots(figsize=(16, 9), nrows=2, ncols=3)
+    if i%args.n_plot == 0 or args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
+        fig,axs=plt.subplots(figsize=(16, plot_hgt), nrows=2, ncols=3)
 
         # A2B maps in the first row
         F_ok = axs[0,0].imshow(PDFF_aux, cmap='jet',
                           interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_ok, ax=axs[0,0])
+        fig.colorbar(F_ok, ax=axs[0,0]).ax.tick_params(labelsize=14)
         axs[0,0].axis('off')
 
         r2_ok = axs[0,1].imshow(r2_aux, cmap=cmap,
                                 interpolation='none', vmin=0, vmax=lmax)
-        fig.colorbar(r2_ok, ax=axs[0,1])
+        fig.colorbar(r2_ok, ax=axs[0,1]).ax.tick_params(labelsize=14)
         axs[0,1].axis('off')
 
         field_ok = axs[0,2].imshow(field_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_ok, ax=axs[0,2])
+        fig.colorbar(field_ok, ax=axs[0,2]).ax.tick_params(labelsize=14)
         axs[0,2].axis('off')
 
         # Ground-truth in the third row
         F_unet = axs[1,0].imshow(PDFFn_aux, cmap='jet',
                                 interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_unet, ax=axs[1,0])
+        fig.colorbar(F_unet, ax=axs[1,0]).ax.tick_params(labelsize=14)
         axs[1,0].axis('off')
 
         r2_unet=axs[1,1].imshow(r2n_aux*r2_sc, cmap='copper',
                                 interpolation='none', vmin=0, vmax=r2_sc)
-        fig.colorbar(r2_unet, ax=axs[1,1]).ax.tick_params(labelsize=15)
+        fig.colorbar(r2_unet, ax=axs[1,1]).ax.tick_params(labelsize=14)
         axs[1,1].axis('off')
 
         field_unet =axs[1,2].imshow(fieldn_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_unet, ax=axs[1,2])
+        fig.colorbar(field_unet, ax=axs[1,2]).ax.tick_params(labelsize=14)
         axs[1,2].axis('off')
 
-        fig.suptitle('TE1/dTE: '+str([TE_smp[0,0,0].numpy(),np.mean(np.diff(TE_smp,axis=1))]), fontsize=18)
+        if args.te_input:
+            fig.suptitle('TE1/dTE: '+str([TE_smp[0,0,0].numpy(),np.mean(np.diff(TE_smp,axis=1))]), fontsize=18)
+        else:
+            fig.suptitle('TE1/dTE: '+str([args.TE1,args.dTE]), fontsize=18)
 
         # plt.show()
         plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
@@ -332,8 +384,12 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     ws_MSE.write(i+1,3,MSE_r2)
     ws_MSE.write(i+1,4,MSE_fm)
     
-    ws_MSE.write(i+1,5,TE_smp[0,0,0].numpy())
-    ws_MSE.write(i+1,6,np.mean(np.diff(TE_smp,axis=1)))
+    if args.te_input:
+        ws_MSE.write(i+1,5,TE_smp[0,0,0].numpy())
+        ws_MSE.write(i+1,6,np.mean(np.diff(TE_smp,axis=1)))
+    else:
+        ws_MSE.write(i+1,5,args.TE1)
+        ws_MSE.write(i+1,6,args.dTE)
 
     # MAE
     MAE_w = np.mean(tf.abs(w_aux-wn_aux), axis=(0,1))
