@@ -2,20 +2,20 @@ import numpy as np
 import matplotlib.patches as patches
 import tensorflow as tf
 
-def PDFF_at_ROI(X,left_x,sup_y):
-  r1,r2 = sup_y,(sup_y+9)
-  c1,c2 = left_x,(left_x+9)
+def PDFF_at_ROI(X,left_x,sup_y,wdt):
+  r1,r2 = sup_y,(sup_y+wdt+1)
+  c1,c2 = left_x,(left_x+wdt+1)
   PDFF_crop = X[r1:r2,c1:c2]
   return np.median(PDFF_crop)
 
-def R2_at_ROI(X,left_x,sup_y):
-  r1,r2 = sup_y,(sup_y+9)
-  c1,c2 = left_x,(left_x+9)
+def R2_at_ROI(X,left_x,sup_y,wdt):
+  r1,r2 = sup_y,(sup_y+wdt+1)
+  c1,c2 = left_x,(left_x+wdt+1)
   R2_crop = X[r1:r2,c1:c2]
   return np.mean(R2_crop)
 
 class IndexTracker(object):
-  def __init__(self, fig, ax, X, PDFF_bool, lims, npy_file='slices_crops.npy'):
+  def __init__(self, fig, ax, X, PDFF_bool, lims, wdt=8, npy_file='slices_crops.npy'):
     self.fig = fig
     self.ax = ax
     ax.set_title('use scroll wheel to navigate images')
@@ -23,6 +23,7 @@ class IndexTracker(object):
     self.X = X
     rows, cols, self.slices = X.shape
     self.ind = 0 # self.slices//2
+    self.wdt = wdt
 
     try:
       with open(npy_file,'rb') as f:
@@ -69,18 +70,18 @@ class IndexTracker(object):
     if event.button == 1:
       r_ct = np.round(event.xdata)
       c_ct = np.round(event.ydata)
-      self.left_x1 = int(r_ct - 4)
-      self.sup_y1 = int(c_ct - 4)
-      self.rect_gt_1 = patches.Rectangle((self.left_x1,self.sup_y1),9,9,
+      self.left_x1 = int(r_ct - self.wdt//2)
+      self.sup_y1 = int(c_ct - self.wdt//2)
+      self.rect_gt_1 = patches.Rectangle((self.left_x1,self.sup_y1),self.wdt+1,self.wdt+1,
         linewidth=1.5,edgecolor='r',facecolor='none')
       self.flag = True
       self.update()
     elif event.button == 3:
       r_ct = np.round(event.xdata)
       c_ct = np.round(event.ydata)
-      self.left_x2 = int(r_ct - 4)
-      self.sup_y2 = int(c_ct - 4)
-      self.rect_gt_2 = patches.Rectangle((self.left_x2,self.sup_y2),9,9,
+      self.left_x2 = int(r_ct - self.wdt//2)
+      self.sup_y2 = int(c_ct - self.wdt//2)
+      self.rect_gt_2 = patches.Rectangle((self.left_x2,self.sup_y2),self.wdt+1,self.wdt+1,
         linewidth=1.5,edgecolor='orange',facecolor='none')
       self.flag2 = True
       self.update()
@@ -131,17 +132,17 @@ class IndexTracker(object):
       self.sup_y1 = self.crops_1[idx][1]
       self.left_x2 = self.crops_2[idx][0]
       self.sup_y2 = self.crops_2[idx][1]
-      self.rect_gt_1 = patches.Rectangle((self.left_x1,self.sup_y1),9,9,
+      self.rect_gt_1 = patches.Rectangle((self.left_x1,self.sup_y1),self.wdt+1,self.wdt+1,
         linewidth=1.5,edgecolor='r',facecolor='none')
-      self.rect_gt_2 = patches.Rectangle((self.left_x2,self.sup_y2),9,9,
+      self.rect_gt_2 = patches.Rectangle((self.left_x2,self.sup_y2),self.wdt+1,self.wdt+1,
         linewidth=1.5,edgecolor='orange',facecolor='none')
     # - - - -
     if self.flag:
       # Calculate PDFF at ROI
       if self.PDFF_bool:
-        self.PDFF = PDFF_at_ROI(self.X[:,:,self.ind],self.left_x1,self.sup_y1)
+        self.PDFF = PDFF_at_ROI(self.X[:,:,self.ind],self.left_x1,self.sup_y1,wdt=self.wdt)
       else:
-        self.PDFF = R2_at_ROI(self.X[:,:,self.ind],self.left_x1,self.sup_y1)
+        self.PDFF = R2_at_ROI(self.X[:,:,self.ind],self.left_x1,self.sup_y1,wdt=self.wdt)
       if self.fflag:
         self.ax.patches = self.ax.patches[-1:]
       self.ax.add_patch(self.rect_gt_1)
@@ -151,9 +152,9 @@ class IndexTracker(object):
     if self.flag2:
       # Calculate PDFF at ROI
       if self.PDFF_bool:
-        self.PDFF2 = PDFF_at_ROI(self.X[:,:,self.ind],self.left_x2,self.sup_y2)
+        self.PDFF2 = PDFF_at_ROI(self.X[:,:,self.ind],self.left_x2,self.sup_y2,wdt=self.wdt)
       else:
-        self.PDFF2 = R2_at_ROI(self.X[:,:,self.ind],self.left_x2,self.sup_y2)
+        self.PDFF2 = R2_at_ROI(self.X[:,:,self.ind],self.left_x2,self.sup_y2,wdt=self.wdt)
       if self.fflag2:
         self.ax.patches = self.ax.patches[:-1]
       self.ax.add_patch(self.rect_gt_2)
@@ -232,9 +233,9 @@ class IndexTracker_phantom(object):
     if event.button == 1:
       r_ct = np.round(event.xdata)
       c_ct = np.round(event.ydata)
-      self.left_x1 = int(r_ct - 4)
-      self.sup_y1 = int(c_ct - 4)
-      self.rect_gt_1 = patches.Rectangle((self.left_x1,self.sup_y1),9,9,
+      self.left_x1 = int(r_ct - self.wdt//2)
+      self.sup_y1 = int(c_ct - self.wdt//2)
+      self.rect_gt_1 = patches.Rectangle((self.left_x1,self.sup_y1),self.wdt+1,self.wdt+1,
         linewidth=1.5,edgecolor='r',facecolor='none')
       self.flag = True
       # self.fflag = True
@@ -252,7 +253,7 @@ class IndexTracker_phantom(object):
     elif event.key == 'v':
       self.frms.append(self.ind)
       self.crops_1.append([self.left_x1,self.sup_y1])
-      self.rect_gt_1 = patches.Rectangle((self.left_x1,self.sup_y1),9,9,
+      self.rect_gt_1 = patches.Rectangle((self.left_x1,self.sup_y1),self.wdt+1,self.wdt+1,
         linewidth=1.5,edgecolor='orange',facecolor='none')
       self.saveFlag = True
       self.update()
@@ -274,16 +275,16 @@ class IndexTracker_phantom(object):
     if (self.ind in self.frms) and not(self.flag):
       idxs = [i for i,x in enumerate(self.frms) if x==self.ind]
       for idx in idxs:
-        self.ax.add_patch(patches.Rectangle((self.crops_1[idx][0],self.crops_1[idx][1]),9,9,
+        self.ax.add_patch(patches.Rectangle((self.crops_1[idx][0],self.crops_1[idx][1]),self.wdt+1,self.wdt+1,
           linewidth=1.5,edgecolor='orange',facecolor='none'))
 
     # - - - -
     if self.flag:
       # Calculate PDFF at ROI
       if self.PDFF_bool:
-        self.PDFF = PDFF_at_ROI(self.X[:,:,self.ind],self.left_x1,self.sup_y1)
+        self.PDFF = PDFF_at_ROI(self.X[:,:,self.ind],self.left_x1,self.sup_y1,wdt=self.wdt)
       else:
-        self.PDFF = R2_at_ROI(self.X[:,:,self.ind],self.left_x1,self.sup_y1)
+        self.PDFF = R2_at_ROI(self.X[:,:,self.ind],self.left_x1,self.sup_y1,wdt=self.wdt)
       if self.fflag and not(self.recentSave):
         self.ax.patches = self.ax.patches[:-1]
       self.ax.add_patch(self.rect_gt_1)
