@@ -20,6 +20,7 @@ import data
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--te_input', type=bool, default=False)
 py.arg('--n_samples', type=int, default=50)
+py.arg('--seed', type=int, default=0)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
@@ -30,6 +31,11 @@ if not(hasattr(args,'VQ_num_embed')):
 	VQ_args = py.args()
 	args.__dict__.update(VQ_args.__dict__)
 
+if not(hasattr(args,'data_size')):
+	py.arg('--data_size', type=int, default=192, choices=[192,384])
+	ds_args = py.args()
+	args.__dict__.update(ds_args.__dict__)
+
 
 # ==============================================================================
 # =                                    data                                    =
@@ -38,7 +44,9 @@ if not(hasattr(args,'VQ_num_embed')):
 ech_idx = args.n_echoes * 2
 fm_sc = 300.0
 r2_sc = 200.0
-hgt,wdt,n_ch = 192,192,2
+hgt = args.data_size
+wdt = args.data_size
+n_ch = 2
 
 
 # ==============================================================================
@@ -108,9 +116,9 @@ TE = wf.gen_TEvar(args.n_echoes,orig=False)
 
 for k in range(args.n_samples):
 	if args.VQ_encoder:
-		Z = tf.random.uniform(z_shape[:-1],minval=0,maxval=args.VQ_num_embed,seed=0,dtype=tf.int32)
+		Z = tf.random.uniform(z_shape[:-1],minval=0,maxval=args.VQ_num_embed,seed=args.seed,dtype=tf.int32)
 	else:
-		Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
+		Z = tf.random.normal(z_shape,seed=args.seed,dtype=tf.float32)
 	Z2B, Z2B2A = sample(Z)
 
 	w_aux = np.squeeze(Z2B[:,:,:,0])
