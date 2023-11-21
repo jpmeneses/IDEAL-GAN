@@ -30,15 +30,22 @@ class ItemPool:
         return tf.stack(out_items, axis=0)
 
 
-def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,num_slice_list=None,
+def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_slice_list=None,
             remove_non_central=False,acqs_data=True,te_data=False,complex_data=False,
             remove_zeros=True, MEBCRN=False):
     f = h5py.File(ds_dir + hdf5_file, 'r')
-    if num_slice_list:
+    if custom_list:
+        if acqs_data:
+            acqs = f['Acquisitions'][custom_list]
+        out_maps = f['OutMaps'][custom_list]
+        if te_data:
+            TEs = f['TEs'][custom_list]
+            TEs = np.expand_dims(TEs,axis=-1)
+    elif num_slice_list:
         ini_end_idxs = np.cumsum(num_slice_list)
-        ini_end_idxs = np.concatenate((np.zeros((1),dtype=int),ini_end_idxs))
+        # ini_end_idxs = np.concatenate((np.zeros((1),dtype=int),ini_end_idxs))
         idxs = list()
-        for k in range(ini_end_idxs[-1]):
+        for k in range(ini_end_idxs[0],ini_end_idxs[-1]):
             k_diff = k-ini_end_idxs[0]
             if np.abs(k_diff) > 4:
                 idxs.append(k)
@@ -162,11 +169,11 @@ def group_TEs(A,B,TEs,TE1,dTE,MEBCRN=False):
         else:
             TE1_i = TE1_orig
             dTE_i = dTE_orig
-        # print(TE1_i,TE1_orig,'\t',dTE_i,dTE_orig)
+        # print(idx,TE1_i,TE1_orig,'\t',dTE_i,dTE_orig)
 
         # Check if it corresponds to original TEs
         if TE1_i==TE1_orig and dTE_i==dTE_orig:
-            if not(flag_orig):
+            if not(flag_orig): # First orig TEs' slice
                 flag_orig = True
                 if num_pat > 0:
                     # Si paciente anterior no tenía imags en comb TEs seleccionada:
