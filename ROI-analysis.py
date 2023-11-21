@@ -1,30 +1,30 @@
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
 import tf2lib as tl
 import DLlib as dl
 import pylib as py
 import wflib as wf
 import data
+
 from utils import *
 
-# import statsmodels.api as sm
+import matplotlib.pyplot as plt
 import tqdm
 import xlsxwriter
-
-import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import PercentFormatter
 
-import os
-os.environ['TF_ENABLE_GPU_GARBAGE_COLLECTION'] = 'false'
+# ==============================================================================
+# =                                   param                                    =
+# ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-sep')
+py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani'])
+py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--te_input', type=bool, default=False)
-py.arg('--MEBCRN', type=bool, default=True)
-py.arg('--multi_TE', type=bool, default=True)
-py.arg('--data_size', type=int, default=192, choices=[192,384])
+py.arg('--ME_layer', type=bool, default=False)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
 py.arg('--batch_size', type=int, default=1)
@@ -32,13 +32,23 @@ test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
 
+if not(hasattr(args,'data_size')):
+  py.arg('--data_size', type=int, default=192, choices=[192,384])
+  ds_args = py.args()
+  args.__dict__.update(ds_args.__dict__)
+
+if not(hasattr(args,'field')):
+  py.arg('--field', type=float, default=1.5)
+  ds_args = py.args()
+  args.__dict__.update(ds_args.__dict__)
+
 # Excel file for saving ROIs values
-if args.multi_TE:
+if args.dataset == 'multiTE':
   workbook =xlsxwriter.Workbook(py.join(args.experiment_dir,args.map + '_ROIs_'
                                 + str(int(np.round(args.TE1*1e4))) + '_' + str(int(np.round(args.dTE*1e4))) 
                                 + '.xlsx'))
 else:
-  workbook = xlsxwriter.Workbook(py.join(args.experiment_dir,args.map+'_ROIs.xlsx'))
+  workbook = xlsxwriter.Workbook(py.join(args.experiment_dir,args.map+'_'+args.dataset+'_ROIs.xlsx'))
 ws_ROI_1 = workbook.add_worksheet('RHL')
 ws_ROI_1.write(0,0,'Ground-truth')
 ws_ROI_1.write(0,1,'Model res.')
@@ -49,46 +59,55 @@ ws_ROI_2.write(0,1,'Model res.')
 # data
 ech_idx = args.n_echoes * 2
 
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
-# dataset_dir = '../MRI-Datasets/'
-if args.multi_TE:
-  if args.data_size == 192:
-    dataset_hdf5 = 'multiTE_GC_192_complex_2D.hdf5'
-  else:
-    dataset_hdf5 = 'multiTE_GC_384_complex_2D.hdf5'
-elif args.n_echoes == 3:
-  if args.data_size == 192:
-    dataset_hdf5 = '3ech_GC_192_complex_2D.hdf5'
-  else:
-    dataset_hdf5 = '3ech_GC_384_complex_2D.hdf5'
-else:
-  dataset_hdf5 = 'JGalgani_GC_384_complex_2D.hdf5'
+dataset_dir = '../datasets/'
+dataset_hdf5 = args.dataset + '_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+npy_file = py.join('ROI_files', 'slices_crops_' + str(args.dataset) + '_' + str(args.data_size) + '.npy')
+if args.dataset == 'JGalgani':
   num_slice_list = [21,20,24,24,21,24,21,21,24,21,21,22,27,23,22,20,24,21,21,22,20]
-
-if args.multi_TE:
-  testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
-                                    te_data=True,remove_zeros=False,MEBCRN=args.MEBCRN)
-  testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=args.MEBCRN)
-  if args.data_size == 192:
-    npy_file = 'slices_crops_multiTE.npy'
+  rnc = True
+elif args.dataset == 'multiTE':
+  ini_idxs = [0,84,204,300,396,484,580,680,776,848,932,1028, 1100,1142,1190,1232,1286,1334,1388,1460]
+  delta_idxs = [21,24,24,24,22,24,25,24,18,21,24,18, 21,24,21,18,16,18,24,21]
+  # First Patient
+  if args.TE1 == 0.0014 and args.dTE == 0.0022:
+    k_idxs = [(0,1),(2,3)]
+  elif args.TE1 == 0.0013 and args.dTE == 0.0023:
+    k_idxs = [(0,1),(3,4)]
   else:
-    npy_file = 'slices_crops_multiTE_384.npy'
-else:
-  testX, testY = data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=True,
-                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=args.MEBCRN)
-  TEs = np.ones((testX.shape[0],1),dtype=np.float32)
-  if args.n_echoes == 3:
-    if args.data_size == 192:
-      npy_file = 'slices_crops_3ech.npy'
+    k_idxs = [(0,2)]
+  for k in k_idxs:
+    custom_list = [a for a in range(ini_idxs[0]+k[0]*delta_idxs[0],ini_idxs[0]+k[1]*delta_idxs[0])]
+  # Rest of the patients
+  for i in range(1,len(ini_idxs)):
+    if (i<=11) and args.TE1 == 0.0013 and args.dTE == 0.0022:
+      k_idxs = [(0,1),(2,3)]
+    elif (i<=11) and args.TE1 == 0.0014 and args.dTE == 0.0022:
+      k_idxs = [(0,1),(3,4)]
+    elif (i==1) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+      k_idxs = [(0,1),(4,5)]
+    elif (i==15 or i==16) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+      k_idxs = [(0,1),(2,3)]
+    elif (i>=17) and args.TE1 == 0.0013 and args.dTE == 0.0024:
+      k_idxs = [(0,1),(2,3)]
     else:
-      npy_file = 'slices_crops_3ech_192.npy'
-  else:
-    npy_file = 'slices_crops_Galgani.npy'
-
-if args.MEBCRN:
-  len_dataset,n_out,hgt,wdt,n_ch = np.shape(testY)
+      k_idxs = [(0,2)]
+    for k in k_idxs:
+      custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
 else:
-  len_dataset,hgt,wdt,n_out = np.shape(testY)
+  num_slice_list = None
+  rnc = False
+
+if args.dataset == 'JGalgani' or args.dataset == '3ech':
+  testX, testY = data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=rnc,
+                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True)
+  TEs = np.ones((testX.shape[0],1),dtype=np.float32)
+else:
+  testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
+                                      acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=True)
+  print('Testing input shape before TE grouping:',testX.shape)
+  testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=True)
+
+len_dataset,n_out,hgt,wdt,n_ch = np.shape(testY)
 r2_sc,fm_sc = 200,300
 
 print('Acquisition Dimensions:', hgt,wdt)
@@ -107,9 +126,13 @@ A_B_dataset_test.batch(1)
 #################################################################################
 
 # model
+if args.ME_layer:
+  input_shape = (args.n_echoes,hgt,wdt,n_ch)
+else:
+  input_shape = (hgt,wdt,ech_idx)
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
   if args.out_vars == 'WF-PM':
-    G_A2B = dl.MDWF_Generator(input_shape=(hgt,wdt,ech_idx),
+    G_A2B = dl.MDWF_Generator(input_shape=input_shape,
                               te_input=args.te_input,
                               te_shape=(args.n_echoes,),
                               filters=args.n_G_filters,
@@ -117,15 +140,11 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                               R2_self_attention=args.D2_SelfAttention,
                               FM_self_attention=args.D3_SelfAttention)
   else:
-    if args.MEBCRN:
-      input_shape = (args.n_echoes,hgt,wdt,n_ch)
-    else:
-      input_shape = (hgt,wdt,ech_idx)
     G_A2B = dl.PM_Generator(input_shape=input_shape,
-                            ME_layer=False,
-                            filters=args.n_G_filters,
+                            ME_layer=args.ME_layer,
                             te_input=args.te_input,
                             te_shape=(args.n_echoes,),
+                            filters=args.n_G_filters,
                             R2_self_attention=args.D1_SelfAttention,
                             FM_self_attention=args.D2_SelfAttention)
 elif args.G_model == 'U-Net':
@@ -157,33 +176,30 @@ tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).re
 
 @tf.function
 def sample(A, B, TE=None):
-  if args.MEBCRN:
-    # Split B
-    B_WF = B[:,:2,:,:,:]
-    B_PM = B[:,2:,:,:,:]
-    # Magnitude of water/fat images
-    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
-    # Split B param maps
-    B_R2 = B_PM[:,:,:,:,1:]
-    B_FM = B_PM[:,:,:,:,:1]
-  else:
-    # Split B
-    B_WF = B[:,:,:,:4]
-    B_PM = B[:,:,:,4:]
-    # Magnitude of water/fat images
-    B_WF_abs = tf.abs(tf.complex(B_WF[:,:,:,0::2],B_WF[:,:,:,1::2]))
-    # Split B param maps
-    B_R2 = B_PM[:,:,:,:1]
-    B_FM = B_PM[:,:,:,1:]
+  # Back-up A
+  A_ME = A
+  if not(args.ME_layer):
+    A = data.A_from_MEBCRN(A)
+  # Split B
+  B_WF = B[:,:2,:,:,:]
+  B_PM = B[:,2:,:,:,:]
+  # Magnitude of water/fat images
+  B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
+  # Split B param maps
+  B_R2 = B_PM[:,:,:,:,1:]
+  B_FM = B_PM[:,:,:,:,:1]
   # Estimate A2B
   if args.out_vars == 'WF':
     if args.te_input:
-      A2B_WF_abs = G_A2B([A,TE], training=True)
+      if TE is None:
+        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
+      A2B_WF = G_A2B([A,TE], training=True)
     else:
-      A2B_WF_abs = G_A2B(A, training=True)
-    A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+      A2B_WF = G_A2B(A, training=True)
+    A2B_WF = data.B_to_MEBCRN(A2B_WF,mode='WF')
+    A2B_WF = tf.where(A_ME[:,:2,:,:,:]!=0.0,A2B_WF,0.0)
     A2B_PM = tf.zeros_like(B_PM)
-    A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+    A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
   elif args.out_vars == 'WFc':
     A2B_WF = G_A2B(A, training=False)
     A2B_WF = tf.where(B[:,:,:,:4]!=0,A2B_WF,0.0)
@@ -194,43 +210,40 @@ def sample(A, B, TE=None):
     A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
   elif args.out_vars == 'PM':
     if args.te_input:
+      if TE is None:
+        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
       A2B_PM = G_A2B([A,TE], training=True)
     else:
       A2B_PM = G_A2B(A, training=True)
-    A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
-    if args.MEBCRN:
-      A2B_R2 = A2B_PM[:,:,:,:,1:]
-      A2B_FM = A2B_PM[:,:,:,:,:1]
-    else:
-      A2B_R2 = A2B_PM[:,:,:,1:]
-      A2B_FM = A2B_PM[:,:,:,:1]
+    if not(args.ME_layer):
+      A2B_PM = data.B_to_MEBCRN(A2B_PM,mode='PM')
+    A2B_PM = tf.where(A_ME[:,:1,:,:,:]!=0.0,A2B_PM,0.0)
+    A2B_R2 = A2B_PM[:,:,:,:,1:]
+    A2B_FM = A2B_PM[:,:,:,:,:1]
     if args.G_model=='U-Net' or args.G_model=='MEBCRN':
       A2B_FM = (A2B_FM - 0.5) * 2
-      A2B_FM = tf.where(B_FM!=0.0,A2B_FM,0.0)
-      A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    A2B_WF = wf.get_rho(A,A2B_PM,te=TE,MEBCRN=args.MEBCRN)
-    if args.MEBCRN:
-      A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
-    else:
-      A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
+      A2B_FM = tf.where(A_ME[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
+      A2B_PM = tf.concat([A2B_FM,A2B_R2],axis=-1)
+    A2B_WF = wf.get_rho(A_ME, A2B_PM, field=args.field, te=TE)
+    A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
   elif args.out_vars == 'WF-PM':
-    B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
     if args.te_input:
+      if TE is None:
+        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
       A2B_abs = G_A2B([A,TE], training=True)
     else:
       A2B_abs = G_A2B(A, training=True)
-    A2B_abs = tf.where(B_abs!=0.0,A2B_abs,0.0)
-    A2B_WF_abs,A2B_PM = tf.dynamic_partition(A2B_abs,indx_B_abs,num_partitions=2)
-    A2B_WF_abs = tf.reshape(A2B_WF_abs,B[:,:,:,:2].shape)
-    A2B_PM = tf.reshape(A2B_PM,B[:,:,:,4:].shape)
-    A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-    A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-    A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+    A2B = data.B_to_MEBCRN(A2B_abs,mode='WF-PM')
+    A2B = tf.where(A_ME[:,:3,:,:,:]!=0.0,A2B,0.0)
+    A2B_WF = A2B[:,:2,:,:,:]
+    A2B_PM = A2B[:,2:,:,:,:]
+    A2B_R2 = A2B_PM[:,:,:,:,1:]
+    A2B_FM = A2B_PM[:,:,:,:,:1]
     if args.G_model=='U-Net' or args.G_model=='MEBCRN':
       A2B_FM = (A2B_FM - 0.5) * 2
-      A2B_FM = tf.where(B_PM[:,:,:,:1]!=0.0,A2B_FM,0.0)
-      A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM],axis=-1)
-
+      A2B_FM = tf.where(A_ME[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
+      A2B_PM = tf.concat([A2B_FM,A2B_R2],axis=-1)
+      A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
   return A2B
 
 all_test_ans = np.zeros((len_dataset,hgt,wdt,3))
@@ -240,18 +253,14 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   A = tf.expand_dims(A,axis=0)
   B = tf.expand_dims(B,axis=0)
   TE= tf.expand_dims(TE,axis=0)
-  if args.multi_TE:
-    A2B = sample(A,B,TE)
-  else:
+  if args.dataset == 'JGalgani' or args.dataset == '3ech':
     A2B = sample(A,B)
-
-  if args.MEBCRN:
-    A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B[:,:2,:,:,:]),axis=-1))
-    A2B_WF_abs = tf.transpose(A2B_WF_abs,perm=[0,2,3,1])
-    A2B_R2 = A2B[:,2,:,:,1:]
   else:
-    A2B_WF_abs = tf.abs(tf.complex(A2B[:,:,:,0:4:2],A2B[:,:,:,1:4:2]))
-    A2B_R2 = A2B[:,:,:,4:5]
+    A2B = sample(A,B,TE)
+
+  A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B[:,:2,:,:,:]),axis=-1))
+  A2B_WF_abs = tf.transpose(A2B_WF_abs,perm=[0,2,3,1])
+  A2B_R2 = A2B[:,2,:,:,1:]
   A2B = tf.concat([A2B_WF_abs,A2B_R2],axis=-1)
 
   all_test_ans[i,:,:,:] = A2B
@@ -262,14 +271,10 @@ f_all_ans = all_test_ans[:,:,:,1]
 r2_all_ans = all_test_ans[:,:,:,2]*r2_sc
 
 # Ground truth
-if args.MEBCRN:
-  w_all_gt = np.abs(tf.complex(testY[:,0,:,:,0],testY[:,0,:,:,1]))
-  f_all_gt = np.abs(tf.complex(testY[:,1,:,:,0],testY[:,1,:,:,1]))
-  r2_all_gt = testY[:,2,:,:,1]*r2_sc
-else:
-  w_all_gt = np.abs(tf.complex(testY[:,:,:,0],testY[:,:,:,1]))
-  f_all_gt = np.abs(tf.complex(testY[:,:,:,2],testY[:,:,:,3]))
-  r2_all_gt = testY[:,:,:,4]*r2_sc
+w_all_gt = np.sqrt(np.sum(testY[:,0,:,:,:]**2,axis=-1))
+f_all_gt = np.sqrt(np.sum(testY[:,1,:,:,:]**2,axis=-1))
+r2_all_gt = testY[:,2,:,:,1]*r2_sc
+
 
 #################################################################################
 #################################################################################
@@ -297,8 +302,13 @@ elif args.map == 'Water':
 else:
   raise TypeError('The selected map is not available')
 
+if args.data_size == 192:
+  ROI_wdt = 8
+elif args.data_size == 384:
+  ROI_wdt = 16
+
 fig, ax = plt.subplots(1, 1)
-tracker = IndexTracker(fig, ax, X, bool_PDFF, lims, npy_file=npy_file)
+tracker = IndexTracker(fig, ax, X, bool_PDFF, lims, wdt=ROI_wdt, npy_file=npy_file)
 
 fig.canvas.mpl_connect('scroll_event', tracker.onscroll)
 fig.canvas.mpl_connect('button_press_event', tracker.button_press)
@@ -321,15 +331,15 @@ if args.map != 'Water':
     # Crop A
     left_x_A = tracker.crops_1[idx][0]
     sup_y_A = tracker.crops_1[idx][1]
-    r1_A,r2_A = sup_y_A,(sup_y_A+9)
-    c1_A,c2_A = left_x_A,(left_x_A+9)
+    r1_A,r2_A = sup_y_A,(sup_y_A+ROI_wdt+1)
+    c1_A,c2_A = left_x_A,(left_x_A+ROI_wdt+1)
     XA_all = X[r1_A:r2_A,c1_A:c2_A,k]
     XA_all_gt = X_gt[r1_A:r2_A,c1_A:c2_A,k]
     # Crop B
     left_x_B = tracker.crops_2[idx][0]
     sup_y_B = tracker.crops_2[idx][1]
-    r1_B,r2_B = sup_y_B,(sup_y_B+9)
-    c1_B,c2_B = left_x_B,(left_x_B+9)
+    r1_B,r2_B = sup_y_B,(sup_y_B+ROI_wdt+1)
+    c1_B,c2_B = left_x_B,(left_x_B+ROI_wdt+1)
     XB_all = X[r1_B:r2_B,c1_B:c2_B,k]
     XB_all_gt = X_gt[r1_B:r2_B,c1_B:c2_B,k]
     if args.map == 'PDFF':

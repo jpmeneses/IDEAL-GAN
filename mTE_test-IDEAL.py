@@ -18,7 +18,7 @@ from skimage.metrics import structural_similarity
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani','phantom_1p5','phantom_3p0'])
-py.arg('--data_size', type=int, default=192, choices=[192,384])
+py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--ME_layer', type=bool, default=False)
 py.arg('--UQ', type=bool, default=False)
@@ -79,8 +79,36 @@ else:
     dataset_hdf5 = args.dataset + '_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 
 if args.dataset == 'JGalgani':
-    num_slice_list = [21,20,24,24,21,24,21,21,24,21,21,22,27,23,22,20,24,21,21,22,20]
+    num_slice_list = [0,21,20,24,24,21,24,21,21,24,21,21,22,27,23,22,20,24,21,21,22,20]
     rnc = True
+elif args.dataset == 'multiTE':
+    ini_idxs = [0,84,204,300,396,484,580,680,776,848,932,1028, 1100,1142,1190,1232,1286,1334,1388,1460]
+    delta_idxs = [21,24,24,24,22,24,25,24,18,21,24,18, 21,24,21,18,16,18,24,21]
+    # First Patient
+    if args.TE1 == 0.0014 and args.dTE == 0.0022:
+        k_idxs = [(0,1),(2,3)]
+    elif args.TE1 == 0.0013 and args.dTE == 0.0023:
+        k_idxs = [(0,1),(3,4)]
+    else:
+        k_idxs = [(0,2)]
+    for k in k_idxs:
+        custom_list = [a for a in range(ini_idxs[0]+k[0]*delta_idxs[0],ini_idxs[0]+k[1]*delta_idxs[0])]
+    # Rest of the patients
+    for i in range(1,len(ini_idxs)):
+        if (i<=11) and args.TE1 == 0.0013 and args.dTE == 0.0022:
+            k_idxs = [(0,1),(2,3)]
+        elif (i<=11) and args.TE1 == 0.0014 and args.dTE == 0.0022:
+            k_idxs = [(0,1),(3,4)]
+        elif (i==1) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+            k_idxs = [(0,1),(4,5)]
+        elif (i==15 or i==16) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+            k_idxs = [(0,1),(2,3)]
+        elif (i>=17) and args.TE1 == 0.0013 and args.dTE == 0.0024:
+            k_idxs = [(0,1),(2,3)]
+        else:
+            k_idxs = [(0,2)]
+        for k in k_idxs:
+            custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
 else:
     num_slice_list = None
     rnc = False
@@ -89,9 +117,12 @@ if args.dataset == 'JGalgani' or args.dataset == '3ech':
     testX, testY=data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=rnc,
                                 acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True)
     TEs = np.ones((testX.shape[0],1),dtype=np.float32)
+elif args.dataset == 'multiTE':
+    testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
+                                        acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=True)
 else:
     testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
-                                        te_data=True,remove_zeros=not(args.dataset=='multiTE'),MEBCRN=True)
+                                        te_data=True,remove_zeros=True,MEBCRN=True)
 if args.dataset == 'multiTE':
     testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=True)
 
@@ -185,6 +216,8 @@ def sample(A, B, TE=None):
     # Estimate A2B
     if args.out_vars == 'WF':
         if args.te_input:
+            if TE is None:
+                TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
             A2B_WF = G_A2B([A,TE], training=True)
         else:
             A2B_WF = G_A2B(A, training=True)
@@ -211,6 +244,8 @@ def sample(A, B, TE=None):
     #     A2B_var = None
     elif args.out_vars == 'PM':
         if args.te_input:
+            if TE is None:
+                TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
             A2B_PM = G_A2B([A,TE], training=False)
         else:
             A2B_PM = G_A2B(A, training=False)
@@ -229,6 +264,8 @@ def sample(A, B, TE=None):
         A2B_var = None
     elif args.out_vars == 'WF-PM':
         if args.te_input:
+            if TE is None:
+                TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
             A2B_abs = G_A2B([A,TE], training=True)
         else:
             A2B_abs = G_A2B(A, training=True)
@@ -284,9 +321,9 @@ py.mkdir(save_dir)
 i = 0
 
 if args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
-    plot_hgt = 6
-else:
     plot_hgt = 9
+else:
+    plot_hgt = 13
 
 for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
     A = tf.expand_dims(A,axis=0)
@@ -295,10 +332,10 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     B_WF = B[:,:2,:,:,:]
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
     
-    if args.te_input:
-        A2B, A2B_var = sample(A, B, TE_smp)
-    else:
+    if args.dataset == 'JGalgani' or args.dataset == '3ech':
         A2B, A2B_var = sample(A, B)
+    else:
+        A2B, A2B_var = sample(A, B, TE_smp)
     A2B_WF = A2B[:,:2,:,:,:]
     A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
 
@@ -312,19 +349,19 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
         r2_aux = np.squeeze(A2B_var)*fm_sc
         lmax = 30
         cmap = 'gnuplot2'
-    field_aux = np.squeeze(A2B[:,2,:,:,0])
+    field_aux = np.squeeze(A2B[:,2,:,:,0])*fm_sc
     PDFF_aux = f_aux/(w_aux+f_aux)
     PDFF_aux[np.isnan(PDFF_aux)] = 0.0
 
     wn_aux = np.squeeze(B_WF_abs[:,0,:,:,:])
     fn_aux = np.squeeze(B_WF_abs[:,1,:,:,:])
-    r2n_aux = np.squeeze(B[:,2,:,:,1])
-    fieldn_aux = np.squeeze(B[:,2,:,:,0])
+    r2n_aux = np.squeeze(B[:,2,:,:,1])*r2_sc
+    fieldn_aux = np.squeeze(B[:,2,:,:,0])*fm_sc
     PDFFn_aux = fn_aux/(wn_aux+fn_aux)
     PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
     
     if i%args.n_plot == 0 or args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
-        fig,axs=plt.subplots(figsize=(16, plot_hgt), nrows=2, ncols=3)
+        fig,axs=plt.subplots(figsize=(16, plot_hgt), nrows=3, ncols=3)
 
         # A2B maps in the first row
         F_ok = axs[0,0].imshow(PDFF_aux, cmap='jet',
@@ -337,7 +374,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
         fig.colorbar(r2_ok, ax=axs[0,1]).ax.tick_params(labelsize=14)
         axs[0,1].axis('off')
 
-        field_ok = axs[0,2].imshow(field_aux*fm_sc, cmap='twilight',
+        field_ok = axs[0,2].imshow(field_aux, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
         fig.colorbar(field_ok, ax=axs[0,2]).ax.tick_params(labelsize=14)
         axs[0,2].axis('off')
@@ -348,20 +385,35 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
         fig.colorbar(F_unet, ax=axs[1,0]).ax.tick_params(labelsize=14)
         axs[1,0].axis('off')
 
-        r2_unet=axs[1,1].imshow(r2n_aux*r2_sc, cmap='copper',
+        r2_unet=axs[1,1].imshow(r2n_aux, cmap='copper',
                                 interpolation='none', vmin=0, vmax=r2_sc)
         fig.colorbar(r2_unet, ax=axs[1,1]).ax.tick_params(labelsize=14)
         axs[1,1].axis('off')
 
-        field_unet =axs[1,2].imshow(fieldn_aux*fm_sc, cmap='twilight',
+        field_unet =axs[1,2].imshow(fieldn_aux, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
         fig.colorbar(field_unet, ax=axs[1,2]).ax.tick_params(labelsize=14)
         axs[1,2].axis('off')
 
-        if args.te_input:
-            fig.suptitle('TE1/dTE: '+str([TE_smp[0,0,0].numpy(),np.mean(np.diff(TE_smp,axis=1))]), fontsize=18)
-        else:
+        F_err = axs[2,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='gray',
+                          interpolation='none', vmin=0, vmax=.1)
+        fig.colorbar(F_err, ax=axs[2,0]).ax.tick_params(labelsize=14)
+        axs[2,0].axis('off')
+
+        r2_err = axs[2,1].imshow(np.abs(r2_aux-r2n_aux), cmap='pink',
+                                interpolation='none', vmin=0, vmax=lmax/5)
+        fig.colorbar(r2_err, ax=axs[2,1]).ax.tick_params(labelsize=14)
+        axs[2,1].axis('off')
+
+        field_err = axs[2,2].imshow(np.abs(field_aux-fieldn_aux), cmap='bone',
+                                    interpolation='none', vmin=0, vmax=fm_sc/20)
+        fig.colorbar(field_err, ax=axs[2,2]).ax.tick_params(labelsize=14)
+        axs[2,2].axis('off')
+
+        if args.dataset == 'JGalgani' or args.dataset == '3ech':
             fig.suptitle('TE1/dTE: '+str([args.TE1,args.dTE]), fontsize=18)
+        else:
+            fig.suptitle('TE1/dTE: '+str([TE_smp[0,0,0].numpy(),np.mean(np.diff(TE_smp,axis=1))]), fontsize=18)
 
         # plt.show()
         plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
@@ -384,12 +436,12 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     ws_MSE.write(i+1,3,MSE_r2)
     ws_MSE.write(i+1,4,MSE_fm)
     
-    if args.te_input:
-        ws_MSE.write(i+1,5,TE_smp[0,0,0].numpy())
-        ws_MSE.write(i+1,6,np.mean(np.diff(TE_smp,axis=1)))
-    else:
+    if args.dataset == 'JGalgani' or args.dataset == '3ech':
         ws_MSE.write(i+1,5,args.TE1)
         ws_MSE.write(i+1,6,args.dTE)
+    else:
+        ws_MSE.write(i+1,5,TE_smp[0,0,0].numpy())
+        ws_MSE.write(i+1,6,np.mean(np.diff(TE_smp,axis=1)))
 
     # MAE
     MAE_w = np.mean(tf.abs(w_aux-wn_aux), axis=(0,1))
