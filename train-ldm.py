@@ -14,9 +14,11 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir', default='GAN-100')
+py.arg('--scheduler', default='linear', choices=['linear','cosine'])
 py.arg('--n_timesteps', type=int, default=200)
 py.arg('--beta_start', type=float, default=0.0001)
 py.arg('--beta_end', type=float, default=0.02)
+py.arg('--s_value', type=float, default=8e-3)
 py.arg('--n_ldm_filters', type=int, default=64)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs_ldm', type=int, default=100)
@@ -129,12 +131,18 @@ tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi,vq_op=vq_op), p
 ################################################################################
 
 # create a fixed beta schedule
-beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
-
-# this will be used as discussed in the reparameterization trick
-alpha = 1 - beta
-alpha_bar = np.cumprod(alpha, 0)
-alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
+if args.scheduler == 'linear':
+    beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
+    # this will be used as discussed in the reparameterization trick
+    alpha = 1 - beta
+    alpha_bar = np.cumprod(alpha, 0)
+    alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
+elif args.scheduler == 'cosine':
+    x = np.linspace(0, args.n_timesteps, args.n_timesteps + 1)
+    alpha_bar = np.cos(((x / args.n_timesteps) + args.s_value) / (1 + args.s_value) * np.pi * 0.5) ** 2
+    alpha_bar /= alpha_bar[0]
+    alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
+    beta = 1.0 - alpha
 
 # initialize the model in the memory of our GPU
 hgt_ls = dec_w.input_shape[1]
