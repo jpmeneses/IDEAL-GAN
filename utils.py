@@ -180,7 +180,7 @@ class IndexTracker(object):
 
 
 class IndexTracker_phantom(object):
-  def __init__(self, fig, ax, X, PDFF_bool, lims, npy_file='slices_crops.npy'):
+  def __init__(self, fig, ax, X, PDFF_bool, lims, wdt=8, npy_file='slices_crops.npy'):
     self.fig = fig
     self.ax = ax
     ax.set_title('use scroll wheel to navigate images')
@@ -188,6 +188,7 @@ class IndexTracker_phantom(object):
     self.X = X
     rows, cols, self.slices = X.shape
     self.ind = 0 # self.slices//2
+    self.wdt = wdt
 
     try:
       with open(npy_file,'rb') as f:
