@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v203-TEaug
-#SBATCH --output=out_TEaug_203.txt
+#SBATCH --job-name=v408g-LDM
+#SBATCH --output=out_LDM_408g.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-TEaug.py --dataset 'TEaug-203' --data_size 384 --n_echoes 3 --out_vars PM --n_G_filters 36
+python train-ldm.py --experiment_dir 'GAN-408g' --n_timesteps 1000 --beta_start 0.0005 --beta_end 0.05 --batch_size 8 --epochs_ldm 2000 --epoch_ldm_ckpt 100 --lr 0.00007
