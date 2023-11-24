@@ -17,7 +17,7 @@ def save_gif(img_list, path="", interval=200):
     imgs = []
     for im in img_list:
         im = np.array(im)
-        im = (im + 1) * 127.5
+        im = (im + 2) * 127.5/2
         im = np.clip(im, 0, 255).astype(np.uint8)
         im = Image.fromarray(im, mode="RGB")
         imgs.append(im)
