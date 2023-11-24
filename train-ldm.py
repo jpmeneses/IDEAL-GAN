@@ -374,6 +374,6 @@ for ep in range(args.epochs_ldm):
 
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
     tl.make_space_above(axs,topmargin=0.8)
-    plt.savefig(py.join(sample_dir, 'ep-%03d.png' % (ep+1)), bbox_inches = 'tight', pad_inches = 0)
+    plt.savefig(py.join(sample_dir, 'ep-%05d.png' % (ep+1)), bbox_inches = 'tight', pad_inches = 0)
     plt.close(fig)
 
