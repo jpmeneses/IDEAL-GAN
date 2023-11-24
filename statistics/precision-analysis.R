@@ -12,9 +12,9 @@ library(gridExtra)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-010/"
+model = "/Sup-204/"
 map = "PDFF"
-epoch = "200"
+epoch = "100"
 
 dir = paste("C:/Users/jpmen/Documents/IDEAL-GAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
@@ -128,7 +128,7 @@ mean_diff <- mean(res_id$bias)
 lower <- mean_diff - 1.96*sd(res_id$bias)
 upper <- mean_diff + 1.96*sd(res_id$bias)
 if (map=="PDFF"){
-  yl = 0.2
+  yl = 0.04
   xl = 0.33
 } else {
   yl = 35.0

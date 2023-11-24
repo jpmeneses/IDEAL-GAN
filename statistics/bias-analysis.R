@@ -10,9 +10,9 @@ library(rstatix)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-model = "/TEaug-004/"
+model = "/Sup-204/"
 map = "PDFF"
-epoch = "200"
+epoch = "100"
 
 dir = paste("C:/Users/jpmen/Documents/IDEAL-GAN/output",model,"Ep-",epoch,sep="")
 setwd(dir)
@@ -48,7 +48,7 @@ refs = c(refs),
 bias = c(meas-refs),
 vial = factor(c(vial_id)),
 Site_Prot = factor(c(im_id),labels=c("S1-P1","S1-P2",
-		   "S2-P1","S2-P2","S3-P1","S3-P2","S6-P1","S6-P2"))
+		   "S2-P1","S2-P2","S3-P1","S3-P2","S4-P2","S6-P1","S6-P2"))
 )
 # factor(c(im_id),labels=c("S1-P1(V1)","S1-P2(V1)","S1-P1(V2)","S1-P2(V2)",
 # 		   "S2-P1","S2-P2","S3-P1","S3-P2","S4-P2","S6-P1","S6-P2"))
