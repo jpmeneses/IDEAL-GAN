@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v600-GAN
-#SBATCH --output=out_600_GAN.txt
+#SBATCH --job-name=v504-LDM
+#SBATCH --output=out_504_LDM.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python train-IDEAL-GAN.py --dataset GAN-600 --n_downsamplings 3 --encoded_size 3 --VQ_encoder True --VQ_num_embed 8 --adv_train True --cGAN True --batch_size 8 --lr 0.001
+python train-ldm.py --experiment_dir GAN-504 --scheduler cosine --n_timesteps 1000 --batch_size 2 --epochs_ldm 2000 --epoch_ldm_ckpt 100
