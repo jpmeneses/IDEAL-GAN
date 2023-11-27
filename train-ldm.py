@@ -47,20 +47,20 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, MEBCRN=True)
+dataset_hdf5_1 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx, MEBCRN=True)
 
-# dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-# acqs_2, out_maps_2 = data.load_hdf5(dataset_dir, dataset_hdf5_2, end=10, MEBCRN=True)
+# dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+# acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, MEBCRN=True)
 
-dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, MEBCRN=True)
+dataset_hdf5_3 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx, MEBCRN=True)
 
-dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, MEBCRN=True)
+dataset_hdf5_4 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx, MEBCRN=True)
 
-dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir, dataset_hdf5_5, MEBCRN=True)
+dataset_hdf5_5 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -286,7 +286,7 @@ for ep in range(args.epochs_ldm):
         with train_summary_writer.as_default():
             tl.summary(loss_dict, step=opt.iterations, name='LDM_losses')
 
-    if (((ep+1) % args.epoch_ldm_ckpt) == 0) or ((ep+1)==args.epochs_ldm):
+    if (ep == 0) or (((ep+1) % args.epoch_ldm_ckpt) == 0) or ((ep+1)==args.epochs_ldm):
         checkpoint_ldm.save(ep)
 
     # Validation inference
