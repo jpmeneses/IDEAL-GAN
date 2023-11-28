@@ -280,7 +280,10 @@ for ep in range(args.epochs_ldm):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        loss_dict = train_step(A, z_std)
+        if args.VQ_encoder:
+            loss_dict = train_step(A)
+        else:
+            loss_dict = train_step(A, z_std)
 
         # summary
         with train_summary_writer.as_default():
@@ -291,7 +294,10 @@ for ep in range(args.epochs_ldm):
 
     # Validation inference
     Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
-    Z2B, Z2B2A = validation_step(Z, z_std)
+    if args.VQ_encoder:
+        Z2B, Z2B2A = validation_step(Z)
+    else:
+        Z2B, Z2B2A = validation_step(Z, z_std)
 
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
