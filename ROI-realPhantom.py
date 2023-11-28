@@ -40,7 +40,7 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
+dataset_dir = '../datasets/'
 dataset_hdf5 = args.dataset + '_GC_192_128_complex_2D.hdf5'
 testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
                                     acqs_data=True, te_data=True, MEBCRN=True)
