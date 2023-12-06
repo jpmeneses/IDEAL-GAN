@@ -71,7 +71,7 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # =                                    data                                    =
 # ==============================================================================
 
-A2B2A_pool = data.ItemPool(args.pool_size)
+A2B2A_pool = data.ItemPool(args.pool_size*not(args.rand_ne))
 
 fm_sc = 300.0
 r2_sc = 200.0
