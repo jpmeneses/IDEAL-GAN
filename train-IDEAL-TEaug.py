@@ -71,39 +71,32 @@ r2_sc,fm_sc = 200.0,300.0
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, 
                             acqs_data=True, te_data=False, MEBCRN=True)
 
 if not(args.DL_gen):
-    dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+    dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
     out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
                                 acqs_data=False, te_data=False, MEBCRN=True)
 
-    dataset_hdf5_3 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+    dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
     out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
                                 acqs_data=False, te_data=False, MEBCRN=True)
 
-    dataset_hdf5_4 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+    dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
     out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
                                 acqs_data=False, te_data=False, MEBCRN=True)
 
-    dataset_hdf5_5 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-# n1_div = 248
-# n3_div = 0
-# n4_div = 434
-
 if args.DL_gen:
     trainY = np.zeros((args.n_per_epoch,1,1,1,1),dtype=np.float32)
 else:
-    trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+    trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
 valX    = acqs_1
 valY    = out_maps_1
 
