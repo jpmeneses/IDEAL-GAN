@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v503-GEN
-#SBATCH --output=out_503_GEN.txt
+#SBATCH --job-name=v410-GAN
+#SBATCH --output=out_410_GAN.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl	
 
-python test-genData.py --experiment_dir output/GAN-503 --n_samples 100
+python train-IDEAL-GAN.py --dataset GAN-410 --rand_ne True --encoded_size 24 --adv_train True --cGAN True --batch_size 8 --lr 0.001 --ls_reg_weight 2e-6
