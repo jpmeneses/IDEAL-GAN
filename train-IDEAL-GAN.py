@@ -21,7 +21,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
-py.arg('--n_echoes', type=int, default=6)
+py.arg('--rand_ne', type=bool, default=False)
 py.arg('--only_mag', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_downsamplings', type=int, default=4)
@@ -73,7 +73,6 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 A2B2A_pool = data.ItemPool(args.pool_size)
 
-ech_idx = args.n_echoes * 2
 fm_sc = 300.0
 r2_sc = 200.0
 
@@ -82,19 +81,19 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx, MEBCRN=True)
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, 12, MEBCRN=True)
 
 dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, MEBCRN=True)
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True)
 
 dataset_hdf5_3 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx, MEBCRN=True)
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True)
 
 dataset_hdf5_4 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx, MEBCRN=True)
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True)
 
 dataset_hdf5_5 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx, MEBCRN=True)
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, 12, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -111,11 +110,11 @@ trainY  = np.concatenate((out_maps_1,out_maps_3,out_maps_4,out_maps_5),axis=0)
 valY    = out_maps_2
 
 # Overall dataset statistics
-len_dataset,_,hgt,wdt,n_ch = np.shape(trainX)
+len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
 _,n_out,_,_,_ = np.shape(trainY)
 
 print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',args.n_echoes)
+print('Echoes:',ne)
 print('Output Maps:',n_out)
 
 # Input and output dimensions (training data)
@@ -141,7 +140,7 @@ if args.only_mag:
     out_activ = 'relu'
 else:
     out_activ = None
-enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
                 filters=args.n_G_filters,
                 num_layers=args.n_downsamplings,
@@ -177,7 +176,7 @@ dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                     bayes_layer=args.PM_bayes_layer
                     )
 
-D_A=dl.PatchGAN(input_shape=(args.n_echoes,hgt,wdt,n_ch), 
+D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch), 
                 cGAN=args.cGAN,
                 multi_echo=True,
                 n_groups=args.n_groups_D,
@@ -188,7 +187,7 @@ if args.only_mag:
     IDEAL_op = wf.IDEAL_mag_Layer()
 else:
     IDEAL_op = wf.IDEAL_Layer()
-LWF_op = wf.LWF_Layer(args.n_echoes,MEBCRN=True)
+
 F_op = dl.FourierLayer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
 Cov_op = dl.CoVar()
@@ -205,7 +204,7 @@ else:
 
 cosine_loss = tf.losses.CosineSimilarity()
 if args.A_loss == 'VGG':
-    metric_model = dl.perceptual_metric(input_shape=(args.n_echoes,hgt,wdt,n_ch), only_mag=args.only_mag)
+    metric_model = dl.perceptual_metric(input_shape=(None,hgt,wdt,n_ch), only_mag=args.only_mag)
 
 if args.A_loss == 'sinGAN':
     # D_0 = dl.sGAN(input_shape=(None,None,n_ch))
@@ -244,7 +243,7 @@ def train_G(A, B):
         A2Z2B_xi= dec_xi(A2Z, training=True)
         
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
-        A2B2A = IDEAL_op(A2B, training=False)
+        A2B2A = IDEAL_op(A2B, ne=A.shape[1], training=False)
 
         ############# Fourier Regularization ##############
         if args.only_mag:
@@ -480,6 +479,9 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
+        if args.rand_ne:
+            ne_sel = np.random.randint(3,7)
+            A = A[:,:ne_sel,:,:,:]
         G_loss_dict, D_loss_dict = train_step(A, B)
 
         # summary
@@ -508,25 +510,17 @@ for ep in range(args.epochs):
             if args.only_mag:
                 im_ech1 = np.squeeze(A2B2A[:,0,:,:,:])
                 im_ech2 = np.squeeze(A2B2A[:,1,:,:,:])
-                if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(A2B2A[:,2,:,:,:])
-                if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(A2B2A[:,3,:,:,:])
-                if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(A2B2A[:,4,:,:,:])
-                if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(A2B2A[:,5,:,:,:])
+                im_ech3 = np.squeeze(A2B2A[:,2,:,:,:])
+                im_ech4 = np.squeeze(A2B2A[:,3,:,:,:])
+                im_ech5 = np.squeeze(A2B2A[:,4,:,:,:])
+                im_ech6 = np.squeeze(A2B2A[:,5,:,:,:])
             else:
                 im_ech1 = np.squeeze(np.abs(tf.complex(A2B2A[:,0,:,:,0],A2B2A[:,0,:,:,1])))
                 im_ech2 = np.squeeze(np.abs(tf.complex(A2B2A[:,1,:,:,0],A2B2A[:,1,:,:,1])))
-                if args.n_echoes >= 3:
-                    im_ech3 = np.squeeze(np.abs(tf.complex(A2B2A[:,2,:,:,0],A2B2A[:,2,:,:,1])))
-                if args.n_echoes >= 4:
-                    im_ech4 = np.squeeze(np.abs(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1])))
-                if args.n_echoes >= 5:
-                    im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1])))
-                if args.n_echoes >= 6:
-                    im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1])))
+                im_ech3 = np.squeeze(np.abs(tf.complex(A2B2A[:,2,:,:,0],A2B2A[:,2,:,:,1])))
+                im_ech4 = np.squeeze(np.abs(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1])))
+                im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1])))
+                im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1])))
             
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
@@ -537,34 +531,22 @@ for ep in range(args.epochs):
                                   interpolation='none', vmin=0, vmax=1)
             axs[0,1].set_title('2nd Echo')
             axs[0,1].axis('off')
-            if args.n_echoes >= 3:
-                acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
+            acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
-                axs[0,2].set_title('3rd Echo')
-                axs[0,2].axis('off')
-            else:
-                fig.delaxes(axs[0,2])
-            if args.n_echoes >= 4:
-                acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
+            axs[0,2].set_title('3rd Echo')
+            axs[0,2].axis('off')
+            acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
-                axs[0,3].set_title('4th Echo')
-                axs[0,3].axis('off')
-            else:
-                fig.delaxes(axs[0,3])
-            if args.n_echoes >= 5:
-                acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
+            axs[0,3].set_title('4th Echo')
+            axs[0,3].axis('off')
+            acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
-                axs[0,4].set_title('5th Echo')
-                axs[0,4].axis('off')
-            else:
-                fig.delaxes(axs[0,4])
-            if args.n_echoes >= 6:
-                acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
+            axs[0,4].set_title('5th Echo')
+            axs[0,4].axis('off')
+            acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
-                axs[0,5].set_title('6th Echo')
-                axs[0,5].axis('off')
-            else:
-                fig.delaxes(axs[0,5])
+            axs[0,5].set_title('6th Echo')
+            axs[0,5].axis('off')
 
             # A2B maps in the second row
             if args.only_mag:
