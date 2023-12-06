@@ -326,7 +326,9 @@ def train_D(A, A2B2A):
         if args.cGAN:
             A_ref = A[:,0::2,:,:,:]
             A_r = A[:,1::2,:,:,:]
-            A_f = A2B2A[:,3:,:,:,:]
+            A_f = A2B2A[:,1::2,:,:,:]
+            if A_r.shape[1] < A_ref.shape[1]:
+                A_ref = A_ref[:,:-1,:,:,:]
             A_d_logits = D_A([A_r,A_ref], training=True)
             A2B2A_d_logits = D_A([A_f,A_ref], training=True)
         else:
