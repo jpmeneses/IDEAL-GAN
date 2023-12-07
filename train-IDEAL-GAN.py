@@ -26,6 +26,7 @@ py.arg('--only_mag', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
+py.arg('--div_decod', type=bool, default=False)
 py.arg('--n_groups_PM', type=int, default=2)
 py.arg('--PM_bayes_layer', type=bool, default=False)
 py.arg('--PM_bayes_weight', type=float, default=1e-5)
@@ -80,34 +81,31 @@ r2_sc = 200.0
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, 12, MEBCRN=True)
 
-dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True)
 
-dataset_hdf5_3 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True)
 
-dataset_hdf5_4 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True)
-
-dataset_hdf5_5 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, 12, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-trainX  = np.concatenate((acqs_1,acqs_3,acqs_4,acqs_5),axis=0)
-valX    = acqs_2
+trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
+valX    = acqs_1
 
 if args.only_mag:
     trainX = np.sqrt(np.sum(np.square(trainX),axis=-1,keepdims=True))
     valX = np.sqrt(np.sum(np.square(valX),axis=-1,keepdims=True))
 
-trainY  = np.concatenate((out_maps_1,out_maps_3,out_maps_4,out_maps_5),axis=0)
-valY    = out_maps_2
+trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
+valY    = out_maps_1
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
@@ -140,6 +138,10 @@ if args.only_mag:
     out_activ = 'relu'
 else:
     out_activ = None
+if args.div_decod:
+    nd = 3
+else:
+    nd = 1
 enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
                 filters=args.n_G_filters,
@@ -151,7 +153,7 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 )
 dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                     output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
+                    filters=args.n_G_filters//nd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation=out_activ,
@@ -159,7 +161,7 @@ dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                     )
 dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
+                    filters=args.n_G_filters//nd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation=out_activ,
@@ -168,7 +170,7 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                     output_shape=(hgt,wdt,n_ch),
                     n_groups=args.n_groups_PM,
-                    filters=args.n_G_filters,
+                    filters=args.n_G_filters//nd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation=out_activ,
