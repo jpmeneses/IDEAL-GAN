@@ -135,7 +135,7 @@ def IDEAL_model(out_maps, params):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
-    r2s = out_maps[:,2,:,:,1] * r2_sc
+    r2s = tf.nn.relu(out_maps[:,2,:,:,1]) * r2_sc
     phi = out_maps[:,2,:,:,0] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
