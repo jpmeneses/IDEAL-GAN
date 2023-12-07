@@ -29,9 +29,9 @@ def perceptual_metric(input_shape, layers=[2,5,8,13,18], multi_echo=True, only_m
 
 def get_features(input_shape, layers=[2,5,8,13,18]):
     inputs = keras.Input(input_shape)
-    x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(x)
+    x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(inputs)
     x = keras.layers.Lambda(lambda x: tf.image.resize(x,[224,224],method='lanczos5'))(x)
-    x = keras.layers.Lambda(lambda x: tf.concat([x[:,:,:,:,:1]*0.5+0.5,tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)),x[:,:,:,:,1:2]*0.5+0.5],axis=-1))(inputs)
+    x = keras.layers.Lambda(lambda x: tf.concat([x[:,:,:,:,:1]*0.5+0.5,tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)),x[:,:,:,:,1:2]*0.5+0.5],axis=-1))(x)
     x = keras.layers.Lambda(lambda x: 255.0*x)(x)
 
     # Change order from 'RGB' to 'BGR'
