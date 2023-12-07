@@ -25,18 +25,21 @@ test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
 
+if not(hasattr(args,'data_size')):
+    py.arg('--data_size', type=int, default=192, choices=[192,384])
+    ds_args = py.args()
+    args.__dict__.update(ds_args.__dict__)
 
 # ==============================================================================
 # =                                    data                                    =
 # ==============================================================================
 
-ech_idx = args.n_echoes * 2
 fm_sc = 300.0
 r2_sc = 200.0
 
 dataset_dir = '../datasets/'
-dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, ech_idx, MEBCRN=True)
+dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, 12, MEBCRN=True)
 
 len_dataset,ne,hgt,wdt,n_ch = valX.shape
 A_dataset_val = tf.data.Dataset.from_tensor_slices(valX)
@@ -46,7 +49,7 @@ A_dataset_val = A_dataset_val.batch(args.val_batch_size).shuffle(len_dataset)
 # =                                   models                                   =
 # ==============================================================================
 
-enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
 				encoded_dims=args.encoded_size,
                 filters=args.n_G_filters,
                 num_layers=args.n_downsamplings,

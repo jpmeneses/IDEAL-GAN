@@ -41,7 +41,6 @@ if not(hasattr(args,'data_size')):
 # =                                    data                                    =
 # ==============================================================================
 
-ech_idx = args.n_echoes * 2
 fm_sc = 300.0
 r2_sc = 200.0
 hgt = args.data_size
@@ -111,7 +110,7 @@ hls = hgt//(2**(args.n_downsamplings))
 wls = wdt//(2**(args.n_downsamplings))
 z_shape = (1,hls,wls,args.encoded_size)
 
-TE = wf.gen_TEvar(args.n_echoes,orig=False)
+TE = wf.gen_TEvar(6,orig=False)
 # Z = tf.random.normal(z_shape,seed=1,dtype=tf.float32)
 
 for k in range(args.n_samples):
@@ -128,14 +127,10 @@ for k in range(args.n_samples):
 
 	im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
 	im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
-	if args.n_echoes >= 3:
-	    im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
-	if args.n_echoes >= 4:
-	    im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
-	if args.n_echoes >= 5:
-	    im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
-	if args.n_echoes >= 6:
-	    im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
+	im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
+	im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
+	im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
+	im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
 
 	fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
@@ -148,34 +143,22 @@ for k in range(args.n_samples):
                           interpolation='none', vmin=0, vmax=1)
 	axs[0,1].set_title('2nd Echo')
 	axs[0,1].axis('off')
-	if args.n_echoes >= 3:
-		acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
+	acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
-		axs[0,2].set_title('3rd Echo')
-		axs[0,2].axis('off')
-	else:
-		fig.delaxes(axs[0,2])
-	if args.n_echoes >= 4:
-		acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
+	axs[0,2].set_title('3rd Echo')
+	axs[0,2].axis('off')
+	acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
-		axs[0,3].set_title('4th Echo')
-		axs[0,3].axis('off')
-	else:
-		fig.delaxes(axs[0,3])
-	if args.n_echoes >= 5:
-		acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
+	axs[0,3].set_title('4th Echo')
+	axs[0,3].axis('off')
+	acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
-		axs[0,4].set_title('5th Echo')
-		axs[0,4].axis('off')
-	else:
-		fig.delaxes(axs[0,4])
-	if args.n_echoes >= 6:
-		acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
+	axs[0,4].set_title('5th Echo')
+	axs[0,4].axis('off')
+	acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
-		axs[0,5].set_title('6th Echo')
-		axs[0,5].axis('off')
-	else:
-		fig.delaxes(axs[0,5])
+	axs[0,5].set_title('6th Echo')
+	axs[0,5].axis('off')
 
 	# Z2B maps in the second row
 	W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
