@@ -62,7 +62,7 @@ dataset_hdf5_1 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, MEBCRN=True)
 
 dataset_hdf5_2 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, MEBCRN=True)
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, MEBCRN=True)
 
 dataset_hdf5_3 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, MEBCRN=True)
@@ -75,7 +75,7 @@ trainX  = np.concatenate((acqs_1,acqs_2,acqs_3),axis=0)
 trainY  = np.concatenate((out_maps_1,out_maps_2,out_maps_3),axis=0)
 
 # Overall dataset statistics
-len_dataset,_,hgt,wdt,n_ch = np.shape(trainX)
+len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
 _,n_out,_,_,_ = np.shape(trainY)
 
 print('Image Dimensions:', hgt, wdt)
@@ -92,7 +92,7 @@ if args.div_decod:
     nd = 3
 else:
     nd = 1
-enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
                 filters=args.n_G_filters,
                 num_layers=args.n_downsamplings,
@@ -271,7 +271,7 @@ for ep in range(args.epochs_ldm):
         if args.data_augmentation:
             p = np.random.rand()
             if p <= 0.4:
-                A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,args.n_echoes*n_ch])
+                A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,ne*n_ch])
 
                 # Random 90 deg rotations
                 A = tf.image.rot90(A,k=np.random.randint(3))
@@ -282,7 +282,7 @@ for ep in range(args.epochs_ldm):
                 # Random vertical reflections
                 A = tf.image.random_flip_up_down(A)
 
-                A = tf.transpose(tf.reshape(A,[A.shape[0],hgt,wdt,args.n_echoes,n_ch]),[0,3,1,2,4])
+                A = tf.transpose(tf.reshape(A,[A.shape[0],hgt,wdt,ne,n_ch]),[0,3,1,2,4])
         # ==============================================================================
 
         # ==============================================================================
@@ -313,14 +313,10 @@ for ep in range(args.epochs_ldm):
     # Magnitude of recon MR images at each echo
     im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
     im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
-    if args.n_echoes >= 3:
-        im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
-    if args.n_echoes >= 4:
-        im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
-    if args.n_echoes >= 5:
-        im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
-    if args.n_echoes >= 6:
-        im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
+    im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
+    im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
+    im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
+    im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
     
     # Acquisitions in the first row
     acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
@@ -331,34 +327,22 @@ for ep in range(args.epochs_ldm):
                           interpolation='none', vmin=0, vmax=1)
     axs[0,1].set_title('2nd Echo')
     axs[0,1].axis('off')
-    if args.n_echoes >= 3:
-        acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
+    acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
-        axs[0,2].set_title('3rd Echo')
-        axs[0,2].axis('off')
-    else:
-        fig.delaxes(axs[0,2])
-    if args.n_echoes >= 4:
-        acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
+    axs[0,2].set_title('3rd Echo')
+    axs[0,2].axis('off')
+    acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
-        axs[0,3].set_title('4th Echo')
-        axs[0,3].axis('off')
-    else:
-        fig.delaxes(axs[0,3])
-    if args.n_echoes >= 5:
-        acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
+    axs[0,3].set_title('4th Echo')
+    axs[0,3].axis('off')
+    acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
-        axs[0,4].set_title('5th Echo')
-        axs[0,4].axis('off')
-    else:
-        fig.delaxes(axs[0,4])
-    if args.n_echoes >= 6:
-        acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
+    axs[0,4].set_title('5th Echo')
+    axs[0,4].axis('off')
+    acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
-        axs[0,5].set_title('6th Echo')
-        axs[0,5].axis('off')
-    else:
-        fig.delaxes(axs[0,5])
+    axs[0,5].set_title('6th Echo')
+    axs[0,5].axis('off')
 
     # A2B maps in the second row
     w_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
