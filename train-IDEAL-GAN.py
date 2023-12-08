@@ -31,6 +31,7 @@ py.arg('--n_groups_PM', type=int, default=2)
 py.arg('--PM_bayes_layer', type=bool, default=False)
 py.arg('--PM_bayes_weight', type=float, default=1e-5)
 py.arg('--encoded_size', type=int, default=256)
+py.arg('--ls_mean_activ', default='leaky_relu', choices=['leaky_relu','relu','tanh',None])
 py.arg('--VQ_encoder', type=bool, default=False)
 py.arg('--VQ_num_embed', type=int, default=64)
 py.arg('--VQ_commit_cost', type=float, default=0.5)
@@ -148,6 +149,7 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
                 sd_out=not(args.VQ_encoder),
+                ls_mean_activ=args.ls_mean_activ,
                 ls_reg_weight=args.ls_reg_weight,
                 NL_self_attention=args.NL_SelfAttention
                 )
