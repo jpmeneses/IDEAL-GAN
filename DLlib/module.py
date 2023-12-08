@@ -671,6 +671,8 @@ def encoder(
     
     if ls_mean_activ == 'leaky_relu':
         ls_mean_activ = tf.nn.leaky_relu
+    elif ls_mean_activ == 'None':
+        ls_mean_activ = None
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=ls_mean_activ,kernel_initializer="he_normal")(x)
     _,ls_hgt,ls_wdt,ls_dims = x.shape
 
