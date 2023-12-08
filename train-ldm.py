@@ -36,6 +36,17 @@ if not(hasattr(args,'PM_bayes_layer')):
     bayes_args = py.args()
     args.__dict__.update(bayes_args.__dict__)
 
+if not(hasattr(args,'VQ_num_embed')):
+    py.arg('--VQ_num_embed', type=bool, default=256)
+    py.arg('--VQ_commit_cost', type=int, default=0.5)
+    VQ_args = py.args()
+    args.__dict__.update(VQ_args.__dict__)
+
+if not(hasattr(args,'rand_ne')):
+    py.arg('--rand_ne', type=bool, default=False)
+    ne_args = py.args()
+    args.__dict__.update(ne_args.__dict__)
+
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
@@ -47,20 +58,14 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_1 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, MEBCRN=True)
 
-# dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-# acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, MEBCRN=True)
+dataset_hdf5_2 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, MEBCRN=True)
 
-dataset_hdf5_3 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_3 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, MEBCRN=True)
-
-dataset_hdf5_4 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, MEBCRN=True)
-
-dataset_hdf5_5 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -83,6 +88,10 @@ A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 # =                                   models                                   =
 # ==============================================================================
 
+if args.div_decod:
+    nd = 3
+else:
+    nd = 1
 enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
                 filters=args.n_G_filters,
@@ -93,7 +102,7 @@ enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
                 )
 dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                     output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
+                    filters=args.n_G_filters//nd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation=None,
@@ -101,7 +110,7 @@ dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                     )
 dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
+                    filters=args.n_G_filters//nd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation=None,
@@ -110,7 +119,7 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                     output_shape=(hgt,wdt,n_ch),
                     n_groups=args.n_groups_PM,
-                    filters=args.n_G_filters,
+                    filters=args.n_G_filters//nd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation=None,
@@ -122,7 +131,7 @@ dec_xi = dl.decoder(encoded_dims=args.encoded_size,
 unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
 
 IDEAL_op = wf.IDEAL_Layer()
-vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
+vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
 
 tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
