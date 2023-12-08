@@ -71,8 +71,8 @@ acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, MEBCRN=True)
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-trainX  = np.concatenate((acqs_1,acqs_3,acqs_4,acqs_5),axis=0)
-trainY  = np.concatenate((out_maps_1,out_maps_3,out_maps_4,out_maps_5),axis=0)
+trainX  = np.concatenate((acqs_1,acqs_2,acqs_3),axis=0)
+trainY  = np.concatenate((out_maps_1,out_maps_2,out_maps_3),axis=0)
 
 # Overall dataset statistics
 len_dataset,_,hgt,wdt,n_ch = np.shape(trainX)
