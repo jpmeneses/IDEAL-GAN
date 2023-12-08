@@ -36,6 +36,16 @@ if not(hasattr(args,'data_size')):
 	ds_args = py.args()
 	args.__dict__.update(ds_args.__dict__)
 
+if not(hasattr(args,'rand_ne')):
+	py.arg('--rand_ne', type=bool, default=False)
+	ne_args = py.args()
+	args.__dict__.update(ne_args.__dict__)
+
+if not(hasattr(args,'div_decod')):
+    py.arg('--div_decod', type=bool, default=False)
+    dec_args = py.args()
+    args.__dict__.update(dec_args.__dict__)
+
 
 # ==============================================================================
 # =                                    data                                    =
@@ -52,16 +62,20 @@ n_ch = 2
 # =                                   models                                   =
 # ==============================================================================
 
+if args.div_decod:
+    nd = 3
+else:
+    nd = 1
 dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                     output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
+                    filters=args.n_G_filters//nd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     NL_self_attention=args.NL_SelfAttention
                     )
 dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                     output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
+                    filters=args.n_G_filters//nd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     NL_self_attention=args.NL_SelfAttention
@@ -69,7 +83,7 @@ dec_f =  dl.decoder(encoded_dims=args.encoded_size,
 dec_xi = dl.decoder(encoded_dims=args.encoded_size,
 					output_shape=(hgt,wdt,n_ch),
 					n_groups=args.n_groups_PM,
-					filters=args.n_G_filters,
+					filters=args.n_G_filters//nd,
 					num_layers=args.n_downsamplings,
 					num_res_blocks=args.n_res_blocks,
 					NL_self_attention=args.NL_SelfAttention,

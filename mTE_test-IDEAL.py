@@ -147,9 +147,9 @@ A_B_dataset_test.batch(1)
 
 # model
 if args.ME_layer:
-    input_shape = (args.n_echoes,hgt,wdt,n_ch)
+    input_shape = (None,None,None,n_ch)
 else:
-    input_shape = (hgt,wdt,ech_idx)
+    input_shape = (None,None,ech_idx)
 
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     if args.out_vars == 'WF-PM':

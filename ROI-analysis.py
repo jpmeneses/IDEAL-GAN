@@ -154,9 +154,9 @@ elif args.G_model == 'U-Net':
     n_out = 2
   G_A2B = dl.UNet(input_shape=(hgt,wdt,ech_idx),
                   n_out=n_out,
-                  filters=args.n_G_filters,
                   te_input=args.te_input,
                   te_shape=(args.n_echoes,),
+                  filters=args.n_G_filters,
                   self_attention=args.D1_SelfAttention)
 elif args.G_model == 'MEBCRN':
   if args.out_vars == 'WFc':

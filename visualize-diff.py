@@ -83,7 +83,7 @@ A_dataset = A_dataset.batch(1)
 # =                                   models                                   =
 # ==============================================================================
 
-enc= dl.encoder(input_shape=(args.n_echoes,hgt,wdt,n_ch),
+enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
                 filters=args.n_G_filters,
                 num_layers=args.n_downsamplings,
