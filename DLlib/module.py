@@ -644,34 +644,38 @@ def encoder(
     num_res_blocks=2,
     dropout=0.0,
     sd_out=True,
+    ls_mean_activ='leaky_relu',
     ls_reg_weight=1.0,
     NL_self_attention=True,
     norm='instance_norm'):
 
     x = inputs1 = keras.Input(input_shape)
 
+    if not(isinstance(filters, list)):
+        filters = [filters*2**k for k in range(num_layers+1)]
     if multi_echo:
-        x = keras.layers.ConvLSTM2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
-    x = keras.layers.Conv2D(filters,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+        x = keras.layers.ConvLSTM2D(filters[0],3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    x = keras.layers.Conv2D(filters[0],3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
     for l in range(num_layers):
         for n_res in range(num_res_blocks):
             x = _residual_block(x, norm=norm)
 
         # Double the number of filters and downsample
-        filters = filters * 2  
-        x = keras.layers.Conv2D(filters,3,strides=2,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+        x = keras.layers.Conv2D(filters[l+1],3,strides=2,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
     if NL_self_attention:
         x = _residual_block(x, norm=norm)
-        x = SelfAttention(ch=filters)(x)
+        x = SelfAttention(ch=filters[-1])(x)
         x = _residual_block(x, norm=norm)
     
-    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+    if ls_mean_activ == 'leaky_relu':
+        ls_mean_activ = tf.nn.leaky_relu
+    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=ls_mean_activ,kernel_initializer="he_normal")(x)
     _,ls_hgt,ls_wdt,ls_dims = x.shape
 
     if sd_out:
-        x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
+        x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=ls_mean_activ,kernel_initializer="he_normal")(x)
         x_mean = keras.layers.Flatten()(x_mean)
 
         x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
@@ -708,31 +712,29 @@ def decoder(
     hgt,wdt,n_out = output_shape
     hls = hgt//(2**(num_layers))
     wls = wdt//(2**(num_layers))
-    filt_ini = filters*(2**num_layers)
     input_shape = (hls,wls,encoded_dims)
+    if not(isinstance(filters, list)):
+        filters = [filters*2**k for k in range(num_layers+1)]
+    filters.reverse()
     
     x = inputs1 = keras.Input(input_shape)
 
-    # wf_init = keras.initializers.VarianceScaling(scale=5e-1,mode='fan_in',distribution='uniform')
-    # pm_init = keras.initializers.VarianceScaling(scale=1e-6,mode='fan_out',distribution='uniform')
-    filt_iter = filt_ini
     x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
-    x = keras.layers.Conv2D(filt_iter,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x) # n_groups
+    x = keras.layers.Conv2D(filters[0],3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x) # n_groups
     if NL_self_attention:
         x = _residual_block(x, norm=norm) # n_groups
-        x = SelfAttention(ch=filt_ini)(x)
+        x = SelfAttention(ch=filters[0])(x)
         x = _residual_block(x, norm=norm) # n_groups
-    for cont in range(num_layers):
-        filt_iter //= 2  # decreasing number of filters with each layer
-        x = _upsample(filt_iter, (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(x)
+    for l in range(num_layers):
+        x = _upsample(filters[l+1], (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(x)
         for n_res in range(num_res_blocks):
             x = _residual_block(x, norm=norm, groups=n_groups)
 
     x = Norm()(x)
     if bayes_layer:
-        x = keras.layers.Conv2D(filters,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
-        x_r = keras.layers.Lambda(lambda z: z[...,:filters//2])(x)
-        x_i = keras.layers.Lambda(lambda z: z[...,filters//2:])(x)
+        x = keras.layers.Conv2D(filters[-1],3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
+        x_r = keras.layers.Lambda(lambda z: z[...,:filters[-1]//2])(x)
+        x_i = keras.layers.Lambda(lambda z: z[...,filters[-1]//2:])(x)
         x_r = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(x_r)
         x_i = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(x_i)
         output = keras.layers.concatenate([x_r,x_i])
