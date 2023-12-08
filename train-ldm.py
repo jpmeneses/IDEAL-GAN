@@ -47,6 +47,11 @@ if not(hasattr(args,'rand_ne')):
     ne_args = py.args()
     args.__dict__.update(ne_args.__dict__)
 
+if not(hasattr(args,'div_decod')):
+    py.arg('--div_decod', type=bool, default=False)
+    dec_args = py.args()
+    args.__dict__.update(dec_args.__dict__)
+
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
