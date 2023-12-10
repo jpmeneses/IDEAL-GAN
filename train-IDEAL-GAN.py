@@ -81,16 +81,16 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, 12, MEBCRN=True)
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, 12, MEBCRN=True, mag_and_phase=args.only_mag)
 
 dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True)
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True, mag_and_phase=args.only_mag)
 
 dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True)
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True, mag_and_phase=args.only_mag)
 
 dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True)
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True, mag_and_phase=args.only_mag)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -104,7 +104,10 @@ valY    = out_maps_1
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
-_,n_out,_,_,_ = np.shape(trainY)
+if args.only_mag:
+    _,_,_,_,n_out = np.shape(trainY)
+else:
+    _,n_out,_,_,_ = np.shape(trainY)
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',ne)
@@ -197,7 +200,10 @@ D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch),
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
 
-IDEAL_op = wf.IDEAL_Layer()
+if args.only_mag:
+    IDEAL_op = wf.IDEAL_mag_Layer()
+else:
+    IDEAL_op = wf.IDEAL_Layer() 
 
 F_op = dl.FourierLayer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
@@ -252,14 +258,13 @@ def train_G(A, B):
         if args.only_mag:
             A2Z2B_mag = dec_mag(A2Z, training=True)
             A2Z2B_pha = dec_pha(A2Z, training=True)
-            A2Z2B_mp = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
-            A2Z2B_w, A2Z2B_f, A2Z2B_xi = wf.mp2wf(A2Z2B_mp)
+            A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
         else:
             A2Z2B_w = dec_w(A2Z, training=True)
             A2Z2B_f = dec_f(A2Z, training=True)
             A2Z2B_xi= dec_xi(A2Z, training=True)
+            A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         
-        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
         A2B2A = IDEAL_op(A2B, ne=A.shape[1], training=False)
 
         ############# Fourier Regularization ##############
@@ -298,10 +303,13 @@ def train_G(A, B):
                     A2B2A_cycle_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B_WF = B[:,:2,:,:,:]
-        B_PM = B[:,2:,:,:,:]
-        B2A2B_cycle_loss = cycle_loss_fn(B_WF, A2B[:,:2,:,:,:])
-        B2A2B_cycle_loss += cycle_loss_fn(B_PM, A2B[:,2:,:,:,:]) * args.FM_loss_weight
+        
+        if args.only_mag:
+            B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
+            B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight # PHASE
+        else:
+            B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
+            B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
         A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
         A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
 
@@ -391,13 +399,12 @@ def sample(A, B):
     if args.only_mag:
         A2Z2B_mag = dec_mag(A2Z, training=True)
         A2Z2B_pha = dec_pha(A2Z, training=True)
-        A2Z2B_mp = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
-        A2Z2B_w, A2Z2B_f, A2Z2B_xi = wf.mp2wf(A2Z2B_mp)
+        A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
     else:
         A2Z2B_w = dec_w(A2Z, training=True)
         A2Z2B_f = dec_f(A2Z, training=True)
         A2Z2B_xi= dec_xi(A2Z, training=True)
-    A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
+        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     A2B2A = IDEAL_op(A2B, training=False)
 
     # Fourier regularization
@@ -434,10 +441,12 @@ def sample(A, B):
                 val_A2B2A_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
-    B_WF = B[:,:2,:,:,:]
-    B_PM = B[:,2:,:,:,:]
-    val_B2A2B_loss = cycle_loss_fn(B_WF, A2B[:,:2,:,:,:])
-    val_B2A2B_loss += cycle_loss_fn(B_PM, A2B[:,2:,:,:,:]) * args.FM_loss_weight
+    if args.only_mag:
+        val_B2A2B_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:])
+        val_B2A2B_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight
+    else:
+        val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
+        val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
@@ -566,25 +575,31 @@ for ep in range(args.epochs):
             axs[0,5].axis('off')
 
             # A2B maps in the second row
-            w_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+            if args.only_mag:
+                w_aux = np.squeeze(A2B[:,0,:,:,0])
+                f_aux = np.squeeze(A2B[:,0,:,:,1])
+                r2_aux = np.squeeze(A2B[:,0,:,:,2])
+                field_aux = np.squeeze(A2B[:,1,:,:,2])
+            else:
+                w_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+                f_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
+                r2_aux = np.squeeze(A2B[:,2,:,:,1])
+                field_aux = np.squeeze(A2B[:,2,:,:,0])
             W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            f_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
             F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_aux = np.squeeze(A2B[:,2,:,:,1])
             r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_aux = np.squeeze(A2B[:,2,:,:,0])
             field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[1,4])
@@ -593,25 +608,31 @@ for ep in range(args.epochs):
             fig.delaxes(axs[1,5])
 
             # Ground-truth in the third row
-            wn_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+            if args.only_mag:
+                wn_aux = np.squeeze(B[:,0,:,:,0])
+                fn_aux = np.squeeze(B[:,0,:,:,1])
+                r2n_aux = np.squeeze(B[:,0,:,:,2])
+                fieldn_aux = np.squeeze(B[:,1,:,:,2])
+            else:
+                wn_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+                fn_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+                r2n_aux = np.squeeze(B[:,2,:,:,1])
+                fieldn_aux = np.squeeze(B[:,2,:,:,0])
             W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_unet, ax=axs[2,1])
             axs[2,1].axis('off')
 
-            fn_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
             F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_unet, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            r2n_aux = np.squeeze(B[:,2,:,:,1])
             r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
                                  interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_unet, ax=axs[2,3])
             axs[2,3].axis('off')
 
-            fieldn_aux = np.squeeze(B[:,2,:,:,0])
             field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_unet, ax=axs[2,4])
