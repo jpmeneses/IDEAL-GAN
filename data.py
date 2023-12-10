@@ -32,7 +32,7 @@ class ItemPool:
 
 def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_slice_list=None,
             remove_non_central=False,acqs_data=True,te_data=False,complex_data=False,
-            remove_zeros=True, MEBCRN=False):
+            remove_zeros=True, MEBCRN=False, mag_and_phase=False):
     f = h5py.File(ds_dir + hdf5_file, 'r')
     if custom_list:
         if acqs_data:
