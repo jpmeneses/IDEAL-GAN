@@ -282,8 +282,8 @@ class IDEAL_mag_Layer(tf.keras.layers.Layer):
 
 
 def mp2wf(mp_out_maps):
-    rho_w_complex = mp_out_maps[:,:1,:,:,:1] * tf.math.exp(np.pi*1j*mp_out_maps[:,1:,:,:,:1])
-    rho_f_complex = mp_out_maps[:,:1,:,:,1:2] * tf.math.exp(np.pi*1j*mp_out_maps[:,1:,:,:,1:2])
+    rho_w_complex = tf.complex(mp_out_maps[:,:1,:,:,:1],0.0) * tf.math.exp(np.pi*1j*tf.complex(mp_out_maps[:,1:,:,:,:1],0.0))
+    rho_f_complex = tf.complex(mp_out_maps[:,:1,:,:,1:2],0.0) * tf.math.exp(np.pi*1j*tf.complex(mp_out_maps[:,1:,:,:,1:2],0.0))
 
     rho_w = tf.concat([tf.math.real(rho_w_complex),tf.math.imag(rho_w_complex)], axis=-1)
     rho_f = tf.concat([tf.math.real(rho_f_complex),tf.math.imag(rho_f_complex)], axis=-1)
