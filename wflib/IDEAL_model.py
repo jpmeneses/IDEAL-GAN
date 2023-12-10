@@ -281,6 +281,18 @@ class IDEAL_mag_Layer(tf.keras.layers.Layer):
         return IDEAL_mag(out_maps, [self.field, te])
 
 
+def mp2wf(mp_out_maps):
+    rho_w_complex = mp_out_maps[:,:1,:,:,:1] * tf.math.exp(np.pi*1j*mp_out_maps[:,1:,:,:,:1])
+    rho_f_complex = mp_out_maps[:,:1,:,:,1:2] * tf.math.exp(np.pi*1j*mp_out_maps[:,1:,:,:,1:2])
+
+    rho_w = tf.concat([tf.math.real(rho_w_complex),tf.math.imag(rho_w_complex)], axis=-1)
+    rho_f = tf.concat([tf.math.real(rho_f_complex),tf.math.imag(rho_f_complex)], axis=-1)
+
+    rho_pm = tf.concat([mp_out_maps[:,1:,:,:,2:],mp_out_maps[:,:1,:,:,2:]], axis=-1)
+
+    return [rho_w, rho_f, rho_pm]
+
+
 @tf.function
 def get_Ps_norm(acqs,param_maps,te=None):
     n_batch,hgt,wdt,d_ech = acqs.shape
