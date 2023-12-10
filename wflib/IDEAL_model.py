@@ -249,25 +249,37 @@ def IDEAL_mag(out_maps, params):
     M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
 
     # Generate complex water/fat signals
-    rho = tf.complex(out_maps[:,:2,:,:,:],0.0) * rho_sc
-    rho_mtx = tf.reshape(rho, [n_batch, ns, -1]) # (nb,ns,nv)
+    mag_rho = out_maps[:,0,:,:,:2]
+    pha_rho = out_maps[:,1,:,:,:2] * np.pi
+    rho = tf.complex(mag_rho*tf.math.cos(pha_rho),mag_rho*tf.math.sin(pha_rho)) * rho_sc # (nb,hgt,wdt,ns)
+    rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
 
-    r2s = out_maps[:,2:,:,:,:] * r2_sc
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
+    rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
+
+    r2s = out_maps[:,0,:,:,2] * r2_sc
+    phi = out_maps[:,1,:,:,2] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(0.0,r2s/(2*np.pi))
+    xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # (nb,ne,nv)
 
     # Matrix operations
-    Smtx = tf.abs(Wp) * tf.abs(tf.linalg.matmul(M,rho_mtx)) # (nb,ne,nv)
+    Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
+    Smtx = Wp * Mp # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
-    res_gt = tf.reshape(Smtx,[n_batch,ne,hgt,wdt,1])
+    S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
+    S_hat = tf.expand_dims(S_hat, -1)
     
-    return res_gt
+    # Split into real and imaginary channels
+    Re_gt = tf.math.real(S_hat)
+    Im_gt = tf.math.imag(S_hat)
+    return res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
 
 
 class IDEAL_mag_Layer(tf.keras.layers.Layer):
@@ -275,22 +287,10 @@ class IDEAL_mag_Layer(tf.keras.layers.Layer):
         super(IDEAL_mag_Layer, self).__init__()
         self.field = field
 
-    def call(self,out_maps,te=None,training=None):
+    def call(self,out_maps,te=None,ne=6,training=None):
         if te is None:
-            te = gen_TEvar(6, out_maps.shape[0], orig=True)
+            te = gen_TEvar(ne, out_maps.shape[0], orig=True)
         return IDEAL_mag(out_maps, [self.field, te])
-
-
-def mp2wf(mp_out_maps):
-    rho_w_complex = tf.complex(mp_out_maps[:,:1,:,:,:1],0.0) * tf.math.exp(np.pi*1j*tf.complex(mp_out_maps[:,1:,:,:,:1],0.0))
-    rho_f_complex = tf.complex(mp_out_maps[:,:1,:,:,1:2],0.0) * tf.math.exp(np.pi*1j*tf.complex(mp_out_maps[:,1:,:,:,1:2],0.0))
-
-    rho_w = tf.concat([tf.math.real(rho_w_complex),tf.math.imag(rho_w_complex)], axis=-1)
-    rho_f = tf.concat([tf.math.real(rho_f_complex),tf.math.imag(rho_f_complex)], axis=-1)
-
-    rho_pm = tf.concat([mp_out_maps[:,1:,:,:,2:],mp_out_maps[:,:1,:,:,2:]], axis=-1)
-
-    return [rho_w, rho_f, rho_pm]
 
 
 @tf.function
