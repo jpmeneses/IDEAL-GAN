@@ -279,7 +279,7 @@ def IDEAL_mag(out_maps, params):
     # Split into real and imaginary channels
     Re_gt = tf.math.real(S_hat)
     Im_gt = tf.math.imag(S_hat)
-    return res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
+    return tf.concat([Re_gt,Im_gt], axis=-1)
 
 
 class IDEAL_mag_Layer(tf.keras.layers.Layer):
