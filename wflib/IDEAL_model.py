@@ -239,6 +239,7 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
+@tf.custom_gradient
 def IDEAL_mag(out_maps, params):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     
@@ -279,7 +280,38 @@ def IDEAL_mag(out_maps, params):
     # Split into real and imaginary channels
     Re_gt = tf.math.real(S_hat)
     Im_gt = tf.math.imag(S_hat)
-    return tf.concat([Re_gt,Im_gt], axis=-1)
+    res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
+
+    def grad(upstream, variables=params): # Must be same shape as out_maps
+        # Re-format upstream 
+        upstream = tf.complex(0.5*upstream[:,:,:,:,0],-0.5*upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
+        upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
+
+        # Water/fat gradient
+        Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[2,0,1])) # (nv,nb,ne,ne)
+        ds_dp = tf.transpose(tf.linalg.matmul(Wp_d,M),perm=[1,0,2,3]) * rho_sc ## (nb,nv,ne,ns) I1
+        
+        # Xi gradient, considering Taylor approximation
+        dxi = tf.linalg.diag(2*np.pi*tf.squeeze(te_complex,-1)) # (nb,ne,1) --> (nb,ne,ne)
+        ds_dxi = tf.linalg.matmul(dxi,Smtx) # (nb,ne,nv)
+        ds_dxi = tf.complex(tf.math.real(ds_dxi)*fm_sc,tf.math.imag(ds_dxi)*r2_sc/(2*np.pi))
+        ds_dxi = tf.expand_dims(tf.transpose(ds_dxi,perm=[0,2,1]),axis=-1) ## (nb,nv,ne,1) I2
+
+        # Concatenate d_s/d_param gradients
+        ds_dq = tf.concat([ds_dp,ds_dxi],axis=-1) # (nb,nv,ne,ns+1)
+        ds_dq = tf.transpose(ds_dq, perm=[0,1,3,2]) ## (nb,nv,ns+1,ne)
+
+        grad_res = tf.linalg.matvec(ds_dq, upstream) # (nb,nv,ns+1)
+        grad_res = tf.reshape(grad_res, [n_batch,hgt,wdt,ns+1]) # (nb,hgt,wdt,ns+1)
+        grad_res_r = +2*tf.math.real(tf.expand_dims(grad_res,axis=1))
+        grad_res_i = -2*tf.math.imag(tf.expand_dims(grad_res,axis=1))
+        grad_res_mag = tf.math.sqrt(grad_res_r**2 + grad_res_i**2)
+        grad_res_pha = tf.math.atan2(grad_res_i,grad_res_r)
+        grad_res = tf.concat([grad_res_mag,grad_res_pha],axis=1) # (nb,2,hgt,wdt,ns+1)
+
+        return (grad_res, [tf.constant([1.0],dtype=tf.float32), tf.ones((n_batch,ne,1),dtype=tf.float32)])
+
+    return res_gt, grad
 
 
 class IDEAL_mag_Layer(tf.keras.layers.Layer):
