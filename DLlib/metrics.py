@@ -11,6 +11,7 @@ def perceptual_metric(input_shape, layers=[2,5,8,13,18], multi_echo=True, only_m
         x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(x)
     x = keras.layers.Lambda(lambda x: tf.image.resize(x,[224,224],method='lanczos5'))(x)
     if only_mag:
+        x = keras.layers.Lambda(lambda x: tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)))(x)
         x = keras.layers.Lambda(lambda x: tf.concat([x,x,x],axis=-1))(x)
     else:
         x =keras.layers.Lambda(lambda x: tf.concat([x[...,:1]*0.5+0.5,
