@@ -9,7 +9,8 @@ def perceptual_metric(input_shape, layers=[2,5,8,13,18], multi_echo=True, only_m
     x = inputs = keras.Input(input_shape)
     if multi_echo:
         x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(x)
-    x = keras.layers.Lambda(lambda x: tf.image.resize(x,[224,224],method='lanczos5'))(x)
+    # x = keras.layers.Lambda(lambda x: tf.image.resize(x,[224,224],method='lanczos5'))(x)
+    x = keras.layers.Lambda(lambda x: tf.pad(x,[16,16]))(x)
     if only_mag:
         x = keras.layers.Lambda(lambda x: tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)))(x)
         x = keras.layers.Lambda(lambda x: tf.concat([x,x,x],axis=-1))(x)
@@ -24,7 +25,7 @@ def perceptual_metric(input_shape, layers=[2,5,8,13,18], multi_echo=True, only_m
         metric_vgg = keras.Model(inputs=vgg.inputs, outputs=vgg.layers[l].output)
         x_l = metric_vgg(x)
         output.append(x_l)
-    
+
     return keras.Model(inputs=inputs, outputs=output)
 
 
@@ -131,7 +132,7 @@ class MMD(keras.metrics.Metric):
 
 
 # class MS_SSIM(keras.metrics.Metric):
-#     def __init__(self, spatial_dims, data_range=1.0, kernel_size=11, kernel_sigma=1.5, 
+#     def __init__(self, spatial_dims, data_range=1.0, kernel_size=11, kernel_sigma=1.5,
 #                     k1=0.01, k2=0.03, weights=(0.0448,0.2856,0.3001,0.2363,0.1333), name='MS_SSIM_metric', **kwargs):
 #         self.MS_SSIM_dist = self.add_weight(name='MS_SSIM_dist', initializer='zeros')
 
