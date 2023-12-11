@@ -293,8 +293,8 @@ def IDEAL_mag(out_maps, params):
         Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[2,0,1])) # (nv,nb,ne,ne)
         ds_dp = tf.transpose(tf.linalg.matmul(Wp_d,M),perm=[1,0,3,2]) * rho_sc ## (nb,nv,ns,ne) I1
         grad_res_rho = tf.linalg.matvec(ds_dp, upstream) # (nb,nv,ns)
-        grad_res_rho = grad_res_rho[:,:,:2] * tf.math.exp(tf.complex(0.0,-rho_pha))
-        grad_res_rho_r = +2*tf.math.real(grad_res[:,:,:2],axis=1)
+        grad_res_rho = grad_res_rho * tf.math.exp(tf.complex(0.0,-rho_pha))
+        grad_res_rho_r = +2*tf.math.real(grad_res_rho,axis=1)
         grad_res_rho_mag = tf.abs(grad_res_rho) * tf.math.cos(tf.math.angle(grad_res_rho))
         grad_res_rho_pha = tf.math.angle(grad_res_rho)
         
