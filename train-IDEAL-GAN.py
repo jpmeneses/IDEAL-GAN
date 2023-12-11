@@ -193,7 +193,7 @@ else:
                         NL_self_attention=args.NL_SelfAttention
                         )
 
-D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch), 
+D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch),
                 cGAN=args.cGAN,
                 multi_echo=True,
                 n_groups=args.n_groups_D,
@@ -203,7 +203,7 @@ D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch),
 if args.only_mag:
     IDEAL_op = wf.IDEAL_mag_Layer()
 else:
-    IDEAL_op = wf.IDEAL_Layer() 
+    IDEAL_op = wf.IDEAL_Layer()
 
 F_op = dl.FourierLayer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
@@ -221,7 +221,7 @@ else:
 
 cosine_loss = tf.losses.CosineSimilarity()
 if args.A_loss == 'VGG':
-    metric_model = dl.perceptual_metric(input_shape=(None,hgt,wdt,n_ch), only_mag=args.only_mag)
+    metric_model = dl.perceptual_metric(input_shape=(None,hgt,wdt,n_ch))
 
 if args.A_loss == 'sinGAN':
     # D_0 = dl.sGAN(input_shape=(None,None,n_ch))
@@ -264,13 +264,13 @@ def train_G(A, B):
             A2Z2B_f = dec_f(A2Z, training=True)
             A2Z2B_xi= dec_xi(A2Z, training=True)
             A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
-        
+
         A2B2A = IDEAL_op(A2B, ne=A.shape[1], training=False)
 
         ############# Fourier Regularization ##############
         A_f = F_op(A, training=False)
         A2B2A_f = F_op(A2B2A, training=False)
-        
+
         ############## Discriminative Losses ##############
         if args.adv_train:
             if args.cGAN:
@@ -284,7 +284,7 @@ def train_G(A, B):
             A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
         else:
             A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
-        
+
         ############ Cycle-Consistency Losses #############
         if args.A_loss == 'VGG':
             A2Y = metric_model(A, training=False)
@@ -303,7 +303,7 @@ def train_G(A, B):
                     A2B2A_cycle_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        
+
         if args.only_mag:
             B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
             B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight # PHASE
@@ -317,11 +317,11 @@ def train_G(A, B):
         activ_reg = tf.constant(0.0,dtype=tf.float32)
         if enc.losses:
             activ_reg += tf.add_n(enc.losses)
-        
+
         G_loss = args.A_loss_weight * A2B2A_cycle_loss + args.B_loss_weight * B2A2B_cycle_loss + A2B2A_g_loss
         G_loss += activ_reg + A2B2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss'] * args.ls_reg_weight
         G_loss += A2Z_cov_loss * args.cov_reg_weight
-        
+
     if args.only_mag:
         G_grad = t.gradient(G_loss, enc.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables)
         G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables))
@@ -353,7 +353,7 @@ def train_D(A, A2B2A):
         else:
             A_d_logits = D_A(A, training=True)
             A2B2A_d_logits = D_A(A2B2A, training=True)
-        
+
         A_d_loss, A2B2A_d_loss = d_loss_fn(A_d_logits, A2B2A_d_logits)
 
         if args.cGAN:
@@ -410,7 +410,7 @@ def sample(A, B):
     # Fourier regularization
     A_f = F_op(A, training=False)
     A2B2A_f = F_op(A2B2A, training=False)
-    
+
     # Discriminative Losses
     if args.adv_train:
         if args.cGAN:
@@ -422,7 +422,7 @@ def sample(A, B):
         val_A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
     else:
         val_A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
-    
+
     # Validation losses
     if args.A_loss == 'VGG':
         A2Y = metric_model(A, training=False)
@@ -522,9 +522,9 @@ for ep in range(args.epochs):
         with train_summary_writer.as_default():
             tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
             tl.summary(D_loss_dict, step=D_optimizer.iterations, name='D_losses')
-            tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate}, 
+            tl.summary({'G learning rate': G_lr_scheduler.current_learning_rate},
                         step=G_optimizer.iterations, name='G learning rate')
-            tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate}, 
+            tl.summary({'D learning rate': D_lr_scheduler.current_learning_rate},
                         step=G_optimizer.iterations, name='D learning rate')
 
         # sample
@@ -547,7 +547,7 @@ for ep in range(args.epochs):
             im_ech4 = np.squeeze(np.abs(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1])))
             im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1])))
             im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1])))
-            
+
             # Acquisitions in the first row
             acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
                                   interpolation='none', vmin=0, vmax=1)
