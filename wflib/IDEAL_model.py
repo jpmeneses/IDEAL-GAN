@@ -30,7 +30,7 @@ def gen_TEvar(n_ech, bs=1, orig=False, TE_ini_min=1.0e-3, TE_ini_d=1.4e-3, d_TE_
         # d_TE_var = (1.5 + 1.0*np.random.uniform()) * 1e-3
         d_TE_c = d_TE_min + np.random.uniform(0,d_TE_d)
         # The lowest the SD, the more equally-distanced TEs
-        d_TE_var = np.random.normal(d_TE_c, 1e-4, size=(n_ech-1,)) 
+        d_TE_var = np.random.normal(d_TE_c, 1e-4, size=(n_ech-1,))
         d_TE_var = np.concatenate((np.array([0.0]), d_TE_var), axis=0)
         te_var_np = np.cumsum(d_TE_var) + TE_ini_var
     te_var = tf.convert_to_tensor(te_var_np,dtype=tf.float32)
@@ -70,7 +70,7 @@ def acq_to_acq(acqs, param_maps, te=None):
 
     if te is None:
         te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
-    
+
     te_complex = tf.complex(0.0,te) # (nb,ne,1)
 
     M, M_pinv = gen_M(te) # M shape: (ne,ns)
@@ -119,11 +119,11 @@ def acq_to_acq(acqs, param_maps, te=None):
 @tf.custom_gradient
 def IDEAL_model(out_maps, params):
     n_batch,_,hgt,wdt,_ = out_maps.shape
-    
+
     te = params[1] # (nb,ne,1)
-    te_complex = tf.complex(0.0,te) 
+    te_complex = tf.complex(0.0,te)
     ne = te.shape[1]
-    
+
     M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
 
     # Generate complex water/fat signals
@@ -152,21 +152,21 @@ def IDEAL_model(out_maps, params):
     # Reshape to original acquisition dimensions
     S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
     S_hat = tf.expand_dims(S_hat, -1)
-    
+
     # Split into real and imaginary channels
     Re_gt = tf.math.real(S_hat)
     Im_gt = tf.math.imag(S_hat)
     res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
-    
+
     def grad(upstream, variables=params): # Must be same shape as out_maps
-        # Re-format upstream 
+        # Re-format upstream
         upstream = tf.complex(0.5*upstream[:,:,:,:,0],-0.5*upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
         upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
 
         # Water/fat gradient
         Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[2,0,1])) # (nv,nb,ne,ne)
         ds_dp = tf.transpose(tf.linalg.matmul(Wp_d,M),perm=[1,0,2,3]) * rho_sc ## (nb,nv,ne,ns) I1
-        
+
         # Xi gradient, considering Taylor approximation
         dxi = tf.linalg.diag(2*np.pi*tf.squeeze(te_complex,-1)) # (nb,ne,1) --> (nb,ne,ne)
         ds_dxi = tf.linalg.matmul(dxi,Smtx) # (nb,ne,nv)
@@ -184,7 +184,7 @@ def IDEAL_model(out_maps, params):
         grad_res = tf.concat([grad_res_r,grad_res_i],axis=-1) # (nb,ns+1,hgt,wdt,2)
 
         return (grad_res, [tf.constant([1.0],dtype=tf.float32), tf.ones((n_batch,ne,1),dtype=tf.float32)])
-    
+
     return res_gt, grad
 
 
@@ -208,11 +208,11 @@ class LWF_Layer(tf.keras.layers.Layer):
     def call(self,out_maps,te=None,training=None):
         n_batch,_,hgt,wdt,_ = out_maps.shape
         ne = 6
-        
+
         if te is None:
             te = gen_TEvar(ne)
         te_complex = tf.complex(0.0,te) # (1,ne)
-        
+
         M = gen_M(te,get_Mpinv=False) # (nb,ne,ns)
 
         # Generate complex water/fat signals
@@ -230,7 +230,7 @@ class LWF_Layer(tf.keras.layers.Layer):
         # Reshape to original acquisition dimensions
         S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt]) # (nb*ne,hgt,wdt)
         S_hat = tf.expand_dims(S_hat,-1)
-        
+
         # Split into real and imaginary channels
         Re_gt = tf.math.real(S_hat)
         Im_gt = tf.math.imag(S_hat)
@@ -242,11 +242,11 @@ class LWF_Layer(tf.keras.layers.Layer):
 @tf.custom_gradient
 def IDEAL_mag(out_maps, params):
     n_batch,_,hgt,wdt,_ = out_maps.shape
-    
+
     te = params[1] # (nb,ne,1)
-    te_complex = tf.complex(0.0,te) 
+    te_complex = tf.complex(0.0,te)
     ne = te.shape[1]
-    
+
     M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
 
     # Generate complex water/fat signals
@@ -278,14 +278,14 @@ def IDEAL_mag(out_maps, params):
     # Reshape to original acquisition dimensions
     S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
     S_hat = tf.expand_dims(S_hat, -1)
-    
+
     # Split into real and imaginary channels
     Re_gt = tf.math.real(S_hat)
     Im_gt = tf.math.imag(S_hat)
     res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
 
     def grad(upstream, variables=params): # Must be same shape as out_maps
-        # Re-format upstream 
+        # Re-format upstream
         upstream = tf.complex(0.5*upstream[:,:,:,:,0],-0.5*upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
         upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
 
@@ -295,8 +295,11 @@ def IDEAL_mag(out_maps, params):
         grad_res_rho = tf.linalg.matvec(ds_dp, upstream) # (nb,nv,ns)
         grad_res_rho = grad_res_rho * tf.math.exp(tf.complex(0.0,-rho_pha))
         grad_res_rho_mag = tf.abs(grad_res_rho) * tf.math.cos(tf.math.angle(grad_res_rho))
-        grad_res_rho_pha = tf.math.angle(grad_res_rho * tf.math.exp(tf.complex(0.0,rho_pha)))
-        
+        grad_res_rho_pha = tf.math.angle(grad_res_rho)
+        grad_res_rho_pha = tf.where(tf.math.logical_and(tf.abs(grad_res_rho_pha)>np.pi/2,
+                                                        tf.abs(grad_res_rho_pha)<np.pi*3/2),
+                                    grad_res_rho_pha+np.pi, grad_res_rho_pha)
+
         # Xi gradient, considering Taylor approximation
         dxi = tf.linalg.diag(2*np.pi*tf.squeeze(te_complex,-1)) # (nb,ne,1) --> (nb,ne,ne)
         ds_dxi = tf.linalg.matmul(dxi,Smtx) # (nb,ne,nv)
@@ -372,10 +375,10 @@ def get_Ps_norm(acqs,param_maps,te=None):
     WmS = Wm * Smtx
     PWmS = tf.linalg.matmul(P0,WmS)
     T = Wp * PWmS
-    
+
     # Reshape to original images dimensions
     Ps = tf.reshape(tf.transpose(T,perm=[0,2,1]),[n_batch,hgt,wdt,ne])
-    
+
     # L2 norm
     L2_norm_vec = tf.math.reduce_euclidean_norm(Ps,axis=[-3,-2])
     # L2_norm = tf.abs(tf.reduce_mean(tf.reduce_sum(L2_norm_vec,axis=-1)))
@@ -393,9 +396,9 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
 
     if te is None:
         te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
-    
+
     te_complex = tf.complex(0.0,te) # (nb,ne,1)
-    
+
     M, M_pinv = gen_M(te, field=field) # M shape: (nb,ne,ns)
 
     # Generate complex signal
@@ -446,7 +449,7 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
         im_stack = tf.stack([zero_fill,Im_rho],4)
         im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
         res_rho = re_aux + im_aux
-    
+
     return res_rho
 
 
@@ -487,7 +490,7 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     phi = mean_maps[:,:,:,1] * fm_sc
     r2s_unc = var_maps[:,:,:,0] * (r2_sc**2)
     phi_unc = var_maps[:,:,:,1] * (fm_sc**2)
-    
+
     r2s_rav = tf.reshape(tf.complex(r2s,0.0),[n_batch,-1])
     r2s_rav = tf.expand_dims(r2s_rav,1)
     r2s_unc_rav = tf.reshape(tf.complex(r2s_unc,0.0),[n_batch,-1])
@@ -518,5 +521,5 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, complex_data=False):
     im_stack_var = tf.stack([zero_fill,Im_rho_var],4)
     im_aux_var = tf.reshape(im_stack_var,[n_batch,hgt,wdt,2*ns])
     res_rho_var = re_aux_var + im_aux_var
-    
+
     return res_rho_var
