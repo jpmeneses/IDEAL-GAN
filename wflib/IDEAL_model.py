@@ -259,6 +259,8 @@ def IDEAL_mag(out_maps, params):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
+    rho_pha = tf.transpose(tf.math.angle(rho_mtx),perm=[0,2,1]) # (nb,nv,ns)
+
     r2s = out_maps[:,0,:,:,2] * r2_sc
     phi = out_maps[:,1,:,:,2] * fm_sc
 
@@ -289,24 +291,27 @@ def IDEAL_mag(out_maps, params):
 
         # Water/fat gradient
         Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[2,0,1])) # (nv,nb,ne,ne)
-        ds_dp = tf.transpose(tf.linalg.matmul(Wp_d,M),perm=[1,0,2,3]) * rho_sc ## (nb,nv,ne,ns) I1
+        ds_dp = tf.transpose(tf.linalg.matmul(Wp_d,M),perm=[1,0,3,2]) * rho_sc ## (nb,nv,ns,ne) I1
+        grad_res_rho = tf.linalg.matvec(ds_dxi, upstream) # (nb,nv,ns)
+        grad_res_rho = grad_res[:,:,:2] * tf.math.exp(tf.complex(0.0,-rho_pha))
+        grad_res_rho_r = +2*tf.math.real(grad_res[:,:,:2],axis=1)
+        grad_res_rho_mag = tf.abs(grad_res_rho) * tf.math.cos(tf.math.angle(grad_res_rho))
+        grad_res_rho_pha = tf.math.angle(grad_res_rho)
         
         # Xi gradient, considering Taylor approximation
         dxi = tf.linalg.diag(2*np.pi*tf.squeeze(te_complex,-1)) # (nb,ne,1) --> (nb,ne,ne)
         ds_dxi = tf.linalg.matmul(dxi,Smtx) # (nb,ne,nv)
         ds_dxi = tf.complex(tf.math.real(ds_dxi)*fm_sc,tf.math.imag(ds_dxi)*r2_sc/(2*np.pi))
-        ds_dxi = tf.expand_dims(tf.transpose(ds_dxi,perm=[0,2,1]),axis=-1) ## (nb,nv,ne,1) I2
+        ds_dxi = tf.expand_dims(tf.transpose(ds_dxi,perm=[0,2,1]),axis=-2) ## (nb,nv,1,ne) I2
+        grad_res_xi = tf.linalg.matvec(ds_dxi, upstream) # (nb,nv,1)
+        grad_res_xi_mag = tf.math.imag(grad_res_xi)
+        grad_res_xi_pha = tf.math.real(grad_res_xi)
 
         # Concatenate d_s/d_param gradients
-        ds_dq = tf.concat([ds_dp,ds_dxi],axis=-1) # (nb,nv,ne,ns+1)
-        ds_dq = tf.transpose(ds_dq, perm=[0,1,3,2]) ## (nb,nv,ns+1,ne)
-
-        grad_res = tf.linalg.matvec(ds_dq, upstream) # (nb,nv,ns+1)
-        grad_res = tf.reshape(grad_res, [n_batch,hgt,wdt,ns+1]) # (nb,hgt,wdt,ns+1)
-        grad_res_r = +2*tf.math.real(tf.expand_dims(grad_res,axis=1))
-        grad_res_i = -2*tf.math.imag(tf.expand_dims(grad_res,axis=1))
-        grad_res_mag = tf.math.sqrt(grad_res_r**2 + grad_res_i**2) * tf.math.sign(grad_res_r) * tf.math.sign(grad_res_i)
-        grad_res_pha = tf.math.atan2(grad_res_i,grad_res_r)
+        grad_res_mag = tf.concat([grad_res_rho_mag,grad_res_xi_mag],axis=-1) # (nb,nv,ns+1)
+        grad_res_pha = tf.concat([grad_res_rho_pha,grad_res_xi_pha],axis=-1)
+        grad_res_mag = tf.expand_dims(tf.reshape(grad_res_mag,[n_batch,hgt,wdt,ns+1]),axis=1) # (nb,hgt,wdt,ns+1)
+        grad_res_pha = tf.expand_dims(tf.reshape(grad_res_pha,[n_batch,hgt,wdt,ns+1]),axis=1)
         grad_res = tf.concat([grad_res_mag,grad_res_pha],axis=1) # (nb,2,hgt,wdt,ns+1)
 
         return (grad_res, [tf.constant([1.0],dtype=tf.float32), tf.ones((n_batch,ne,1),dtype=tf.float32)])
