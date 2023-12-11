@@ -305,7 +305,7 @@ def IDEAL_mag(out_maps, params):
         grad_res = tf.reshape(grad_res, [n_batch,hgt,wdt,ns+1]) # (nb,hgt,wdt,ns+1)
         grad_res_r = +2*tf.math.real(tf.expand_dims(grad_res,axis=1))
         grad_res_i = -2*tf.math.imag(tf.expand_dims(grad_res,axis=1))
-        grad_res_mag = tf.math.sqrt(grad_res_r**2 + grad_res_i**2)
+        grad_res_mag = tf.math.sqrt(grad_res_r**2 + grad_res_i**2) * tf.math.sign(grad_res_r) * tf.math.sign(grad_res_i)
         grad_res_pha = tf.math.atan2(grad_res_i,grad_res_r)
         grad_res = tf.concat([grad_res_mag,grad_res_pha],axis=1) # (nb,2,hgt,wdt,ns+1)
 
