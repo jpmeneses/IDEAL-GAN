@@ -298,7 +298,7 @@ def IDEAL_mag(out_maps, params):
         grad_res_rho_pha = tf.math.angle(grad_res_rho)
         grad_res_rho_pha = tf.where(tf.math.logical_and(tf.abs(grad_res_rho_pha)>np.pi/2,
                                                         tf.abs(grad_res_rho_pha)<np.pi*3/2),
-                                    grad_res_rho_pha+np.pi, grad_res_rho_pha)
+                                    grad_res_rho_pha-np.pi, grad_res_rho_pha)
 
         # Xi gradient, considering Taylor approximation
         dxi = tf.linalg.diag(2*np.pi*tf.squeeze(te_complex,-1)) # (nb,ne,1) --> (nb,ne,ne)
