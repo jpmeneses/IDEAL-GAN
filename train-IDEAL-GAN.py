@@ -159,7 +159,7 @@ if args.only_mag:
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_pha = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_out),
+                        output_shape=(hgt,wdt,n_out-1),
                         filters=args.n_G_filters//nd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
@@ -258,6 +258,7 @@ def train_G(A, B):
         if args.only_mag:
             A2Z2B_mag = dec_mag(A2Z, training=True)
             A2Z2B_pha = dec_pha(A2Z, training=True)
+            A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
             A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
         else:
             A2Z2B_w = dec_w(A2Z, training=True)
@@ -397,13 +398,14 @@ def sample(A, B):
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
     if args.only_mag:
-        A2Z2B_mag = dec_mag(A2Z, training=True)
-        A2Z2B_pha = dec_pha(A2Z, training=True)
+        A2Z2B_mag = dec_mag(A2Z, training=False)
+        A2Z2B_pha = dec_pha(A2Z, training=False)
+        A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
         A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
     else:
-        A2Z2B_w = dec_w(A2Z, training=True)
-        A2Z2B_f = dec_f(A2Z, training=True)
-        A2Z2B_xi= dec_xi(A2Z, training=True)
+        A2Z2B_w = dec_w(A2Z, training=False)
+        A2Z2B_f = dec_f(A2Z, training=False)
+        A2Z2B_xi= dec_xi(A2Z, training=False)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     A2B2A = IDEAL_op(A2B, training=False)
 
