@@ -87,7 +87,6 @@ dec_xi = dl.decoder(encoded_dims=args.encoded_size,
 					num_layers=args.n_downsamplings,
 					num_res_blocks=args.n_res_blocks,
 					NL_self_attention=args.NL_SelfAttention,
-					bayes_layer=args.PM_bayes_layer
 					)
 
 
