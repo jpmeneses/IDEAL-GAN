@@ -309,10 +309,10 @@ def IDEAL_mag(out_maps, params):
         dphi = tf.linalg.diag(tf.math.exp(tf.complex(0.0,tf.ones([n_batch,ne],dtype=tf.float32)))) # (nb,ne,ne)
         ds_dphi = tf.linalg.matmul(dphi,Smtx) * np.pi # (nb,ne,nv)
         ds_dphi = tf.expand_dims(tf.transpose(ds_dphi,perm=[0,2,1]),axis=-2) ## (nb,nv,1,ne) I3
-        grad_res_phi = tf.linalg.matvec(ds_dphi, upstream) # (nb,nv,1)
+        grad_res_phi = tf.math.real(tf.linalg.matvec(ds_dphi, upstream)) # (nb,nv,1)
 
         # Concatenate d_s/d_param gradients
-        grad_res_mag = tf.concat([grad_res_rho_mag,grad_res_r2],axis=-1) # (nb,nv,ns+1)
+        grad_res_mag = tf.concat([grad_res_rho,grad_res_r2],axis=-1) # (nb,nv,ns+1)
         grad_res_pha = tf.concat([tf.zeros_like(grad_res_phi),grad_res_phi,grad_res_fm],axis=-1)
         grad_res_mag = tf.expand_dims(tf.reshape(grad_res_mag,[n_batch,hgt,wdt,ns+1]),axis=1) # (nb,1,hgt,wdt,ns+1)
         grad_res_pha = tf.expand_dims(tf.reshape(grad_res_pha,[n_batch,hgt,wdt,ns+1]),axis=1)
