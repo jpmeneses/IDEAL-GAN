@@ -16,8 +16,9 @@ def perceptual_metric(input_shape, layers=[2,5,8,13,18], multi_echo=True, only_m
         x = keras.layers.Lambda(lambda x: tf.concat([x,x,x],axis=-1))(x)
     else:
         x =keras.layers.Lambda(lambda x: tf.concat([x[...,:1]*0.5+0.5,
-                                                    tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)),
+                                                    x[...,:1]*0.5+0.5,,
                                                     x[...,1:2]*0.5+0.5],axis=-1))(x)
+    # tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True))
     x = keras.layers.Lambda(lambda x: 255.0*x)(x)
     x = keras.applications.vgg19.preprocess_input(x)
     output = list()
