@@ -160,7 +160,7 @@ if args.only_mag:
                         )
     dec_pha = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_out-1),
-                        filters=args.n_G_filters//nd,
+                        filters=args.n_G_filters//(nd+1),
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation='tanh',
