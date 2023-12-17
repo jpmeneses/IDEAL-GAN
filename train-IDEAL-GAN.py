@@ -259,14 +259,18 @@ def train_G(A, B):
             A2Z2B_mag = dec_mag(A2Z, training=True)
             A2Z2B_pha = dec_pha(A2Z, training=True)
             A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
-            A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
+            A2B_mag = tf.concat([A2Z2B_mag,B[:,1:,:,:,:]],axis=1)
+            A2B_pha = tf.concat([B[:,:1,:,:,:],A2Z2B_pha],axis=1)
+            A2B2A = IDEAL_op(A2B_mag, ne=A.shape[1], training=False)
+            A2B2A_pha = IDEAL_op(A2B_pha, ne=A.shape[1], training=False)
+            A2B2A_list = [A2B2A,A2B2A_pha]
         else:
             A2Z2B_w = dec_w(A2Z, training=True)
             A2Z2B_f = dec_f(A2Z, training=True)
             A2Z2B_xi= dec_xi(A2Z, training=True)
             A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
-
-        A2B2A = IDEAL_op(A2B, ne=A.shape[1], training=False)
+            A2B2A = IDEAL_op(A2B, ne=A.shape[1], training=False)
+            A2B2A_list = [A2B2A]
 
         ############# Fourier Regularization ##############
         A_f = F_op(A, training=False)
@@ -289,10 +293,11 @@ def train_G(A, B):
         ############ Cycle-Consistency Losses #############
         if args.A_loss == 'VGG':
             A2Y = metric_model(A, training=False)
-            A2B2A2Y = metric_model(A2B2A, training=False)
-            A2B2A_cycle_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
-            for l in range(1,len(A2Y)):
-                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
+            A2B2A_cycle_loss = tf.constant(0.0,dtype=tf.float32)
+            for A2B2A_i in A2B2A_list:
+                A2B2A2Y = metric_model(A2B2A_i, training=False)
+                for l in range(len(A2Y)):
+                    A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)/2
         elif args.A_loss == 'sinGAN':
             A2B2A_cycle_loss = 0.0
             for D in D_list:
@@ -407,6 +412,7 @@ def sample(A, B):
         A2Z2B_f = dec_f(A2Z, training=False)
         A2Z2B_xi= dec_xi(A2Z, training=False)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
+
     A2B2A = IDEAL_op(A2B, training=False)
 
     # Fourier regularization
@@ -429,8 +435,8 @@ def sample(A, B):
     if args.A_loss == 'VGG':
         A2Y = metric_model(A, training=False)
         A2B2A2Y = metric_model(A2B2A, training=False)
-        val_A2B2A_loss = cosine_loss(A2Y[0], A2B2A2Y[0])/len(A2Y)
-        for l in range(1,len(A2Y)):
+        val_A2B2A_loss = tf.constant(0.0,dtype=tf.float32)
+        for l in range(len(A2Y)):
             val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
     elif args.A_loss == 'sinGAN':
         val_A2B2A_loss = 0.0
