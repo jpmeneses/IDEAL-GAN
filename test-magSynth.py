@@ -60,8 +60,8 @@ if args.only_mag:
 else:
     _,n_out,_,_,_ = np.shape(valY)
 
-A_dataset_val = tf.data.Dataset.from_tensor_slices(valX)
-A_dataset_val = A_dataset_val.batch(args.val_batch_size).shuffle(len_dataset)
+A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
+A_B_dataset_val = A_B_dataset_val.batch(args.val_batch_size).shuffle(len_dataset)
 
 # ==============================================================================
 # =                                   models                                   =
@@ -175,7 +175,7 @@ ms_ssim_scores = []
 ssim_scores = []
 
 k = 0
-for A in A_dataset_val:
+for A, B in A_B_dataset_val:
     # Get only-magnitude latent space
     A2B, A2B2A = sample(A)
 
@@ -207,7 +207,7 @@ for A in A_dataset_val:
     im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1])))
     im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1])))
 
-    fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
+    fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
     # Acquisitions in the first row
     acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
@@ -265,6 +265,52 @@ for A in A_dataset_val:
                                 interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
     fig.colorbar(field_ok, ax=axs[1,5])
     axs[1,5].axis('off')
+
+    # Ground-truth in the third row
+    if args.only_mag:
+        wn_m_aux = np.squeeze(B[:,0,:,:,0])
+        wn_p_aux = np.squeeze(B[:,1,:,:,0])
+        fn_m_aux = np.squeeze(B[:,0,:,:,1])
+        fn_p_aux = np.squeeze(B[:,1,:,:,1])
+        r2n_aux = np.squeeze(B[:,0,:,:,2])
+        fieldn_aux = np.squeeze(B[:,1,:,:,2])
+    else:
+        wn_m_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+        wn_p_aux = np.squeeze(np.arctan2(B[:,0,:,:,1],B[:,0,:,:,0]))/np.pi
+        fn_m_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+        fn_p_aux = np.squeeze(np.arctan2(B[:,1,:,:,1],B[:,1,:,:,0]))/np.pi
+        r2n_aux = np.squeeze(B[:,2,:,:,1])
+        fieldn_aux = np.squeeze(B[:,2,:,:,0])
+
+    W_unet = axs[2,0].imshow(wn_m_aux, cmap='bone',
+                            interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(W_unet, ax=axs[2,0])
+    axs[2,0].axis('off')
+
+    Wp_unet = axs[2,1].imshow(wn_p_aux, cmap='twilight',
+                            interpolation='none', vmin=-1, vmax=1)
+    fig.colorbar(Wp_unet, ax=axs[2,1])
+    axs[2,1].axis('off')
+
+    F_unet = axs[2,2].imshow(fn_m_aux, cmap='pink',
+                            interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(F_unet, ax=axs[2,2])
+    axs[2,2].axis('off')
+
+    Fp_unet = axs[2,3].imshow(fn_p_aux, cmap='twilight',
+                            interpolation='none', vmin=-1, vmax=1)
+    fig.colorbar(Fp_unet, ax=axs[2,3])
+    axs[2,3].axis('off')
+
+    r2_unet = axs[2,4].imshow(r2n_aux*r2_sc, cmap='copper',
+                            interpolation='none', vmin=0, vmax=r2_sc)
+    fig.colorbar(r2_unet, ax=axs[2,4])
+    axs[2,4].axis('off')
+
+    field_unet = axs[2,5].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                            interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+    fig.colorbar(field_unet, ax=axs[2,5])
+    axs[2,5].axis('off')
 
     # fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE, axis=1))]), fontsize=16)
 
