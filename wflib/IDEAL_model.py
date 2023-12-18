@@ -294,7 +294,7 @@ def IDEAL_mag(out_maps, params):
         # Water/fat gradient
         Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[2,0,1])) # (nv,nb,ne,ne)
         ds_dp = tf.transpose(tf.linalg.matmul(Wp_d,M),perm=[1,0,3,2]) * rho_sc ## (nb,nv,ns,ne) I1
-        grad_res_rho = tf.math.real(tf.linalg.matvec(ds_dp, upstream)) # (nb,nv,ns)
+        grad_res_rho = +2*tf.math.real(tf.linalg.matvec(ds_dp, upstream)) # (nb,nv,ns)
 
         # Xi gradient
         dxi = tf.linalg.diag(2*np.pi*tf.squeeze(te_complex,-1)) # (nb,ne,1) --> (nb,ne,ne)
