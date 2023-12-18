@@ -317,8 +317,8 @@ def train_G(A, B):
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         if args.only_mag:
-            B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B_mag) # MAG
-            B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B_pha) * args.FM_loss_weight # PHASE
+            B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
+            B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,1:], A2B[:,1:,:,:,1:]) * args.FM_loss_weight # PHASE
         else:
             B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
             B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
