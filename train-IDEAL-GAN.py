@@ -24,6 +24,7 @@ py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--rand_ne', type=bool, default=False)
 py.arg('--only_mag', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
+py.arg('--n_G_filt_list', default='')
 py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
 py.arg('--div_decod', type=bool, default=False)
@@ -66,6 +67,8 @@ py.mkdir(output_dir)
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
+if len(args.n_G_filt_list) > 0:
+    filt_list = [int(a_i) for a_i in args.n_G_filt_list.split(',')]
 
 # ==============================================================================
 # =                                    data                                    =
@@ -139,9 +142,17 @@ if args.div_decod:
         nd = 3
 else:
     nd = 1
+if len(args.n_G_filt_list) == (args.n_downsamplings+1):
+    nfe = filt_list
+    nfd = [a//nd for a in filt_list]
+    nfd2 = [a//(nd+1) for a in filt_list]
+else:
+    nfe = args.n_G_filters
+    nfd = args.n_G_filters//nd
+    nfd2= args.n_G_filters//(nd+1)
 enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
-                filters=args.n_G_filters,
+                filters=nfe,
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
                 sd_out=not(args.VQ_encoder),
@@ -152,7 +163,7 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
 if args.only_mag:
     dec_mag = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_out),
-                        filters=args.n_G_filters//nd,
+                        filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation='relu',
@@ -160,7 +171,7 @@ if args.only_mag:
                         )
     dec_pha = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_out-1),
-                        filters=args.n_G_filters//(nd+1),
+                        filters=nfd2,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation='tanh',
@@ -169,7 +180,7 @@ if args.only_mag:
 else:
     dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_ch),
-                        filters=args.n_G_filters//nd,
+                        filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation=None,
@@ -177,7 +188,7 @@ else:
                         )
     dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_ch),
-                        filters=args.n_G_filters//nd,
+                        filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation=None,
@@ -186,7 +197,7 @@ else:
     dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_ch),
                         n_groups=args.n_groups_PM,
-                        filters=args.n_G_filters//nd,
+                        filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation=None,
@@ -259,18 +270,14 @@ def train_G(A, B):
             A2Z2B_mag = dec_mag(A2Z, training=True)
             A2Z2B_pha = dec_pha(A2Z, training=True)
             A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
-            A2B_mag = tf.concat([A2Z2B_mag,B[:,1:,:,:,:]],axis=1)
-            A2B_pha = tf.concat([B[:,:1,:,:,:],A2Z2B_pha],axis=1)
-            A2B2A = IDEAL_op(A2B_mag, ne=A.shape[1], training=False)
-            A2B2A_pha = IDEAL_op(A2B_pha, ne=A.shape[1], training=False)
-            A2B2A_list = [A2B2A,A2B2A_pha]
+            A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
         else:
             A2Z2B_w = dec_w(A2Z, training=True)
             A2Z2B_f = dec_f(A2Z, training=True)
             A2Z2B_xi= dec_xi(A2Z, training=True)
             A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
-            A2B2A = IDEAL_op(A2B, ne=A.shape[1], training=False)
-            A2B2A_list = [A2B2A]
+
+        A2B2A = IDEAL_op(A2B, ne=A.shape[1], training=False)
 
         ############# Fourier Regularization ##############
         A_f = F_op(A, training=False)
@@ -293,11 +300,10 @@ def train_G(A, B):
         ############ Cycle-Consistency Losses #############
         if args.A_loss == 'VGG':
             A2Y = metric_model(A, training=False)
+            A2B2A2Y = metric_model(A2B2A, training=False)
             A2B2A_cycle_loss = tf.constant(0.0,dtype=tf.float32)
-            for A2B2A_i in A2B2A_list:
-                A2B2A2Y = metric_model(A2B2A_i, training=False)
-                for l in range(len(A2Y)):
-                    A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)/2
+            for l in range(len(A2Y)):
+                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)/2
         elif args.A_loss == 'sinGAN':
             A2B2A_cycle_loss = 0.0
             for D in D_list:
