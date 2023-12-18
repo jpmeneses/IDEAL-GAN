@@ -22,6 +22,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--rand_ne', type=bool, default=False)
+py.arg('--rand_ph_offset', type=bool, default=False)
 py.arg('--only_mag', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_G_filt_list', default='')
@@ -530,6 +531,15 @@ for ep in range(args.epochs):
         if args.rand_ne:
             ne_sel = np.random.randint(3,7)
             A = A[:,:ne_sel,:,:,:]
+        if args.rand_ph_offset:
+            pha_offset = np.random.uniform(low=-np.pi/8,high=np.pi/8)
+            A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+            A_pha = tf.math.atan2(A[...,1:],A[...,:1]) 
+            A =  tf.concat([A_mag*tf.math.cos(A_pha+pha_offset),
+                            A_mag*tf.math.sin(A_pha+pha_offset)],axis=-1)
+            B_pha = B[:,1:,:,:,1:2] + pha_offset/np.pi
+            B_out_pha = tf.concat([B[:,1:,:,:,:1],B_pha,B[:,1:,:,:,2:]],axis=-1)
+            B = tf.concat([B[:,:1,:,:,:],B_out_pha],axis=1)
         G_loss_dict, D_loss_dict = train_step(A, B)
 
         # summary
