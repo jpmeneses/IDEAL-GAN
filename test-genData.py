@@ -36,11 +36,6 @@ if not(hasattr(args,'data_size')):
 	ds_args = py.args()
 	args.__dict__.update(ds_args.__dict__)
 
-if not(hasattr(args,'rand_ne')):
-	py.arg('--rand_ne', type=bool, default=False)
-	ne_args = py.args()
-	args.__dict__.update(ne_args.__dict__)
-
 if not(hasattr(args,'div_decod')):
     py.arg('--div_decod', type=bool, default=False)
     dec_args = py.args()
