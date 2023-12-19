@@ -168,6 +168,7 @@ if args.only_mag:
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation='relu',
+                        output_initializer='he_normal',
                         NL_self_attention=args.NL_SelfAttention
                         )
     dec_pha = dl.decoder(encoded_dims=args.encoded_size,
@@ -304,7 +305,7 @@ def train_G(A, B):
             A2B2A2Y = metric_model(A2B2A, training=False)
             A2B2A_cycle_loss = tf.constant(0.0,dtype=tf.float32)
             for l in range(len(A2Y)):
-                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)/2
+                A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
         elif args.A_loss == 'sinGAN':
             A2B2A_cycle_loss = 0.0
             for D in D_list:
