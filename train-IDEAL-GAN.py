@@ -534,12 +534,24 @@ for ep in range(args.epochs):
         if args.rand_ph_offset:
             pha_offset = np.random.uniform(low=-np.pi/8,high=np.pi/8)
             A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-            A_pha = tf.math.atan2(A[...,1:],A[...,:1]) 
+            A_pha = tf.math.atan2(A[...,1:],A[...,:1])
             A =  tf.concat([A_mag*tf.math.cos(A_pha+pha_offset),
                             A_mag*tf.math.sin(A_pha+pha_offset)],axis=-1)
-            B_pha = B[:,1:,:,:,1:2] + pha_offset/np.pi
-            B_out_pha = tf.concat([B[:,1:,:,:,:1],B_pha,B[:,1:,:,:,2:]],axis=-1)
-            B = tf.concat([B[:,:1,:,:,:],B_out_pha],axis=1)
+            if args.only_mag:
+                B_pha = B[:,1:,:,:,1:2] + pha_offset/np.pi
+                B_out_pha = tf.concat([B[:,1:,:,:,:1],B_pha,B[:,1:,:,:,2:]],axis=-1)
+                B = tf.concat([B[:,:1,:,:,:],B_out_pha],axis=1)
+            else:
+                B_w_mag = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:1,:,:,:]),axis=-1,keepdims=True))
+                B_w_pha = tf.math.atan2(B[:,:1,:,:,1:],B[:,:1,:,:,:1])
+                B_w_pha += pha_offset
+                B_w = tf.concat([B_w_mag*tf.math.cos(B_w_pha),B_w_mag*tf.math.sin(B_w_pha)],axis=-1)
+                B_f_mag = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,1:2,:,:,:]),axis=-1,keepdims=True))
+                B_f_pha = tf.math.atan2(B[:,1:2,:,:,1:],B[:,1:2,:,:,:1])
+                B_f_pha += pha_offset
+                B_f = tf.concat([B_f_mag*tf.math.cos(B_f_pha),B_f_mag*tf.math.sin(B_f_pha)],axis=-1)
+                B = tf.concat([B_w,B_f,B[:,2:,:,:,:]],axis=1)
+
         G_loss_dict, D_loss_dict = train_step(A, B)
 
         # summary
