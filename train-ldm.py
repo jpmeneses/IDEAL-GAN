@@ -31,26 +31,27 @@ output_dir = py.join('output',ldm_args.experiment_dir)
 args = py.args_from_yaml(py.join('output', ldm_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(ldm_args.__dict__)
 
-if not(hasattr(args,'PM_bayes_layer')):
-    py.arg('--PM_bayes_layer', type=bool, default=False)
-    bayes_args = py.args()
-    args.__dict__.update(bayes_args.__dict__)
-
 if not(hasattr(args,'VQ_num_embed')):
     py.arg('--VQ_num_embed', type=bool, default=256)
     py.arg('--VQ_commit_cost', type=int, default=0.5)
     VQ_args = py.args()
     args.__dict__.update(VQ_args.__dict__)
 
-if not(hasattr(args,'rand_ne')):
-    py.arg('--rand_ne', type=bool, default=False)
-    ne_args = py.args()
-    args.__dict__.update(ne_args.__dict__)
-
 if not(hasattr(args,'div_decod')):
     py.arg('--div_decod', type=bool, default=False)
     dec_args = py.args()
     args.__dict__.update(dec_args.__dict__)
+
+if not(hasattr(args,'ls_mean_activ')):
+    py.arg('--ls_mean_activ', default='leaky_relu', choices=['leaky_relu','relu','tanh','None'])
+    lsa_args = py.args()
+    args.__dict__.update(lsa_args.__dict__)
+
+if hasattr(args,'n_G_filt_list'):
+    if len(args.n_G_filt_list) > 0:
+        filt_list = [int(a_i) for a_i in args.n_G_filt_list.split(',')]
+    else:
+        filt_list = list()
 
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
@@ -64,13 +65,13 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, MEBCRN=True)
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, MEBCRN=True, mag_and_phase=args.only_mag)
 
 dataset_hdf5_2 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, MEBCRN=True)
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, MEBCRN=True, mag_and_phase=args.only_mag)
 
 dataset_hdf5_3 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, MEBCRN=True)
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, MEBCRN=True, mag_and_phase=args.only_mag)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -81,7 +82,10 @@ trainY  = np.concatenate((out_maps_1,out_maps_2,out_maps_3),axis=0)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
-_,n_out,_,_,_ = np.shape(trainY)
+if args.only_mag:
+    _,_,_,_,n_out = np.shape(trainY)
+else:
+    _,n_out,_,_,_ = np.shape(trainY)
 
 print('Image Dimensions:', hgt, wdt)
 print('Num. Output Maps:',n_out)
@@ -94,51 +98,86 @@ A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 # ==============================================================================
 
 if args.div_decod:
-    nd = 3
+    if args.only_mag:
+        nd = 2
+    else:
+        nd = 3
 else:
     nd = 1
+if len(args.n_G_filt_list) == (args.n_downsamplings+1):
+    nfe = filt_list
+    nfd = [a//nd for a in filt_list]
+    nfd2 = [a//(nd+1) for a in filt_list]
+else:
+    nfe = args.n_G_filters
+    nfd = args.n_G_filters//nd
+    nfd2= args.n_G_filters//(nd+1)
 enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
-                filters=args.n_G_filters,
+                filters=nfe,
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
                 sd_out=not(args.VQ_encoder),
+                ls_mean_activ=args.ls_mean_activ,
                 NL_self_attention=args.NL_SelfAttention
                 )
-dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters//nd,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention
-                    )
-dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters//nd,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention
-                    )
-dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    n_groups=args.n_groups_PM,
-                    filters=args.n_G_filters//nd,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention,
-                    bayes_layer=args.PM_bayes_layer
-                    )
+if args.only_mag:
+    dec_mag = dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,n_out),
+                        filters=nfd,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation='relu',
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_pha = dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,n_out-1),
+                        filters=nfd2,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation='tanh',
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+else:
+    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,n_ch),
+                        filters=nfd,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation=None,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,n_ch),
+                        filters=nfd,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation=None,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,n_ch),
+                        n_groups=args.n_groups_PM,
+                        filters=nfd,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation=None,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
 
 # create our unet model
 unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
 
-IDEAL_op = wf.IDEAL_Layer()
+if args.only_mag:
+    IDEAL_op = wf.IDEAL_mag_Layer()
+else:
+    IDEAL_op = wf.IDEAL_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
 
-tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
+if args.only_mag:
+    tl.Checkpoint(dict(enc=enc,dec_mag=dec_mag,dec_pha=dec_pha,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
+else:
+    tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 ################################################################################
 ########################### DIFFUSION TIMESTEPS ################################
@@ -201,10 +240,16 @@ def validation_step(Z, Z_std=1.0):
         vq_dict = vq_op(Z)
         Z = vq_dict['quantize']
     Z = tf.math.multiply_no_nan(Z,Z_std)
-    Z2B_w = dec_w(Z, training=False)
-    Z2B_f = dec_f(Z, training=False)
-    Z2B_xi= dec_xi(Z, training=False)
-    Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
+    if args.only_mag:
+        A2Z2B_mag = dec_mag(A2Z, training=False)
+        A2Z2B_pha = dec_pha(A2Z, training=False)
+        A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
+        A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
+    else:
+        A2Z2B_w = dec_w(A2Z, training=False)
+        A2Z2B_f = dec_f(A2Z, training=False)
+        A2Z2B_xi= dec_xi(A2Z, training=False)
+        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     Z2B2A = IDEAL_op(Z2B, training=False)
 
     return Z2B, Z2B2A
@@ -350,31 +395,49 @@ for ep in range(args.epochs_ldm):
     axs[0,5].axis('off')
 
     # A2B maps in the second row
-    w_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
-    W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
-                            interpolation='none', vmin=0, vmax=10)
-    fig.colorbar(W_ok, ax=axs[1,1])
+    if args.only_mag:
+        w_m_aux = np.squeeze(A2B[:,0,:,:,0])
+        w_p_aux = np.squeeze(A2B[:,1,:,:,0])
+        f_m_aux = np.squeeze(A2B[:,0,:,:,1])
+        f_p_aux = np.squeeze(A2B[:,1,:,:,1])
+        r2_aux = np.squeeze(A2B[:,0,:,:,2])
+        field_aux = np.squeeze(A2B[:,1,:,:,2])
+    else:
+        w_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+        w_p_aux = np.squeeze(np.arctan2(A2B[:,0,:,:,1],A2B[:,0,:,:,0]))/np.pi
+        f_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
+        f_p_aux = np.squeeze(np.arctan2(A2B[:,1,:,:,1],A2B[:,1,:,:,0]))/np.pi
+        r2_aux = np.squeeze(A2B[:,2,:,:,1])
+        field_aux = np.squeeze(A2B[:,2,:,:,0])
+    W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
+                            interpolation='none', vmin=0, vmax=1)
+    fig.colorbar(W_ok, ax=axs[1,0])
+    axs[1,0].axis('off')
+
+    Wp_ok =  axs[1,1].imshow(w_p_aux, cmap='twilight',
+                            interpolation='none', vmin=-1, vmax=1)
+    fig.colorbar(Wp_ok, ax=axs[1,1])
     axs[1,1].axis('off')
 
-    f_aux = np.squeeze(np.abs(tf.complex(Z2B[:,1,:,:,0],Z2B[:,1,:,:,1])))
-    F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
-                            interpolation='none', vmin=0, vmax=10)
+    F_ok =  axs[1,2].imshow(f_m_aux, cmap='pink',
+                            interpolation='none', vmin=0, vmax=1)
     fig.colorbar(F_ok, ax=axs[1,2])
     axs[1,2].axis('off')
 
-    r2_aux = np.squeeze(Z2B[:,2,:,:,1])
-    r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
-                            interpolation='none', vmin=0, vmax=10*fm_sc)
-    fig.colorbar(r2_ok, ax=axs[1,3])
+    Fp_ok = axs[1,3].imshow(f_p_aux, cmap='twilight',
+                            interpolation='none', vmin=-1, vmax=1)
+    fig.colorbar(Fp_ok, ax=axs[1,3])
     axs[1,3].axis('off')
 
-    field_aux = np.squeeze(Z2B[:,2,:,:,0])
-    field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
-                                interpolation='none', vmin=-5*fm_sc, vmax=5*fm_sc)
-    fig.colorbar(field_ok, ax=axs[1,4])
+    r2_ok = axs[1,4].imshow(r2_aux*r2_sc, cmap='copper',
+                            interpolation='none', vmin=0, vmax=r2_sc)
+    fig.colorbar(r2_ok, ax=axs[1,4])
     axs[1,4].axis('off')
-    fig.delaxes(axs[1,0])
-    fig.delaxes(axs[1,5])
+
+    field_ok =  axs[1,5].imshow(field_aux*fm_sc, cmap='twilight',
+                                interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+    fig.colorbar(field_ok, ax=axs[1,5])
+    axs[1,5].axis('off')
 
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
     tl.make_space_above(axs,topmargin=0.8)
