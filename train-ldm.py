@@ -245,15 +245,15 @@ def validation_step(Z, Z_std=1.0):
         Z = vq_dict['quantize']
     Z = tf.math.multiply_no_nan(Z,Z_std)
     if args.only_mag:
-        A2Z2B_mag = dec_mag(A2Z, training=False)
-        A2Z2B_pha = dec_pha(A2Z, training=False)
-        A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
-        A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
+        Z2B_mag = dec_mag(Z, training=False)
+        Z2B_pha = dec_pha(Z, training=False)
+        Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
+        Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
     else:
-        A2Z2B_w = dec_w(A2Z, training=False)
-        A2Z2B_f = dec_f(A2Z, training=False)
-        A2Z2B_xi= dec_xi(A2Z, training=False)
-        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
+        Z2B_w = dec_w(Z, training=False)
+        Z2B_f = dec_f(Z, training=False)
+        Z2B_xi= dec_xi(Z, training=False)
+        Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
     Z2B2A = IDEAL_op(Z2B, training=False)
 
     return Z2B, Z2B2A
