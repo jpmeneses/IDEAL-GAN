@@ -198,8 +198,12 @@ elif args.scheduler == 'cosine':
     beta = 1.0 - alpha
 
 # initialize the model in the memory of our GPU
-hgt_ls = dec_w.input_shape[1]
-wdt_ls = dec_w.input_shape[2]
+if only_mag:
+    hgt_ls = dec_mag.input_shape[1]
+    wdt_ls = dec_mag.input_shape[2]
+else:
+    hgt_ls = dec_w.input_shape[1]
+    wdt_ls = dec_w.input_shape[2]
 test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
 test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
 k = unet(test_images, test_timestamps)
@@ -396,19 +400,19 @@ for ep in range(args.epochs_ldm):
 
     # A2B maps in the second row
     if args.only_mag:
-        w_m_aux = np.squeeze(A2B[:,0,:,:,0])
-        w_p_aux = np.squeeze(A2B[:,1,:,:,0])
-        f_m_aux = np.squeeze(A2B[:,0,:,:,1])
-        f_p_aux = np.squeeze(A2B[:,1,:,:,1])
-        r2_aux = np.squeeze(A2B[:,0,:,:,2])
-        field_aux = np.squeeze(A2B[:,1,:,:,2])
+        w_m_aux = np.squeeze(Z2B[:,0,:,:,0])
+        w_p_aux = np.squeeze(Z2B[:,1,:,:,0])
+        f_m_aux = np.squeeze(Z2B[:,0,:,:,1])
+        f_p_aux = np.squeeze(Z2B[:,1,:,:,1])
+        r2_aux = np.squeeze(Z2B[:,0,:,:,2])
+        field_aux = np.squeeze(Z2B[:,1,:,:,2])
     else:
-        w_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
-        w_p_aux = np.squeeze(np.arctan2(A2B[:,0,:,:,1],A2B[:,0,:,:,0]))/np.pi
-        f_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
-        f_p_aux = np.squeeze(np.arctan2(A2B[:,1,:,:,1],A2B[:,1,:,:,0]))/np.pi
-        r2_aux = np.squeeze(A2B[:,2,:,:,1])
-        field_aux = np.squeeze(A2B[:,2,:,:,0])
+        w_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
+        w_p_aux = np.squeeze(np.arctan2(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]))/np.pi
+        f_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,1,:,:,0],Z2B[:,1,:,:,1])))
+        f_p_aux = np.squeeze(np.arctan2(Z2B[:,1,:,:,1],Z2B[:,1,:,:,0]))/np.pi
+        r2_aux = np.squeeze(Z2B[:,2,:,:,1])
+        field_aux = np.squeeze(Z2B[:,2,:,:,0])
     W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
                             interpolation='none', vmin=0, vmax=1)
     fig.colorbar(W_ok, ax=axs[1,0])
