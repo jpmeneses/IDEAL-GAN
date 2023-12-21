@@ -198,7 +198,7 @@ elif args.scheduler == 'cosine':
     beta = 1.0 - alpha
 
 # initialize the model in the memory of our GPU
-if only_mag:
+if args.only_mag:
     hgt_ls = dec_mag.input_shape[1]
     wdt_ls = dec_mag.input_shape[2]
 else:
