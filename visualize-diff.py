@@ -49,6 +49,28 @@ output_dir = py.join('output',ldm_args.experiment_dir)
 args = py.args_from_yaml(py.join('output', ldm_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(ldm_args.__dict__)
 
+if not(hasattr(args,'VQ_num_embed')):
+    py.arg('--VQ_num_embed', type=bool, default=256)
+    py.arg('--VQ_commit_cost', type=int, default=0.5)
+    VQ_args = py.args()
+    args.__dict__.update(VQ_args.__dict__)
+
+if not(hasattr(args,'div_decod')):
+    py.arg('--div_decod', type=bool, default=False)
+    dec_args = py.args()
+    args.__dict__.update(dec_args.__dict__)
+
+if not(hasattr(args,'ls_mean_activ')):
+    py.arg('--ls_mean_activ', default='leaky_relu', choices=['leaky_relu','relu','tanh','None'])
+    lsa_args = py.args()
+    args.__dict__.update(lsa_args.__dict__)
+
+if hasattr(args,'n_G_filt_list'):
+    if len(args.n_G_filt_list) > 0:
+        filt_list = [int(a_i) for a_i in args.n_G_filt_list.split(',')]
+    else:
+        filt_list = list()
+
 # ==============================================================================
 # =                                    data                                    =
 # ==============================================================================
@@ -58,8 +80,8 @@ args.__dict__.update(ldm_args.__dict__)
 ################################################################################
 dataset_dir = '../datasets/'
 
-dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, end=args.n_samples, MEBCRN=True)
+dataset_hdf5_2 = 'JGalgani_GC_192_complex_2D.hdf5'
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, end=args.n_samples, MEBCRN=True, mag_and_phase=args.only_mag)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -89,38 +111,13 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
                 sd_out=not(args.VQ_encoder),
+                ls_mean_activ=args.ls_mean_activ,
                 NL_self_attention=args.NL_SelfAttention
                 )
-dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention
-                    )
-dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention
-                    )
-dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    n_groups=args.n_groups_PM,
-                    filters=args.n_G_filters,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention,
-                    bayes_layer=args.PM_bayes_layer
-                    )
 
 vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
 
-tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(enc=enc,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 ################################################################################
 ########################### DIFFUSION TIMESTEPS ################################
