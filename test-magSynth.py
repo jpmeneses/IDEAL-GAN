@@ -61,7 +61,7 @@ else:
     _,n_out,_,_,_ = np.shape(valY)
 
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
-A_B_dataset_val = A_B_dataset_val.batch(args.val_batch_size).shuffle(len_dataset)
+A_B_dataset_val = A_B_dataset_val.batch(args.val_batch_size)
 
 # ==============================================================================
 # =                                   models                                   =
