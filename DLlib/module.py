@@ -79,18 +79,18 @@ def _residual_block(x, norm, groups=1, Bayes=False):
 
     if Bayes:
         h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
+        h = Norm()(h)
     else:
         conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False))
         h = conv2d(h)
-    h = Norm()(h)
     h = tf.nn.leaky_relu(h)
 
     if Bayes:
         h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
+        h = Norm()(h)
     else:
         conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False))
         h = conv2d(h)
-    h = Norm()(h)
 
     return keras.layers.add([x, h])
 
