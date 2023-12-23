@@ -42,6 +42,12 @@ if not(hasattr(args,'div_decod')):
     dec_args = py.args()
     args.__dict__.update(dec_args.__dict__)
 
+if hasattr(args,'n_G_filt_list'):
+    if len(args.n_G_filt_list) > 0:
+        filt_list = [int(a_i) for a_i in args.n_G_filt_list.split(',')]
+    else:
+        filt_list = list()
+
 # ==============================================================================
 # =                                    data                                    =
 # ==============================================================================
@@ -68,19 +74,23 @@ A_B_dataset_val = A_B_dataset_val.batch(args.val_batch_size)
 # ==============================================================================
 
 if args.div_decod:
-    nd = 3
-else:
-    nd = 1
-if args.div_decod:
     if args.only_mag:
         nd = 2
     else:
         nd = 3
 else:
     nd = 1
+if len(args.n_G_filt_list) == (args.n_downsamplings+1):
+    nfe = filt_list
+    nfd = [a//nd for a in filt_list]
+    nfd2 = [a//(nd+1) for a in filt_list]
+else:
+    nfe = args.n_G_filters
+    nfd = args.n_G_filters//nd
+    nfd2= args.n_G_filters//(nd+1)
 enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
 				encoded_dims=args.encoded_size,
-                filters=args.n_G_filters,
+                filters=nfe,
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
                 sd_out=not(args.VQ_encoder),
@@ -89,7 +99,7 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
 if args.only_mag:
     dec_mag = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_out),
-                        filters=args.n_G_filters//nd,
+                        filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation='relu',
@@ -97,7 +107,7 @@ if args.only_mag:
                         )
     dec_pha = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_out-1),
-                        filters=args.n_G_filters//(nd+1),
+                        filters=nfd2,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation='tanh',
@@ -106,7 +116,7 @@ if args.only_mag:
 else:
     dec_w =  dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_ch),
-                        filters=args.n_G_filters//nd,
+                        filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation=None,
@@ -114,7 +124,7 @@ else:
                         )
     dec_f =  dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_ch),
-                        filters=args.n_G_filters//nd,
+                        filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation=None,
@@ -123,7 +133,7 @@ else:
     dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_ch),
                         n_groups=args.n_groups_PM,
-                        filters=args.n_G_filters//nd,
+                        filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
                         output_activation=None,
