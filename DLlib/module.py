@@ -79,18 +79,16 @@ def _residual_block(x, norm, groups=1, Bayes=False):
 
     if Bayes:
         h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
-        h = Norm()(h)
     else:
-        conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False))
-        h = conv2d(h)
+        h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
+    h = Norm()(h)
     h = tf.nn.leaky_relu(h)
 
     if Bayes:
         h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
-        h = Norm()(h)
     else:
-        conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False))
-        h = conv2d(h)
+        h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
+    h = Norm()(h)
 
     return keras.layers.add([x, h])
 
@@ -656,17 +654,15 @@ def encoder(
     if not(isinstance(filters, list)):
         filters = [filters*2**k for k in range(num_layers+1)]
     if multi_echo:
-        x = keras.layers.ConvLSTM2D(filters[0],3,padding="same",activation='relu',kernel_initializer='he_normal')(x)
-    conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(filters[0],3,padding="same",activation='relu',kernel_initializer="he_normal"))
-    x = conv2d(x)
+        x = keras.layers.ConvLSTM2D(filters[0],3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    x = keras.layers.Conv2D(filters[0],3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
     for l in range(num_layers):
         for n_res in range(num_res_blocks):
             x = _residual_block(x, norm=norm)
 
         # Double the number of filters and downsample
-        conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(filters[l+1],3,strides=2,padding="same",activation='relu',kernel_initializer="he_normal"))
-        x = conv2d(x)
+        x = keras.layers.Conv2D(filters[l+1],3,strides=2,padding="same",activation=tf.nn.leaky_relu,kernel_initializer="he_normal")(x)
 
     if NL_self_attention:
         x = _residual_block(x, norm=norm)
@@ -677,17 +673,14 @@ def encoder(
         ls_mean_activ = tf.nn.leaky_relu
     elif ls_mean_activ == 'None':
         ls_mean_activ = None
-    conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(encoded_dims,3,padding="same",activation=ls_mean_activ,kernel_initializer="he_normal"))
-    x = conv2d(x)
+    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=ls_mean_activ,kernel_initializer="he_normal")(x)
     _,ls_hgt,ls_wdt,ls_dims = x.shape
 
     if sd_out:
-        conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(encoded_dims,1,padding="same",activation=ls_mean_activ,kernel_initializer="he_normal"))
-        x_mean = conv2d(x)
+        x_mean = keras.layers.Conv2D(encoded_dims,1,padding="same",activation=ls_mean_activ,kernel_initializer="he_normal")(x)
         x_mean = keras.layers.Flatten()(x_mean)
 
-        conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal"))
-        x_std = conv2d(x)
+        x_std = keras.layers.Conv2D(encoded_dims,1,padding="same",activation='relu',kernel_initializer="he_normal")(x)
         x_std = keras.layers.Flatten()(x_std)
         
         x = keras.layers.concatenate([x_mean,x_std],axis=-1)
@@ -697,8 +690,7 @@ def encoder(
         output = tfp.layers.IndependentNormal([ls_hgt,ls_wdt,encoded_dims],
                     activity_regularizer=tfp.layers.KLDivergenceRegularizer(prior, weight=ls_reg_weight))(x)
     else:
-        conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(encoded_dims,1,padding="same"))
-        output = conv2d(x)
+        output = keras.layers.Conv2D(encoded_dims,1,padding="same")(x)
 
     return keras.Model(inputs=inputs1, outputs=output)
 
@@ -729,12 +721,8 @@ def decoder(
     
     x = inputs1 = keras.Input(input_shape)
 
-    conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(encoded_dims,3,padding="same",activation='relu',kernel_initializer='he_normal'))
-    x = conv2d(x)
-
-    conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(filters[0],3,padding="same",activation='relu',kernel_initializer='he_normal'))
-    x = conv2d(x) # n_groups
-
+    x = keras.layers.Conv2D(encoded_dims,3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x)
+    x = keras.layers.Conv2D(filters[0],3,padding="same",activation=tf.nn.leaky_relu,kernel_initializer='he_normal')(x) # n_groups
     if NL_self_attention:
         x = _residual_block(x, norm=norm) # n_groups
         x = SelfAttention(ch=filters[0])(x)
@@ -753,8 +741,7 @@ def decoder(
         x_i = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(x_i)
         output = keras.layers.concatenate([x_r,x_i])
     else:
-        conv2d = tfa.layers.WeightNormalization(keras.layers.Conv2D(n_out,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer))
-        output = conv2d(x)
+        output = keras.layers.Conv2D(n_out,3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
     if multi_echo:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
 
