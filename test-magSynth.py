@@ -156,7 +156,8 @@ else:
 def sample(A):
     # Turn complex-valued CSE-MR image into only-magnitude
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-    A_pha = -1.5 * np.pi
+    # A_pha = -1.5 * np.pi
+    A_pha = tf.random.uniform(A_mag.shape,minval=-np.pi,maxval=np.pi,seed=0)
     A = tf.concat([A_mag*tf.math.cos(A_pha),A_mag*tf.math.sin(A_pha)],axis=-1)
     A2Z = enc(A, training=True)
     if args.VQ_encoder:
