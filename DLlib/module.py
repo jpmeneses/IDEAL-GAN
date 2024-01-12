@@ -101,19 +101,22 @@ class FourierLayer(tf.keras.layers.Layer):
     def call(self, x, training=None):
         # Generate complex x
         if self.multi_echo:
-            real_x = x[:,:2,:,:,0]
-            imag_x = x[:,:2,:,:,1]
-        else:
-            real_x = x[:,:,:,0]
-            imag_x = x[:,:,:,1]
+            ini_shape = x.shape
+            x = keras.layers.Lambda(lambda z: tf.reshape(z,[-1,z.shape[2],z.shape[3],z.shape[4]]))(x)
+            
+        real_x = x[:,:,:,0]
+        imag_x = x[:,:,:,1]
         x_complex = tf.complex(real_x,imag_x)
 
-        x_fourier = tf.signal.fft2d(x_complex)
+        x_fourier = tf.signal.fftshift(tf.signal.fft2d(x_complex),axes=(1,2))
         
         # Split into real and imaginary channels
         Re_gt = tf.math.real(tf.expand_dims(x_fourier,-1))
         Im_gt = tf.math.imag(tf.expand_dims(x_fourier,-1))
         res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+
+        if self.multi_echo:
+            res_gt = keras.layers.Lambda(lambda z: tf.reshape(z,ini_shape))(res_gt)
 
         return res_gt
 
