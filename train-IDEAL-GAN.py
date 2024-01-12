@@ -233,6 +233,7 @@ else:
     raise(NameError('Unrecognized Main Loss Function'))
 
 cosine_loss = tf.losses.CosineSimilarity()
+msle_loss = tf.losses.MeanSquaredLogarithmicError()
 if args.A_loss == 'VGG':
     metric_model = dl.perceptual_metric(input_shape=(None,hgt,wdt,n_ch))
 
@@ -324,7 +325,7 @@ def train_G(A, B):
         else:
             B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
             B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
-        A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
+        A2B2A_f_cycle_loss = msle_loss(A_f, A2B2A_f)
         A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
 
         ################ Regularizers #####################
@@ -533,24 +534,25 @@ for ep in range(args.epochs):
             ne_sel = np.random.randint(3,7)
             A = A[:,:ne_sel,:,:,:]
         if args.rand_ph_offset:
-            # pha_offset = np.random.uniform(low=-np.pi/8,high=np.pi/8)
-            pha_scale = np.random.uniform(low=0,high=1.0)
+            pha_offset = np.random.uniform(low=-np.pi/2,high=np.pi/2)
             A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
             A_pha = tf.math.atan2(A[...,1:],A[...,:1])
-            A =  tf.concat([A_mag*tf.math.cos(A_pha*pha_scale),
-                            A_mag*tf.math.sin(A_pha*pha_scale)],axis=-1)
+            A =  tf.concat([A_mag*tf.math.cos(A_pha+pha_offset),
+                            A_mag*tf.math.sin(A_pha+pha_offset)],axis=-1)
             if args.only_mag:
-                B_pha = B[:,1:,:,:,1:2] * pha_scale
+                B_pha = B[:,1:,:,:,1:2] + pha_offset/np.pi
+                B_pha = tf.where(B_pha < -np.pi, B_pha + 2*np.pi, B_pha)
+                B_pha = tf.where(B_pha > np.pi, B_pha - 2*np.pi, B_pha)
                 B_out_pha = tf.concat([B[:,1:,:,:,:1],B_pha,B[:,1:,:,:,2:]],axis=-1)
                 B = tf.concat([B[:,:1,:,:,:],B_out_pha],axis=1)
             else:
                 B_w_mag = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:1,:,:,:]),axis=-1,keepdims=True))
                 B_w_pha = tf.math.atan2(B[:,:1,:,:,1:],B[:,:1,:,:,:1])
-                B_w_pha *= pha_scale
+                B_w_pha += pha_offset
                 B_w = tf.concat([B_w_mag*tf.math.cos(B_w_pha),B_w_mag*tf.math.sin(B_w_pha)],axis=-1)
                 B_f_mag = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,1:2,:,:,:]),axis=-1,keepdims=True))
                 B_f_pha = tf.math.atan2(B[:,1:2,:,:,1:],B[:,1:2,:,:,:1])
-                B_f_pha *= pha_scale
+                B_f_pha += pha_offset
                 B_f = tf.concat([B_f_mag*tf.math.cos(B_f_pha),B_f_mag*tf.math.sin(B_f_pha)],axis=-1)
                 B = tf.concat([B_w,B_f,B[:,2:,:,:,:]],axis=1)
 
