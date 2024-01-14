@@ -464,7 +464,7 @@ def sample(A, B):
     else:
         val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
         val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
-    val_A2B2A_f_loss = cycle_loss_fn(A_f, A2B2A_f)
+    val_A2B2A_f_loss = msle_loss(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
                         'B2A2B_cycle_loss': val_B2A2B_loss,
