@@ -554,7 +554,7 @@ for ep in range(args.epochs):
         if args.DL_gen:
             hls = hgt//(2**(DL_args.n_downsamplings))
             wls = wdt//(2**(DL_args.n_downsamplings))
-            z_shape = (1,hls,wls,DL_args.encoded_size)
+            z_shape = (args.batch_size,hls,wls,DL_args.encoded_size)
             Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
             B, A = gen_sample(Z)
         # ==============================================================================
