@@ -68,7 +68,7 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 
-dataset_hdf5_1 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
@@ -204,13 +204,13 @@ if args.DL_gen:
         nfe = DL_args.n_G_filters
         nfd = DL_args.n_G_filters//nd
         nfd2= DL_args.n_G_filters//(nd+1)
-    enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
-                    encoded_dims=DL_args.encoded_size,
-                    filters=nfe,
-                    num_layers=DL_args.n_downsamplings,
-                    num_res_blocks=DL_args.n_res_blocks,
-                    NL_self_attention=DL_args.NL_SelfAttention
-                    )
+    # enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
+    #                 encoded_dims=DL_args.encoded_size,
+    #                 filters=nfe,
+    #                 num_layers=DL_args.n_downsamplings,
+    #                 num_res_blocks=DL_args.n_res_blocks,
+    #                 NL_self_attention=DL_args.NL_SelfAttention
+    #                 )
     if DL_args.only_mag:
         dec_mag = dl.decoder(encoded_dims=DL_args.encoded_size,
                             output_shape=(hgt,wdt,n_out),
@@ -229,7 +229,7 @@ if args.DL_gen:
                             output_activation='tanh',
                             NL_self_attention=DL_args.NL_SelfAttention
                             )
-        tl.Checkpoint(dict(enc=enc,dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+        tl.Checkpoint(dict(dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
     else:
         dec_w =  dl.decoder(encoded_dims=DL_args.encoded_size,
                             output_shape=(hgt,wdt,n_ch),
@@ -256,7 +256,7 @@ if args.DL_gen:
                             output_activation=None,
                             NL_self_attention=args.NL_SelfAttention
                             )
-        tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+        tl.Checkpoint(dict(dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
@@ -554,7 +554,7 @@ for ep in range(args.epochs):
         if args.DL_gen:
             hls = hgt//(2**(DL_args.n_downsamplings))
             wls = wdt//(2**(DL_args.n_downsamplings))
-            z_shape = (args.batch_size,hls,wls,DL_args.encoded_size)
+            z_shape = (A.shape[0],hls,wls,DL_args.encoded_size)
             Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
             B, A = gen_sample(Z)
         # ==============================================================================
