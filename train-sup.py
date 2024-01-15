@@ -281,7 +281,8 @@ def train_G(A, B):
         if args.out_vars == 'WF':
             # Compute model's output
             A2B_WF_abs = G_A2B(A, training=True)
-            A2B_WF_abs = tf.where(B[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+            if not(args.DL_gen):
+                A2B_WF_abs = tf.where(B[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
 
             # Compute zero-valued param maps
             A2B_PM = tf.zeros_like(A2B_WF_abs)
@@ -296,7 +297,8 @@ def train_G(A, B):
         elif args.out_vars == 'WFc':
             # Compute model's output
             A2B_WF = G_A2B(A, training=True)
-            A2B_WF = tf.where(B[:,:,:,:4]!=0.0,A2B_WF,0.0)
+            if not(args.DL_gen):
+                A2B_WF = tf.where(B[:,:,:,:4]!=0.0,A2B_WF,0.0)
 
             # Magnitude of water/fat images
             A2B_WF_real = A2B_WF[:,:,:,0::2]
@@ -316,7 +318,8 @@ def train_G(A, B):
         elif args.out_vars == 'PM':
             # Compute model's output
             A2B_PM = G_A2B(A, training=True)
-            A2B_PM = tf.where(B[:,:,:,:2]!=0.0,A2B_PM,0.0)
+            if not(args.DL_gen):
+                A2B_PM = tf.where(B[:,:,:,:2]!=0.0,A2B_PM,0.0)
 
             # Split A2B param maps
             A2B_R2 = A2B_PM[:,:,:,:1]
@@ -343,7 +346,8 @@ def train_G(A, B):
             # Compute model's output
             B_abs = tf.concat([B_WF_abs,B_PM],axis=-1)
             A2B_abs = G_A2B(A, training=True)
-            A2B_abs = tf.where(B[:,:,:,:4]!=0.0,A2B_abs,0.0)
+            if not(args.DL_gen):
+                A2B_abs = tf.where(B[:,:,:,:4]!=0.0,A2B_abs,0.0)
 
             # Split A2B outputs
             A2B_WF_abs = A2B_abs[:,:,:,:2]
@@ -583,7 +587,10 @@ for ep in range(args.epochs):
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
-            A, B = next(val_iter)
+            # A, B = next(val_iter)
+            A = A[0,...]
+            B = B[0,...]
+
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
             A2B, val_sup_dict = validation_step(A, B)
