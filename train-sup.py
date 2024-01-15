@@ -490,7 +490,7 @@ if args.DL_gen:
         Z2B2A = IDEAL_op(Z2B)
         # rho_hat = tf.transpose(rho_hat, perm=[0,2,3,1])
         Re_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
-        Im_rho = tf.transopse(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
+        Im_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
         zero_fill = tf.zeros_like(Re_rho)
         re_stack = tf.stack([Re_rho,zero_fill],4)
         re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
