@@ -493,9 +493,9 @@ if args.DL_gen:
         Im_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
         zero_fill = tf.zeros_like(Re_rho)
         re_stack = tf.stack([Re_rho,zero_fill],4)
-        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
+        re_aux = tf.reshape(re_stack,[Z.shape[0],hgt,wdt,2*ns])
         im_stack = tf.stack([zero_fill,Im_rho],4)
-        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
+        im_aux = tf.reshape(im_stack,[Z.shape[0],hgt,wdt,2*ns])
         res_rho = re_aux + im_aux
         # Turn Z2B into non-MEBCRN format
         if DL_args.only_mag:
