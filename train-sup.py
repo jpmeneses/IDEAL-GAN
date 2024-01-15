@@ -21,7 +21,12 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-sup')
+py.arg('--data_size', type=int, default=192, choices=[192,384])
+py.arg('--DL_gen', type=bool, default=False)
+py.arg('--DL_experiment_dir', default='output/GAN-238')
+py.arg('--n_per_epoch', type=int, default=10000)
 py.arg('--n_echoes', type=int, default=6)
+py.arg('--field', type=float, default=1.5)
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
 py.arg('--n_G_filters', type=int, default=72)
@@ -48,6 +53,8 @@ py.mkdir(output_dir)
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
+if args.DL_gen:
+    DL_args = py.args_from_yaml(py.join(args.DL_experiment_dir, 'settings.yml'))
 
 # ==============================================================================
 # =                                    data                                    =
@@ -61,39 +68,54 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 
-dataset_hdf5_1 = 'INTA_GC_384_complex_2D.hdf5'
+dataset_hdf5_1 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-dataset_hdf5_2 = 'INTArest_GC_384_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+if not(args.DL_gen):
+    dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                        acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-dataset_hdf5_3 = 'Volunteers_GC_384_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+    dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
+                                        acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-dataset_hdf5_4 = 'Attilio_GC_384_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+    dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
+                                        acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
 ################################################################################
 ############################# DATASET PARTITIONS ###############################
 ################################################################################
 
-trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
+if args.DL_gen:
+    trainX = np.zeros((args.n_per_epoch,1,1,1),dtype=np.float32)
+    if args.G_model == 'MEBCRN':
+        trainX = np.expand_dims(trainX, axis=-1)
+else:
+    trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
 valX    = acqs_1
 
-trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
+if args.DL_gen:
+    trainY = np.zeros((args.n_per_epoch,1,1,1),dtype=np.float32)
+    if args.G_model == 'MEBCRN':
+        trainY = np.expand_dims(trainY, axis=-1)
+else:
+    trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
 valY    = out_maps_1
 
 # Overall dataset statistics
-len_dataset,hgt,wdt,n_out = np.shape(trainY)
-echoes = args.n_echoes
-d_ech = echoes*2
+if args.G_model == 'MEBCRN':
+    len_dataset,_,_,_,_ = np.shape(trainY)
+    _,n_out,hgt,wdt,n_ch = np.shape(valY)
+else:
+    len_dataset,_,_,_ = np.shape(trainY)
+    _,hgt,wdt,n_out = np.shape(valY)
+    n_ch = 2
 
 print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:', echoes)
+print('Echoes:', args.n_echoes)
 print('Output Maps:', n_out)
 
 # Input and output dimensions (training data)
@@ -117,13 +139,13 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 if args.G_model == 'multi-decod':
     if args.out_vars == 'WF-PM':
-        G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,d_ech),
+        G_A2B=dl.MDWF_Generator(input_shape=(hgt,wdt,args.n_echoes*2),
                                 filters=args.n_G_filters,
                                 WF_self_attention=args.D1_SelfAttention,
                                 R2_self_attention=args.D2_SelfAttention,
                                 FM_self_attention=args.D3_SelfAttention)
     else:
-        G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+        G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,args.n_echoes*2),
                                 ME_layer=False,
                                 filters=args.n_G_filters,
                                 R2_self_attention=args.D1_SelfAttention,
@@ -139,7 +161,7 @@ elif args.G_model == 'U-Net':
     else:
         n_out = 2
         out_activ = 'relu'
-    G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+    G_A2B = dl.UNet(input_shape=(hgt,wdt,args.n_echoes*2),
                     n_out=n_out,
                     filters=args.n_G_filters,
                     output_activation=out_activ,
@@ -166,7 +188,82 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
+if args.DL_gen:
+    if DL_args.div_decod:
+        if DL_args.only_mag:
+            nd = 2
+        else:
+            nd = 3
+    else:
+        nd = 1
+    if len(DL_args.n_G_filt_list) == (DL_args.n_downsamplings+1):
+        nfe = filt_list
+        nfd = [a//nd for a in filt_list]
+        nfd2 = [a//(nd+1) for a in filt_list]
+    else:
+        nfe = DL_args.n_G_filters
+        nfd = DL_args.n_G_filters//nd
+        nfd2= DL_args.n_G_filters//(nd+1)
+    enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
+                    encoded_dims=DL_args.encoded_size,
+                    filters=nfe,
+                    num_layers=DL_args.n_downsamplings,
+                    num_res_blocks=DL_args.n_res_blocks,
+                    NL_self_attention=DL_args.NL_SelfAttention
+                    )
+    if DL_args.only_mag:
+        dec_mag = dl.decoder(encoded_dims=DL_args.encoded_size,
+                            output_shape=(hgt,wdt,n_out),
+                            filters=nfd,
+                            num_layers=DL_args.n_downsamplings,
+                            num_res_blocks=DL_args.n_res_blocks,
+                            output_activation='relu',
+                            output_initializer='he_normal',
+                            NL_self_attention=DL_args.NL_SelfAttention
+                            )
+        dec_pha = dl.decoder(encoded_dims=DL_args.encoded_size,
+                            output_shape=(hgt,wdt,n_out-1),
+                            filters=nfd2,
+                            num_layers=DL_args.n_downsamplings,
+                            num_res_blocks=DL_args.n_res_blocks,
+                            output_activation='tanh',
+                            NL_self_attention=DL_args.NL_SelfAttention
+                            )
+        tl.Checkpoint(dict(enc=enc,dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+    else:
+        dec_w =  dl.decoder(encoded_dims=DL_args.encoded_size,
+                            output_shape=(hgt,wdt,n_ch),
+                            filters=nfd,
+                            num_layers=DL_args.n_downsamplings,
+                            num_res_blocks=DL_args.n_res_blocks,
+                            output_activation=None,
+                            NL_self_attention=DL_args.NL_SelfAttention
+                            )
+        dec_f =  dl.decoder(encoded_dims=DL_args.encoded_size,
+                            output_shape=(hgt,wdt,n_ch),
+                            filters=nfd,
+                            num_layers=DL_args.n_downsamplings,
+                            num_res_blocks=DL_args.n_res_blocks,
+                            output_activation=None,
+                            NL_self_attention=DL_args.NL_SelfAttention
+                            )
+        dec_xi = dl.decoder(encoded_dims=DL_args.encoded_size,
+                            output_shape=(hgt,wdt,n_ch),
+                            n_groups=DL_args.n_groups_PM,
+                            filters=nfd,
+                            num_layers=args.n_downsamplings,
+                            num_res_blocks=args.n_res_blocks,
+                            output_activation=None,
+                            NL_self_attention=args.NL_SelfAttention
+                            )
+        tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+
 sup_loss_fn = tf.losses.MeanAbsoluteError()
+
+if DL_args.only_mag:
+    IDEAL_op = wf.IDEAL_mag_Layer()
+else:
+    IDEAL_op = wf.IDEAL_Layer()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
@@ -375,6 +472,46 @@ def validation_step(A, B):
     A2B_abs, val_sup_dict = sample(A, B)
     return A2B_abs, val_sup_dict
 
+if args.DL_gen:
+    @tf.function
+    def gen_sample(Z,TE=None):
+        # Z2B2A Cycle
+        if DL_args.only_mag:
+            Z2B_mag = dec_mag(Z, training=True)
+            Z2B_pha = dec_pha(Z, training=True)
+            Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
+            Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
+        else:
+            Z2B_w = dec_w(Z, training=False)
+            Z2B_f = dec_f(Z, training=False)
+            Z2B_xi= dec_xi(Z, training=False)
+            Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
+        # Calculate CSE-MRI data (in non-MEBCRN format)
+        Z2B2A = IDEAL_op(Z2B)
+        # rho_hat = tf.transpose(rho_hat, perm=[0,2,3,1])
+        Re_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
+        Im_rho = tf.transopse(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
+        zero_fill = tf.zeros_like(Re_rho)
+        re_stack = tf.stack([Re_rho,zero_fill],4)
+        re_aux = tf.reshape(re_stack,[n_batch,hgt,wdt,2*ns])
+        im_stack = tf.stack([zero_fill,Im_rho],4)
+        im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
+        res_rho = re_aux + im_aux
+        # Turn Z2B into non-MEBCRN format
+        if DL_args.only_mag:
+            Z2B_W_r = Z2B_mag[:,0,:,:,:1] * tf.math.cos(Z2B_pha[:,0,:,:,1:2]*np.pi)
+            Z2B_W_i = Z2B_mag[:,0,:,:,:1] * tf.math.sin(Z2B_pha[:,0,:,:,1:2]*np.pi)
+            Z2B_F_r = Z2B_mag[:,0,:,:,1:2]* tf.math.cos(Z2B_pha[:,0,:,:,1:2]*np.pi)
+            Z2B_F_i = Z2B_mag[:,0,:,:,1:2]* tf.math.sin(Z2B_pha[:,0,:,:,1:2]*np.pi)
+            Z2B_r2 = Z2B_mag[:,0,:,:,2:]
+            Z2B_fm = Z2B_pha[:,0,:,:,2:]
+            Z2B = tf.concat([Z2B_W_r,Z2B_W_i,Z2B_F_r,Z2B_F_i,Z2B_r2,Z2B_fm],axis=-1)
+        else:
+            Z2B= tf.concat([tf.squeeze(Z2B_w,axis=1),
+                            tf.squeeze(Z2B_f,axis=1),
+                            tf.squeeze(Z2B_xi,axis=1)],axis=-1)
+        return Z2B, Z2B2A
+
 
 # ==============================================================================
 # =                                    run                                     =
@@ -414,20 +551,26 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
+        if args.DL_gen:
+            hls = hgt//(2**(DL_args.n_downsamplings))
+            wls = wdt//(2**(DL_args.n_downsamplings))
+            z_shape = (1,hls,wls,DL_args.encoded_size)
+            Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
+            B, A = gen_sample(Z)
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
-        p = np.random.rand()
-        if p <= 0.4:
-            # Random 90 deg rotations
-            for _ in range(np.random.randint(3)):
-                B = tf.image.rot90(B)
+        # p = np.random.rand()
+        # if p <= 0.4:
+        #     # Random 90 deg rotations
+        #     for _ in range(np.random.randint(3)):
+        #         B = tf.image.rot90(B)
 
-            # Random horizontal reflections
-            B = tf.image.random_flip_left_right(B)
+        #     # Random horizontal reflections
+        #     B = tf.image.random_flip_left_right(B)
 
-            # Random vertical reflections
-            B = tf.image.random_flip_up_down(B)
+        #     # Random vertical reflections
+        #     B = tf.image.random_flip_up_down(B)
         # ==============================================================================
         
         G_loss_dict = train_step(A, B)
