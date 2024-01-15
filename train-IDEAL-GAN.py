@@ -145,8 +145,8 @@ else:
     nd = 1
 if len(args.n_G_filt_list) == (args.n_downsamplings+1):
     nfe = filt_list
-    nfd = [a//nd for a in filt_list]
-    nfd2 = [a//(nd+1) for a in filt_list]
+    nfd = [a//nd//2 for a in filt_list]
+    nfd2 = [a//(nd+1)//2 for a in filt_list]
 else:
     nfe = args.n_G_filters
     nfd = args.n_G_filters//nd
