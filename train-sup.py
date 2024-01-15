@@ -95,7 +95,7 @@ if args.DL_gen:
         trainX = np.expand_dims(trainX, axis=-1)
 else:
     trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
-valX    = acqs_1
+valX = acqs_1
 
 if args.DL_gen:
     trainY = np.zeros((args.n_per_epoch,1,1,1),dtype=np.float32)
@@ -103,7 +103,7 @@ if args.DL_gen:
         trainY = np.expand_dims(trainY, axis=-1)
 else:
     trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
-valY    = out_maps_1
+valY = out_maps_1
 
 # Overall dataset statistics
 if args.G_model == 'MEBCRN':
@@ -490,13 +490,13 @@ if args.DL_gen:
         Z2B2A = IDEAL_op(Z2B)
         # rho_hat = tf.transpose(rho_hat, perm=[0,2,3,1])
         Re_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
-        Im_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
+        Im_rho = tf.transpose(Z2B2A[:,:,:,:,1], perm=[0,2,3,1])
         zero_fill = tf.zeros_like(Re_rho)
         re_stack = tf.stack([Re_rho,zero_fill],4)
-        re_aux = tf.reshape(re_stack,[Z.shape[0],hgt,wdt,2*ns])
+        re_aux = tf.reshape(re_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
         im_stack = tf.stack([zero_fill,Im_rho],4)
-        im_aux = tf.reshape(im_stack,[Z.shape[0],hgt,wdt,2*ns])
-        res_rho = re_aux + im_aux
+        im_aux = tf.reshape(im_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
+        Z2B2A = re_aux + im_aux
         # Turn Z2B into non-MEBCRN format
         if DL_args.only_mag:
             Z2B_W_r = Z2B_mag[:,0,:,:,:1] * tf.math.cos(Z2B_pha[:,0,:,:,1:2]*np.pi)
