@@ -213,7 +213,7 @@ if args.DL_gen:
     #                 )
     if DL_args.only_mag:
         dec_mag = dl.decoder(encoded_dims=DL_args.encoded_size,
-                            output_shape=(hgt,wdt,n_out),
+                            output_shape=(hgt,wdt,3),
                             filters=nfd,
                             num_layers=DL_args.n_downsamplings,
                             num_res_blocks=DL_args.n_res_blocks,
@@ -222,7 +222,7 @@ if args.DL_gen:
                             NL_self_attention=DL_args.NL_SelfAttention
                             )
         dec_pha = dl.decoder(encoded_dims=DL_args.encoded_size,
-                            output_shape=(hgt,wdt,n_out-1),
+                            output_shape=(hgt,wdt,2),
                             filters=nfd2,
                             num_layers=DL_args.n_downsamplings,
                             num_res_blocks=DL_args.n_res_blocks,
