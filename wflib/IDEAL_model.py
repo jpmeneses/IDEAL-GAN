@@ -24,6 +24,11 @@ def gen_TEvar(n_ech, bs=1, orig=False, TE_ini_min=1.0e-3, TE_ini_d=1.4e-3, d_TE_
         d_TE_var = 2.1 * 1e-3
         stp_te = TE_ini_var + d_TE_var * (n_ech-1) + 1e-4
         te_var_np = np.arange(start=TE_ini_var,stop=stp_te,step=d_TE_var)
+    elif not TE_ini_d and not d_TE_d:
+        TE_ini_var = TE_ini_min
+        d_TE_var = d_TE_min
+        stp_te = TE_ini_var + d_TE_var * (n_ech-1) + 1e-4
+        te_var_np = np.arange(start=TE_ini_var,stop=stp_te,step=d_TE_var)
     else:
         # TE_ini_var = (1.0 + 1.5*np.random.uniform()) * 1e-3
         TE_ini_var = TE_ini_min + np.random.uniform(0,TE_ini_d)

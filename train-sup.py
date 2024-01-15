@@ -26,6 +26,8 @@ py.arg('--DL_gen', type=bool, default=False)
 py.arg('--DL_experiment_dir', default='output/GAN-238')
 py.arg('--n_per_epoch', type=int, default=10000)
 py.arg('--n_echoes', type=int, default=6)
+py.arg('--TE1', type=float, default=0.0013)
+py.arg('--dTE', type=float, default=0.0021)
 py.arg('--field', type=float, default=1.5)
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
@@ -491,7 +493,7 @@ if args.DL_gen:
             Z2B_xi= dec_xi(Z, training=False)
             Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
         # Calculate CSE-MRI data (in non-MEBCRN format)
-        Z2B2A = IDEAL_op(Z2B)
+        Z2B2A = IDEAL_op(Z2B, te=TE, training=False)
         # rho_hat = tf.transpose(rho_hat, perm=[0,2,3,1])
         Re_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
         Im_rho = tf.transpose(Z2B2A[:,:,:,:,1], perm=[0,2,3,1])
@@ -556,11 +558,14 @@ for ep in range(args.epochs):
     # train for an epoch
     for A, B in A_B_dataset:
         if args.DL_gen:
+            # Generate TE array
+            te_var=wf.gen_TEvar(args.n_echoes, bs=B.shape[0], TE_ini_min=args.TE1,
+                                TE_ini_d=None, d_TE_min=args.dTE, d_TE_d=None)
             hls = hgt//(2**(DL_args.n_downsamplings))
             wls = wdt//(2**(DL_args.n_downsamplings))
             z_shape = (A.shape[0],hls,wls,DL_args.encoded_size)
             Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
-            B, A = gen_sample(Z)
+            B, A = gen_sample(Z,te_var)
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
