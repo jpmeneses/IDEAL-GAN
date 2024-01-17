@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v303-sup
-#SBATCH --output=out_sup_303.txt
+#SBATCH --job-name=v721-GAN
+#SBATCH --output=out_GAN_721.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl
 
-python train-sup.py --dataset Sup-303 --data_size 384 --DL_gen True --DL_experiment_dir output/GAN-715 --n_per_epoch 5000 --TE1 0.0014 --dTE 0.0022 --G_model U-Net --epochs 60 --epoch_decay 60
+python train-IDEAL-GAN.py --dataset GAN-721 --data_size 384 --rand_ne True --rand_ph_offset True --only_mag True --rem_R2 True --n_G_filt_list 36,72,72,144,144,288 --n_downsamplings 5 --div_decod True  --encoded_size 24 --ls_mean_activ None --adv_train True --cGAN True --batch_size 2 --epochs 140 --epoch_decay 140 --lr 0.001 --FM_loss_weight 0.5 --ls_reg_weight 2e-6 --Fourier_reg_weight 2e-4
