@@ -143,7 +143,7 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 if len(args.n_G_decod_div) > 0:
     nm, nd = decod_div
 else:
-    nm, nd = 1, 1
+    nm, nd = 1, 2
 if len(args.n_G_filt_list) == (args.n_downsamplings+1):
     nfe = filt_list
     nfd = [nm*a//nd for a in filt_list]
