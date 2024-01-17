@@ -18,7 +18,7 @@ def save_gif(img_list, mode="RGB", path="", interval=200):
     for im in img_list:
         im = im.numpy()
         if mode=='L': # In this case, input range is [0,1]
-            im = im * 127.5
+            im = im * 255
         else:
             im = (im + 2) * 127.5/2
         im = np.clip(im, 0, 255).astype(np.uint8)
@@ -39,7 +39,7 @@ def save_gif(img_list, mode="RGB", path="", interval=200):
 # =                                   param                                    =
 # ==============================================================================
 
-py.arg('--experiment_dir', default='GAN-100')
+py.arg('--experiment_dir', default='output/GAN-100')
 py.arg('--scheduler', default='linear', choices=['linear','cosine'])
 py.arg('--n_timesteps', type=int, default=200)
 py.arg('--beta_start', type=float, default=0.0001)
@@ -48,8 +48,8 @@ py.arg('--s_value', type=float, default=8e-3)
 py.arg('--n_samples', type=int, default=50)
 ldm_args = py.args()
 
-output_dir = py.join('output',ldm_args.experiment_dir)
-args = py.args_from_yaml(py.join('output', ldm_args.experiment_dir, 'settings.yml'))
+output_dir = py.join(ldm_args.experiment_dir)
+args = py.args_from_yaml(py.join(output_dir, 'settings.yml'))
 args.__dict__.update(ldm_args.__dict__)
 
 if not(hasattr(args,'VQ_num_embed')):
@@ -83,7 +83,7 @@ if hasattr(args,'n_G_filt_list'):
 ################################################################################
 dataset_dir = '../datasets/'
 
-dataset_hdf5_2 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+dataset_hdf5_2 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, end=args.n_samples, MEBCRN=True, mag_and_phase=args.only_mag)
 
 ################################################################################
@@ -167,52 +167,31 @@ elif args.scheduler == 'cosine':
     alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
     beta = 1.0 - alpha
 
-# @tf.function
-# def encode(A, Z_std=1.0):
-#     A2Z = enc(A, training=False)
-#     Z2B = dec_mag(A2Z, training=False)
-#     Z2B_PDFF = Z2B[:,0,:,:,0]
-#     return tf.math.divide_no_nan(A2Z,Z_std), Z2B_PDFF
-
 @tf.function
-def sample(A):
+def encode(A, Z_std=1.0):
     A2Z = enc(A, training=False)
-    if args.VQ_encoder:
-        vq_dict = vq_op(A2Z)
-        A2Z = vq_dict['quantize']
-    # Reconstruct to synthesize missing phase
-    A2Z2B_mag = dec_mag(A2Z, training=False)
-    A2Z2B_pha = dec_pha(A2Z, training=False)
-    A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
-    A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
-    # A2B_w = A2B[:,0,:,:,0]
-    A2B_w = tf.math.sqrt(tf.reduce_sum(tf.square(A[:,0,:,:,:]),axis=-1,keepdims=False))
-    # Reconstructed multi-echo images
-    # A2B2A = IDEAL_op(A2B)
-
-    return A2Z, A2B_w
+    return tf.math.divide_no_nan(A2Z,Z_std)
 
 @tf.function
 def decode(Z, Z_std=1.0):
     Z = tf.math.multiply_no_nan(Z,Z_std)
-    # Z = tf.random.normal(Z.shape, dtype=tf.float32)
     Z2B = dec_mag(Z, training=False)
-    # Z2B_PDFF = tf.math.divide_no_nan(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]+Z2B[:,0,:,:,1])
-    Z2B_PDFF = Z2B[:,0,:,:,0]
+    Z2B_PDFF = tf.math.divide_no_nan(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]+Z2B[:,0,:,:,1])
+    # Z2B_PDFF = Z2B[:,0,:,:,0]
     return Z2B, Z2B_PDFF
 
 # LS scaling factor
-# z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
 
-# # checkpoint
-# checkpoint_ldm = tl.Checkpoint(dict(z_std=z_std),
-#                                py.join(output_dir, 'checkpoints_ldm'),
-#                                max_to_keep=5)
-# try:  # restore checkpoint including the epoch counter
-#     checkpoint_ldm.restore().assert_existing_objects_matched()
-#     print('Scaling Factor:',z_std.numpy())
-# except Exception as e:
-#     print(e)
+# checkpoint
+checkpoint_ldm = tl.Checkpoint(dict(z_std=z_std),
+                               py.join(output_dir, 'checkpoints_ldm'),
+                               max_to_keep=5)
+try:  # restore checkpoint including the epoch counter
+    checkpoint_ldm.restore().assert_existing_objects_matched()
+    print('Scaling Factor:',z_std.numpy())
+except Exception as e:
+    print(e)
 
 # sample
 sample_dir = py.join(output_dir, 'samples_forward_diff')
@@ -222,8 +201,8 @@ i = 0
 
 for A in A_dataset:
     print('SHAPE',A.shape)
-    A2Z, A2B_PDFF = sample(A) #, z_std)
-    # _, A2B_PDFF = decode(A2Z, z_std)
+    A2Z = encode(A, z_std)
+    _, A2B_PDFF = decode(A2Z, z_std)
     # A2B_PDFF = tf.reduce_sum(tf.square(A[:,0,:,:,:]),axis=-1,keepdims=False)
     img_list = [tf.squeeze(A2Z,axis=0)]
     map_list = [tf.squeeze(A2B_PDFF,axis=0)]
@@ -231,7 +210,7 @@ for A in A_dataset:
         noise = tf.random.normal(A2Z.shape, dtype=tf.float32)
         A2Z = np.sqrt(1-beta_t) * A2Z + beta_t * noise
         img_list.append(tf.squeeze(A2Z,axis=0))
-        _, A2B_PDFF = decode(A2Z)#, z_std)
+        _, A2B_PDFF = decode(A2Z, z_std)
         map_list.append(tf.squeeze(A2B_PDFF,axis=0))
 
     save_gif(([img_list[0]] * 100) + img_list + ([img_list[-1]] * 100), path=py.join(sample_dir,'sample-%03d.gif' % i), interval=20)

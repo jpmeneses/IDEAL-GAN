@@ -13,7 +13,7 @@ import data
 # =                                   param                                    =
 # ==============================================================================
 
-py.arg('--experiment_dir', default='GAN-100')
+py.arg('--experiment_dir', default='output/GAN-100')
 py.arg('--scheduler', default='linear', choices=['linear','cosine'])
 py.arg('--n_timesteps', type=int, default=200)
 py.arg('--beta_start', type=float, default=0.0001)
