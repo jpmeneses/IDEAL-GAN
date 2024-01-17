@@ -159,7 +159,7 @@ def sample(A):
     # A_pha = -1.5 * np.pi
     A_pha = tf.random.uniform(A_mag.shape,minval=-np.pi,maxval=np.pi,seed=0)
     A = tf.concat([A_mag*tf.math.cos(A_pha),A_mag*tf.math.sin(A_pha)],axis=-1)
-    A2Z = enc(A, training=True)
+    A2Z = enc(A, training=False)
     if args.VQ_encoder:
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
