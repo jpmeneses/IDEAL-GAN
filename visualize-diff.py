@@ -12,14 +12,17 @@ import data
 from PIL import Image
 
 # Save a GIF using logged images
-def save_gif(img_list, path="", interval=200):
+def save_gif(img_list, mode="RGB", path="", interval=200):
     # Transform images from [-1,1] to [0, 255]
     imgs = []
     for im in img_list:
-        im = np.array(im)
-        im = (im + 2) * 127.5/2
+        im = im.numpy()
+        if mode=='L': # In this case, input range is [0,1]
+            im = im * 127.5
+        else:
+            im = (im + 2) * 127.5/2
         im = np.clip(im, 0, 255).astype(np.uint8)
-        im = Image.fromarray(im, mode="RGB")
+        im = Image.fromarray(im, mode=mode)
         imgs.append(im)
     
     imgs = iter(imgs)
@@ -80,7 +83,7 @@ if hasattr(args,'n_G_filt_list'):
 ################################################################################
 dataset_dir = '../datasets/'
 
-dataset_hdf5_2 = 'JGalgani_GC_192_complex_2D.hdf5'
+dataset_hdf5_2 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, end=args.n_samples, MEBCRN=True, mag_and_phase=args.only_mag)
 
 ################################################################################
@@ -93,7 +96,10 @@ print('Validation output shape:',valY.shape)
 
 # Overall dataset statistics
 len_dataset,_,hgt,wdt,n_ch = np.shape(valX)
-_,n_out,_,_,_ = np.shape(valY)
+if args.only_mag:
+    _,_,_,_,n_out = np.shape(valY)
+else:
+    _,n_out,_,_,_ = np.shape(valY)
 
 print('Image Dimensions:', hgt, wdt)
 print('Num. Output Maps:',n_out)
@@ -105,19 +111,43 @@ A_dataset = A_dataset.batch(1)
 # =                                   models                                   =
 # ==============================================================================
 
+nd = 2
+if len(args.n_G_filt_list) == (args.n_downsamplings+1):
+    nfe = filt_list
+    nfd = [a//nd for a in filt_list]
+    nfd2 = [a//(nd+1) for a in filt_list]
+else:
+    nfe = args.n_G_filters
+    nfd = args.n_G_filters//nd
+    nfd2= args.n_G_filters//(nd+1)
 enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 encoded_dims=args.encoded_size,
-                filters=args.n_G_filters,
+                filters=nfe,
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
                 sd_out=not(args.VQ_encoder),
                 ls_mean_activ=args.ls_mean_activ,
                 NL_self_attention=args.NL_SelfAttention
                 )
+dec_mag = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_out),
+                    filters=nfd,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='relu',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_pha = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_out-1),
+                    filters=nfd2,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='tanh',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
 
-vq_op = dl.VectorQuantizer(args.encoded_size,256,0.5)
-
-tl.Checkpoint(dict(enc=enc,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(enc=enc, dec_mag=dec_mag, dec_pha=dec_pha, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 ################################################################################
 ########################### DIFFUSION TIMESTEPS ################################
@@ -137,22 +167,52 @@ elif args.scheduler == 'cosine':
     alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
     beta = 1.0 - alpha
 
-def encode(A, Z_std=1.0):
+# @tf.function
+# def encode(A, Z_std=1.0):
+#     A2Z = enc(A, training=False)
+#     Z2B = dec_mag(A2Z, training=False)
+#     Z2B_PDFF = Z2B[:,0,:,:,0]
+#     return tf.math.divide_no_nan(A2Z,Z_std), Z2B_PDFF
+
+@tf.function
+def sample(A):
     A2Z = enc(A, training=False)
-    return tf.math.divide_no_nan(A2Z,Z_std)
+    if args.VQ_encoder:
+        vq_dict = vq_op(A2Z)
+        A2Z = vq_dict['quantize']
+    # Reconstruct to synthesize missing phase
+    A2Z2B_mag = dec_mag(A2Z, training=False)
+    A2Z2B_pha = dec_pha(A2Z, training=False)
+    A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
+    A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
+    # A2B_w = A2B[:,0,:,:,0]
+    A2B_w = tf.math.sqrt(tf.reduce_sum(tf.square(A[:,0,:,:,:]),axis=-1,keepdims=False))
+    # Reconstructed multi-echo images
+    # A2B2A = IDEAL_op(A2B)
+
+    return A2Z, A2B_w
+
+@tf.function
+def decode(Z, Z_std=1.0):
+    Z = tf.math.multiply_no_nan(Z,Z_std)
+    # Z = tf.random.normal(Z.shape, dtype=tf.float32)
+    Z2B = dec_mag(Z, training=False)
+    # Z2B_PDFF = tf.math.divide_no_nan(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]+Z2B[:,0,:,:,1])
+    Z2B_PDFF = Z2B[:,0,:,:,0]
+    return Z2B, Z2B_PDFF
 
 # LS scaling factor
-z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+# z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
 
-# checkpoint
-checkpoint_ldm = tl.Checkpoint(dict(z_std=z_std),
-                               py.join(output_dir, 'checkpoints_ldm'),
-                               max_to_keep=5)
-try:  # restore checkpoint including the epoch counter
-    checkpoint_ldm.restore().assert_existing_objects_matched()
-    print('Scaling Factor:',z_std.numpy())
-except Exception as e:
-    print(e)
+# # checkpoint
+# checkpoint_ldm = tl.Checkpoint(dict(z_std=z_std),
+#                                py.join(output_dir, 'checkpoints_ldm'),
+#                                max_to_keep=5)
+# try:  # restore checkpoint including the epoch counter
+#     checkpoint_ldm.restore().assert_existing_objects_matched()
+#     print('Scaling Factor:',z_std.numpy())
+# except Exception as e:
+#     print(e)
 
 # sample
 sample_dir = py.join(output_dir, 'samples_forward_diff')
@@ -161,18 +221,25 @@ py.mkdir(sample_dir)
 i = 0    
 
 for A in A_dataset:
-    A2Z = encode(A, z_std)
-    A2Z = tf.squeeze(A2Z,axis=0)
-    img_list = [A2Z]
+    print('SHAPE',A.shape)
+    A2Z, A2B_PDFF = sample(A) #, z_std)
+    # _, A2B_PDFF = decode(A2Z, z_std)
+    # A2B_PDFF = tf.reduce_sum(tf.square(A[:,0,:,:,:]),axis=-1,keepdims=False)
+    img_list = [tf.squeeze(A2Z,axis=0)]
+    map_list = [tf.squeeze(A2B_PDFF,axis=0)]
     for beta_t in beta:
         noise = tf.random.normal(A2Z.shape, dtype=tf.float32)
         A2Z = np.sqrt(1-beta_t) * A2Z + beta_t * noise
-        img_list.append(A2Z)
-    save_gif(([img_list[0]] * 100) + img_list + ([img_list[-1]] * 100), py.join(sample_dir,'sample-%03d.gif' % i), interval=20)
+        img_list.append(tf.squeeze(A2Z,axis=0))
+        _, A2B_PDFF = decode(A2Z)#, z_std)
+        map_list.append(tf.squeeze(A2B_PDFF,axis=0))
+
+    save_gif(([img_list[0]] * 100) + img_list + ([img_list[-1]] * 100), path=py.join(sample_dir,'sample-%03d.gif' % i), interval=20)
+    save_gif(([map_list[0]] * 100) + map_list + ([map_list[-1]] * 100), mode='L', path=py.join(sample_dir,'map-%03d.gif' % i), interval=20)
     i+=1
 
 img_list = []
 for beta_t in beta:
     noise = tf.random.normal(A2Z.shape, dtype=tf.float32)
-    img_list.append(noise)
-save_gif(([img_list[0]] * 100) + img_list + ([img_list[-1]] * 100), py.join(sample_dir,'sample-%03d.gif' % i), interval=20)
+    img_list.append(tf.squeeze(noise,axis=0))
+save_gif(([img_list[0]] * 100) + img_list + ([img_list[-1]] * 100), path=py.join(sample_dir,'sample-%03d.gif' % i), interval=20)
