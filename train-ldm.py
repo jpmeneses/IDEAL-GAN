@@ -27,8 +27,8 @@ py.arg('--data_augmentation', type=bool, default=False)
 py.arg('--lr', type=float, default=0.00005)
 ldm_args = py.args()
 
-output_dir = py.join('output',ldm_args.experiment_dir)
-args = py.args_from_yaml(py.join('output', ldm_args.experiment_dir, 'settings.yml'))
+output_dir = ldm_args.experiment_dir
+args = py.args_from_yaml(py.join(output_dir, 'settings.yml'))
 args.__dict__.update(ldm_args.__dict__)
 
 if not(hasattr(args,'VQ_num_embed')):
