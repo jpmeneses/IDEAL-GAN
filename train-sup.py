@@ -262,10 +262,11 @@ if args.DL_gen:
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
-if DL_args.only_mag:
-    IDEAL_op = wf.IDEAL_mag_Layer()
-else:
-    IDEAL_op = wf.IDEAL_Layer()
+if args.DL_gen:
+    if DL_args.only_mag:
+        IDEAL_op = wf.IDEAL_mag_Layer()
+    else:
+        IDEAL_op = wf.IDEAL_Layer()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
