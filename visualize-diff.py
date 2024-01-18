@@ -137,17 +137,8 @@ dec_mag = dl.decoder(encoded_dims=args.encoded_size,
                     output_activation='relu',
                     NL_self_attention=args.NL_SelfAttention
                     )
-dec_pha = dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_out-1),
-                    filters=nfd2,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation='tanh',
-                    NL_self_attention=args.NL_SelfAttention
-                    )
-vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
 
-tl.Checkpoint(dict(enc=enc, dec_mag=dec_mag, dec_pha=dec_pha, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(enc=enc, dec_mag=dec_mag), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 ################################################################################
 ########################### DIFFUSION TIMESTEPS ################################
