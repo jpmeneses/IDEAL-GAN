@@ -27,9 +27,9 @@ py.arg('--only_mag', type=bool, default=False)
 py.arg('--rem_R2', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_G_filt_list', default='')
-py.arg('--n_G_decod_div', default='')
 py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
+py.arg('--div_decod', type=bool, default=True)
 py.arg('--n_groups_PM', type=int, default=2)
 py.arg('--encoded_size', type=int, default=256)
 py.arg('--ls_mean_activ', default='leaky_relu', choices=['leaky_relu','relu','tanh','None'])
@@ -71,9 +71,6 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
 if len(args.n_G_filt_list) > 0:
     filt_list = [int(a_i) for a_i in args.n_G_filt_list.split(',')]
-
-if len(args.n_G_decod_div) > 0:
-    decod_div = [int(k_i) for k_i in args.n_G_decod_div.split('//')]
 
 # ==============================================================================
 # =                                    data                                    =
@@ -140,14 +137,17 @@ A_B_dataset_val.batch(1)
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
-if len(args.n_G_decod_div) > 0:
-    nm, nd = decod_div
+if args.div_decod:
+    if args.only_mag:
+        nd = 2
+    else:
+        nd = 3
 else:
-    nm, nd = 1, 2
+    nd = 1
 if len(args.n_G_filt_list) == (args.n_downsamplings+1):
     nfe = filt_list
-    nfd = [nm*a//nd for a in filt_list]
-    nfd2 = [nm*a//(nd+1) for a in filt_list]
+    nfd = [a//nd for a in filt_list]
+    nfd2 = [a//(nd+1) for a in filt_list]
 else:
     nfe = args.n_G_filters
     nfd = args.n_G_filters//nd
