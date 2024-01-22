@@ -260,6 +260,19 @@ if args.DL_gen:
         k = unet(test_images, test_timestamps)
         # Checkpoint
         tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.DL_experiment_dir, 'checkpoints_ldm')).restore()
+        # create a fixed beta schedule
+        if DL_args.scheduler == 'linear':
+            beta = np.linspace(DL_args.beta_start, DL_args.beta_end, DL_args.n_timesteps)
+            # this will be used as discussed in the reparameterization trick
+            alpha = 1 - beta
+            alpha_bar = np.cumprod(alpha, 0)
+            alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
+        elif args.scheduler == 'cosine':
+            x = np.linspace(0, DL_args.n_timesteps, DL_args.n_timesteps + 1)
+            alpha_bar = np.cos(((x / DL_args.n_timesteps) + DL_args.s_value) / (1 + DL_args.s_value) * np.pi * 0.5) ** 2
+            alpha_bar /= alpha_bar[0]
+            alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
+            beta = 1.0 - alpha
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
