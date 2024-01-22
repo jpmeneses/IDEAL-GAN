@@ -1,14 +1,10 @@
-import functools
-
-import random
 import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
 
-import tensorflow as tf
-import tensorflow.keras as keras
 import tf2lib as tl
-import tf2gan as gan
 import DLlib as dl
+import DMlib as dm
 import pylib as py
 import wflib as wf
 
@@ -274,7 +270,7 @@ if args.DL_gen:
         IDEAL_op = wf.IDEAL_Layer()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
-G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
 # ==============================================================================
 # =                                 train step                                 =
