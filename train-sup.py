@@ -23,6 +23,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
+py.arg('--DL_LDM', type=bool, default=False)
 py.arg('--DL_experiment_dir', default='output/GAN-238')
 py.arg('--n_per_epoch', type=int, default=10000)
 py.arg('--n_echoes', type=int, default=6)
@@ -199,20 +200,11 @@ if args.DL_gen:
     else:
         nd = 1
     if len(DL_args.n_G_filt_list) == (DL_args.n_downsamplings+1):
-        nfe = filt_list
         nfd = [a//nd for a in filt_list]
         nfd2 = [a//(nd+1) for a in filt_list]
     else:
-        nfe = DL_args.n_G_filters
         nfd = DL_args.n_G_filters//nd
         nfd2= DL_args.n_G_filters//(nd+1)
-    # enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
-    #                 encoded_dims=DL_args.encoded_size,
-    #                 filters=nfe,
-    #                 num_layers=DL_args.n_downsamplings,
-    #                 num_res_blocks=DL_args.n_res_blocks,
-    #                 NL_self_attention=DL_args.NL_SelfAttention
-    #                 )
     if DL_args.only_mag:
         dec_mag = dl.decoder(encoded_dims=DL_args.encoded_size,
                             output_shape=(hgt,wdt,3),
@@ -259,6 +251,15 @@ if args.DL_gen:
                             NL_self_attention=args.NL_SelfAttention
                             )
         tl.Checkpoint(dict(dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+    if args.DL_LDM:
+        unet = dl.denoise_Unet(dim=DL_args.n_ldm_filters, dim_mults=(1,2,4), channels=DL_args.encoded_size)
+        z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+        # Initiate unet
+        test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
+        test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
+        k = unet(test_images, test_timestamps)
+        # Checkpoint
+        tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
@@ -482,6 +483,11 @@ def validation_step(A, B):
 if args.DL_gen:
     @tf.function
     def gen_sample(Z,TE=None):
+        if args.DL_LDM:
+            for i in range(args.n_timesteps-1):
+                t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
+                pred_noise = unet(Z, t)
+                Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
         # Z2B2A Cycle
         if DL_args.only_mag:
             Z2B_mag = dec_mag(Z, training=True)
