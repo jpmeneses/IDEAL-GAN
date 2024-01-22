@@ -481,7 +481,7 @@ def validation_step(A, B):
     return A2B_abs, val_sup_dict
 
 if args.DL_gen:
-    @tf.function
+    # @tf.function
     def gen_sample(Z,TE=None):
         if args.DL_LDM:
             for i in range(DL_args.n_timesteps-1):
