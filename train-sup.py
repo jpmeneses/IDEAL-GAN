@@ -611,7 +611,7 @@ for ep in range(args.epochs):
                         step=G_optimizer.iterations, name='G learning rate')
 
         # sample
-        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
+        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200//args.batch_size):
             A, B = next(val_iter)
             # A = A[0,...]
             # B = B[0,...]
