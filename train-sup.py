@@ -224,6 +224,8 @@ if args.DL_gen:
                             NL_self_attention=DL_args.NL_SelfAttention
                             )
         tl.Checkpoint(dict(dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+        hgt_ls = dec_mag.input_shape[1]
+        wdt_ls = dec_mag.input_shape[2]
     else:
         dec_w =  dl.decoder(encoded_dims=DL_args.encoded_size,
                             output_shape=(hgt,wdt,n_ch),
@@ -251,15 +253,17 @@ if args.DL_gen:
                             NL_self_attention=args.NL_SelfAttention
                             )
         tl.Checkpoint(dict(dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+        hgt_ls = dec_w.input_shape[1]
+        wdt_ls = dec_w.input_shape[2]
     if args.DL_LDM:
         unet = dl.denoise_Unet(dim=DL_args.n_ldm_filters, dim_mults=(1,2,4), channels=DL_args.encoded_size)
         z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
         # Initiate unet
-        test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
-        test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
+        test_images = tf.ones((1, hgt_ls, wdt_ls, DL_args.encoded_size), dtype=tf.float32)
+        test_timestamps = dm.generate_timestamp(0, 1, DL_args.n_timesteps)
         k = unet(test_images, test_timestamps)
         # Checkpoint
-        tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
+        tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.DL_experiment_dir, 'checkpoints_ldm')).restore()
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
@@ -484,8 +488,8 @@ if args.DL_gen:
     @tf.function
     def gen_sample(Z,TE=None):
         if args.DL_LDM:
-            for i in range(args.n_timesteps-1):
-                t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
+            for i in range(DL_args.n_timesteps-1):
+                t = np.expand_dims(np.array(DL_args.n_timesteps-i-1, np.int32), 0)
                 pred_noise = unet(Z, t)
                 Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
         # Z2B2A Cycle
