@@ -267,7 +267,7 @@ if args.DL_gen:
             alpha = 1 - beta
             alpha_bar = np.cumprod(alpha, 0)
             alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
-        elif args.scheduler == 'cosine':
+        elif DL_args.scheduler == 'cosine':
             x = np.linspace(0, DL_args.n_timesteps, DL_args.n_timesteps + 1)
             alpha_bar = np.cos(((x / DL_args.n_timesteps) + DL_args.s_value) / (1 + DL_args.s_value) * np.pi * 0.5) ** 2
             alpha_bar /= alpha_bar[0]
