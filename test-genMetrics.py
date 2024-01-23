@@ -19,6 +19,7 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
+py.arg('--LDM', type=bool, default=False)
 py.arg('--te_input', type=bool, default=False)
 py.arg('--val_batch_size', type=int, default=1)
 test_args = py.args()
@@ -49,37 +50,92 @@ A_dataset_val = A_dataset_val.batch(args.val_batch_size).shuffle(len_dataset)
 # =                                   models                                   =
 # ==============================================================================
 
-enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
-				encoded_dims=args.encoded_size,
-                filters=args.n_G_filters,
-                num_layers=args.n_downsamplings,
-                num_res_blocks=args.n_res_blocks,
-                NL_self_attention=args.NL_SelfAttention)
-dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention
-                    )
-dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=args.n_G_filters,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention
-                    )
-dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_ch),
-                    n_groups=args.n_groups_PM,
-                    filters=args.n_G_filters,
-                    num_layers=args.n_downsamplings,
-                    num_res_blocks=args.n_res_blocks,
-                    output_activation=None,
-                    NL_self_attention=args.NL_SelfAttention
-                    )
+if args.div_decod:
+    if args.only_mag:
+        nd = 2
+    else:
+        nd = 3
+else:
+    nd = 1
+if len(args.n_G_filt_list) == (args.n_downsamplings+1):
+    nfd = [a//nd for a in filt_list]
+    nfd2 = [a//(nd+1) for a in filt_list]
+else:
+    nfd = args.n_G_filters//nd
+    nfd2= args.n_G_filters//(nd+1)
+if args.only_mag:
+    dec_mag = dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,3),
+                        filters=nfd,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation='relu',
+                        output_initializer='he_normal',
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_pha = dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,2),
+                        filters=nfd2,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation='tanh',
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    tl.Checkpoint(dict(dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+    hgt_ls = dec_mag.input_shape[1]
+    wdt_ls = dec_mag.input_shape[2]
+else:
+    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,n_ch),
+                        filters=nfd,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation=None,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,n_ch),
+                        filters=nfd,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation=None,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
+                        output_shape=(hgt,wdt,n_ch),
+                        n_groups=args.n_groups_PM,
+                        filters=nfd,
+                        num_layers=args.n_downsamplings,
+                        num_res_blocks=args.n_res_blocks,
+                        output_activation=None,
+                        NL_self_attention=args.NL_SelfAttention
+                        )
+    tl.Checkpoint(dict(dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+    hgt_ls = dec_w.input_shape[1]
+    wdt_ls = dec_w.input_shape[2]
+if args.LDM:
+    # create our unet model
+    unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
+    z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+    # Initiate unet
+    test_images = tf.ones((1, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
+    test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
+    k = unet(test_images, test_timestamps)
+    # Checkpoint
+    tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.DL_experiment_dir, 'checkpoints_ldm')).restore()
+    # create a fixed beta schedule
+    if args.scheduler == 'linear':
+        beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
+        # this will be used as discussed in the reparameterization trick
+        alpha = 1 - beta
+        alpha_bar = np.cumprod(alpha, 0)
+        alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
+    elif args.scheduler == 'cosine':
+        x = np.linspace(0, args.n_timesteps, args.n_timesteps + 1)
+        alpha_bar = np.cos(((x / args.n_timesteps) + args.s_value) / (1 + args.s_value) * np.pi * 0.5) ** 2
+        alpha_bar /= alpha_bar[0]
+        alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
+        beta = 1.0 - alpha
 
 get_features = dl.get_features((ne,hgt,wdt,n_ch))
 
@@ -92,12 +148,23 @@ def encode(A):
 	return A2Z
 
 
-def sample(Z,TE=None):
+def sample(Z,denoise=False,TE=None):
+    if denoise:
+        for i in range(args.n_timesteps-1):
+            t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
+            pred_noise = unet(Z, t)
+            Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 	# Z2B2A Cycle
-	Z2B_w = dec_w(Z, training=False)
-	Z2B_f = dec_f(Z, training=False)
-	Z2B_xi= dec_xi(Z, training=False)
-	Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
+	if args.only_mag:
+        Z2B_mag = dec_mag(Z, training=True)
+        Z2B_pha = dec_pha(Z, training=True)
+        Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
+        Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
+    else:
+        Z2B_w = dec_w(Z, training=False)
+        Z2B_f = dec_f(Z, training=False)
+        Z2B_xi= dec_xi(Z, training=False)
+        Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
 	# Water/fat magnitudes
 	Z2B_WF_real = tf.concat([Z2B_w[:,0,:,:,:1],Z2B_f[:,0,:,:,:1]],axis=-1)
 	Z2B_WF_imag = tf.concat([Z2B_w[:,0,:,:,1:],Z2B_f[:,0,:,:,1:]],axis=-1)
@@ -127,7 +194,7 @@ for A in A_dataset_val:
     # Generate some synthetic images using the defined model
     z_shape = (A.shape[0],hls,wls,args.encoded_size)
     Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
-    Z2B, Z2B2A = sample(Z)
+    Z2B, Z2B2A = sample(Z, denoise=args.LDM)
 
     # Get the features for the real data
     real_eval_feats = get_features(A)
