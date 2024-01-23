@@ -184,7 +184,7 @@ for A in A_dataset_val:
     # Generate some synthetic images using the defined model
     z_shape = (A.shape[0],hgt_ls,wdt_ls,args.encoded_size)
     Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
-    Z2B, Z2B2A = sample(Z, denoise=args.LDM)
+    Z2B2A = sample(Z, denoise=args.LDM)
 
     # Get the features for the real data
     real_eval_feats = get_features(A)
