@@ -138,8 +138,6 @@ get_features = dl.get_features((ne,hgt,wdt,n_ch))
 
 IDEAL_op = wf.IDEAL_Layer()
 
-tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
-
 def encode(A):
 	A2Z = enc(A, training=True)
 	return A2Z
@@ -172,8 +170,6 @@ def sample(Z,denoise=False,TE=None):
 
     return Z2B_abs, Z2B2A
 
-hls = hgt//(2**(args.n_downsamplings))
-wls = wdt//(2**(args.n_downsamplings))
 
 synth_features = []
 real_features = []
@@ -188,7 +184,7 @@ mmd = dl.MMD()
 
 for A in A_dataset_val:
     # Generate some synthetic images using the defined model
-    z_shape = (A.shape[0],hls,wls,args.encoded_size)
+    z_shape = (A.shape[0],hgt_ls,wdt_ls,args.encoded_size)
     Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
     Z2B, Z2B2A = sample(Z, denoise=args.LDM)
 
