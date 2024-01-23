@@ -81,7 +81,7 @@ if args.only_mag:
                         output_activation='tanh',
                         NL_self_attention=args.NL_SelfAttention
                         )
-    tl.Checkpoint(dict(dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+    tl.Checkpoint(dict(dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.experiment_dir, 'checkpoints')).restore()
     hgt_ls = dec_mag.input_shape[1]
     wdt_ls = dec_mag.input_shape[2]
 else:
@@ -110,7 +110,7 @@ else:
                         output_activation=None,
                         NL_self_attention=args.NL_SelfAttention
                         )
-    tl.Checkpoint(dict(dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+    tl.Checkpoint(dict(dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
     hgt_ls = dec_w.input_shape[1]
     wdt_ls = dec_w.input_shape[2]
 if args.LDM:
@@ -122,7 +122,7 @@ if args.LDM:
     test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
     k = unet(test_images, test_timestamps)
     # Checkpoint
-    tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.DL_experiment_dir, 'checkpoints_ldm')).restore()
+    tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
     # create a fixed beta schedule
     if args.scheduler == 'linear':
         beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
