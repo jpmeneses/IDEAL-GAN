@@ -136,7 +136,10 @@ if args.LDM:
 
 get_features = dl.get_features((ne,hgt,wdt,n_ch))
 
-IDEAL_op = wf.IDEAL_Layer()
+if args.only_mag:
+    IDEAL_op = wf.IDEAL_mag_Layer()
+else:
+    IDEAL_op = wf.IDEAL_Layer()
 
 def encode(A):
 	A2Z = enc(A, training=True)
@@ -160,15 +163,10 @@ def sample(Z,denoise=False,TE=None):
         Z2B_f = dec_f(Z, training=False)
         Z2B_xi= dec_xi(Z, training=False)
         Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
-    # Water/fat magnitudes
-    Z2B_WF_real = tf.concat([Z2B_w[:,0,:,:,:1],Z2B_f[:,0,:,:,:1]],axis=-1)
-    Z2B_WF_imag = tf.concat([Z2B_w[:,0,:,:,1:],Z2B_f[:,0,:,:,1:]],axis=-1)
-    Z2B_WF_abs = tf.abs(tf.complex(Z2B_WF_real,Z2B_WF_imag))
-    Z2B_abs = tf.concat([Z2B_WF_abs,tf.squeeze(Z2B_xi,axis=1)],axis=-1)
     # Reconstructed multi-echo images
     Z2B2A = IDEAL_op(Z2B)
 
-    return Z2B_abs, Z2B2A
+    return Z2B2A
 
 
 synth_features = []
@@ -204,11 +202,11 @@ for A in A_dataset_val:
 
     # Auto-encode real image
     A2Z = encode(A)
-    A2Z2B, A2B2A = sample(A2Z)
+    A2Z2A = sample(A2Z)
 
     # Compute MMD
     # mmd.reset_state()
-    mmd_scores.append(mmd(A, A2B2A))
+    mmd_scores.append(mmd(A, A2Z2A))
 
 	
 synth_features = tf.concat(synth_features,axis=0)
