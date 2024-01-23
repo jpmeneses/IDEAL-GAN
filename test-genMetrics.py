@@ -40,7 +40,7 @@ r2_sc = 200.0
 
 dataset_dir = '../datasets/'
 dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, 12, MEBCRN=True)
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, 12, MEBCRN=True, mag_and_phase=args.only_mag)
 
 len_dataset,ne,hgt,wdt,n_ch = valX.shape
 A_dataset_val = tf.data.Dataset.from_tensor_slices(valX)
@@ -154,8 +154,8 @@ def sample(Z,denoise=False,TE=None):
             t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
             pred_noise = unet(Z, t)
             Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
-	# Z2B2A Cycle
-	if args.only_mag:
+    # Z2B2A Cycle
+    if args.only_mag:
         Z2B_mag = dec_mag(Z, training=True)
         Z2B_pha = dec_pha(Z, training=True)
         Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
@@ -165,16 +165,15 @@ def sample(Z,denoise=False,TE=None):
         Z2B_f = dec_f(Z, training=False)
         Z2B_xi= dec_xi(Z, training=False)
         Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
-	# Water/fat magnitudes
-	Z2B_WF_real = tf.concat([Z2B_w[:,0,:,:,:1],Z2B_f[:,0,:,:,:1]],axis=-1)
-	Z2B_WF_imag = tf.concat([Z2B_w[:,0,:,:,1:],Z2B_f[:,0,:,:,1:]],axis=-1)
-	Z2B_WF_abs = tf.abs(tf.complex(Z2B_WF_real,Z2B_WF_imag))
-	Z2B_abs = tf.concat([Z2B_WF_abs,tf.squeeze(Z2B_xi,axis=1)],axis=-1)
-	# Reconstructed multi-echo images
-	Z2B2A = IDEAL_op(Z2B)
+    # Water/fat magnitudes
+    Z2B_WF_real = tf.concat([Z2B_w[:,0,:,:,:1],Z2B_f[:,0,:,:,:1]],axis=-1)
+    Z2B_WF_imag = tf.concat([Z2B_w[:,0,:,:,1:],Z2B_f[:,0,:,:,1:]],axis=-1)
+    Z2B_WF_abs = tf.abs(tf.complex(Z2B_WF_real,Z2B_WF_imag))
+    Z2B_abs = tf.concat([Z2B_WF_abs,tf.squeeze(Z2B_xi,axis=1)],axis=-1)
+    # Reconstructed multi-echo images
+    Z2B2A = IDEAL_op(Z2B)
 
-	return Z2B_abs, Z2B2A
-
+    return Z2B_abs, Z2B2A
 
 hls = hgt//(2**(args.n_downsamplings))
 wls = wdt//(2**(args.n_downsamplings))
