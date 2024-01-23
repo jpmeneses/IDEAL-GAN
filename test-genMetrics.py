@@ -55,11 +55,21 @@ if args.div_decod:
 else:
     nd = 1
 if len(args.n_G_filt_list) == (args.n_downsamplings+1):
+    nfe = filt_list
     nfd = [a//nd for a in filt_list]
     nfd2 = [a//(nd+1) for a in filt_list]
 else:
+    nfe = args.n_G_filters
     nfd = args.n_G_filters//nd
     nfd2= args.n_G_filters//(nd+1)
+enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
+                encoded_dims=args.encoded_size,
+                filters=nfe,
+                num_layers=args.n_downsamplings,
+                num_res_blocks=args.n_res_blocks,
+                sd_out=not(args.VQ_encoder),
+                ls_mean_activ=args.ls_mean_activ,
+                NL_self_attention=args.NL_SelfAttention)
 if args.only_mag:
     dec_mag = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,3),
@@ -78,7 +88,7 @@ if args.only_mag:
                         output_activation='tanh',
                         NL_self_attention=args.NL_SelfAttention
                         )
-    tl.Checkpoint(dict(dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.experiment_dir, 'checkpoints')).restore()
+    tl.Checkpoint(dict(enc=enc,dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.experiment_dir, 'checkpoints')).restore()
     hgt_ls = dec_mag.input_shape[1]
     wdt_ls = dec_mag.input_shape[2]
 else:
@@ -107,7 +117,7 @@ else:
                         output_activation=None,
                         NL_self_attention=args.NL_SelfAttention
                         )
-    tl.Checkpoint(dict(dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
+    tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
     hgt_ls = dec_w.input_shape[1]
     wdt_ls = dec_w.input_shape[2]
 if args.LDM:
