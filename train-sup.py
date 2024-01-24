@@ -499,7 +499,7 @@ if args.DL_gen:
     # @tf.function
     def gen_sample(Z,TE=None):
         if args.DL_LDM:
-            inference_range = range(0, args.n_timesteps, args.n_timesteps // args.infer_steps)
+            inference_range = range(0, DL_args.n_timesteps, DL_args.n_timesteps // args.infer_steps)
             for index, i in enumerate(reversed(range(args.infer_steps))):
                 t = np.expand_dims(inference_range[i], 0)
                 pred_noise = unet(Z, t)
