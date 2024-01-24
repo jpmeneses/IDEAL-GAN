@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import tqdm
 
 import tf2lib as tl
 import DLlib as dl
@@ -15,6 +16,8 @@ import data
 
 py.arg('--experiment_dir', default='output/GAN-100')
 py.arg('--te_input', type=bool, default=False)
+py.arg('--DDIM', type=bool, default=False)
+py.arg('--infer_steps', type=int, default=10)
 py.arg('--n_samples', type=int, default=50)
 py.arg('--seed', type=int, default=0)
 ldm_args = py.args()
@@ -165,11 +168,17 @@ k = unet(test_images, test_timestamps)
 
 loss_fn = tf.losses.MeanSquaredError()
 
-def sample(Z, Z_std=1.0):
-    for i in range(args.n_timesteps-1):
-        t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
+def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
+    # Create a range of inference steps that the output should be sampled at
+    inference_range = range(0, args.n_timesteps, args.n_timesteps // inference_timesteps)
+    for index, i in tqdm.tqdm(enumerate(reversed(range(inference_timesteps))), desc='Sample '+str(ns).zfill(3), total=inference_timesteps):
+        t = np.expand_dims(inference_range[i], 0)
+
         pred_noise = unet(Z, t)
-        Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
+        if args.DDIM:
+            Z = dm.ddim(Z, pred_noise, t, 0, alpha, alpha_bar)
+        else:
+            Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
     if args.VQ_encoder:
         vq_dict = vq_op(Z)
@@ -205,7 +214,7 @@ for k in range(args.n_samples):
     if args.VQ_encoder:
         Z2B, Z2B2A = sample(Z)
     else:
-        Z2B, Z2B2A = sample(Z, z_std)
+        Z2B, Z2B2A = sample(Z, z_std, inference_timesteps=args.infer_steps, ns=k)
 
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 

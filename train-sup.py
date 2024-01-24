@@ -19,9 +19,11 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
-py.arg('--DL_LDM', type=bool, default=False)
 py.arg('--DL_experiment_dir', default='output/GAN-238')
 py.arg('--n_per_epoch', type=int, default=10000)
+py.arg('--DL_LDM', type=bool, default=False)
+py.arg('--DDIM', type=bool, default=False)
+py.arg('--infer_steps', type=int, default=25)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -497,10 +499,14 @@ if args.DL_gen:
     # @tf.function
     def gen_sample(Z,TE=None):
         if args.DL_LDM:
-            for i in range(DL_args.n_timesteps-1):
-                t = np.expand_dims(np.array(DL_args.n_timesteps-i-1, np.int32), 0)
+            inference_range = range(0, args.n_timesteps, args.n_timesteps // args.infer_steps)
+            for index, i in enumerate(reversed(range(args.infer_steps))):
+                t = np.expand_dims(inference_range[i], 0)
                 pred_noise = unet(Z, t)
-                Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
+                if args.DDIM:
+                    Z = dm.ddim(Z, pred_noise, t, 0, alpha, alpha_bar)
+                else:
+                    Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
         # Z2B2A Cycle
         if DL_args.only_mag:
             Z2B_mag = dec_mag(Z, training=True)
