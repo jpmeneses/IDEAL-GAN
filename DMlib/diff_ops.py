@@ -47,7 +47,7 @@ def ddpm_add_cond(x_t, condition, t, alpha, alpha_bar, L1_norm=True, L1_w=1e-2):
         res += tf.math.sign(x_t) * L1_w
     return res
 
-def ddim(x_t, pred_noise, t, sigma_t, alpha_bar):
+def ddim(x_t, pred_noise, t, sigma_t, alpha, alpha_bar):
     alpha_t_bar = np.take(alpha_bar, t)
     alpha_t_minus_one = np.take(alpha, t-1)
 
