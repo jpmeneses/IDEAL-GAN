@@ -194,7 +194,7 @@ def sample(A,Z_std):
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
     if args.LDM:
-        Z = tf.math.multiply_no_nan(Z,Z_std)
+        A2Z = tf.math.multiply_no_nan(A2Z,Z_std)
         inference_range = range(0, args.n_timesteps)
         # Forward diffusion
         rng, tsrng = np.random.randint(0, 100000, size=(2,))
@@ -204,7 +204,7 @@ def sample(A,Z_std):
             t = np.expand_dims(inference_range[i], 0)
             pred_noise = unet(A2Z, t)
             A2Z = dm.ddpm(A2Z, pred_noise, t, alpha, alpha_bar, beta)
-        Z = tf.math.multiply_no_nan(Z,Z_std)
+        A2Z = tf.math.multiply_no_nan(A2Z,Z_std)
     # Reconstruct to synthesize missing phase
     if args.only_mag:
         A2Z2B_mag = dec_mag(A2Z, training=False)
