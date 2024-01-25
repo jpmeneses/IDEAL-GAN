@@ -18,6 +18,7 @@ py.arg('--experiment_dir', default='output/GAN-100')
 py.arg('--te_input', type=bool, default=False)
 py.arg('--DDIM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=10)
+py.arg('--infer_sigma', type=float, default=0.0)
 py.arg('--n_samples', type=int, default=50)
 py.arg('--seed', type=int, default=0)
 ldm_args = py.args()
@@ -176,7 +177,7 @@ def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
 
         pred_noise = unet(Z, t)
         if args.DDIM:
-            Z = dm.ddim(Z, pred_noise, t, 0, alpha, alpha_bar)
+            Z = dm.ddim(Z, pred_noise, t, args.infer_sigma, alpha, alpha_bar)
         else:
             Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
