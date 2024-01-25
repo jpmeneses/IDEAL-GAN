@@ -21,6 +21,7 @@ py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
 py.arg('--DL_experiment_dir', default='output/GAN-238')
 py.arg('--n_per_epoch', type=int, default=10000)
+py.arg('--gen_noise', type=float, default=0.1)
 py.arg('--DL_LDM', type=bool, default=False)
 py.arg('--DDIM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=25)
@@ -529,6 +530,7 @@ if args.DL_gen:
         im_stack = tf.stack([zero_fill,Im_rho],4)
         im_aux = tf.reshape(im_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
         Z2B2A = re_aux + im_aux
+        Z2B2A = tf.keras.layers.GaussianNoise(stddev=args.gen_noise)(Z2B2A)
         # Turn Z2B into non-MEBCRN format
         if DL_args.only_mag:
             Z2B_W_r = Z2B_mag[:,0,:,:,:1] * tf.math.cos(Z2B_pha[:,0,:,:,1:2]*np.pi)
