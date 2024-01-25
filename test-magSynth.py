@@ -70,6 +70,8 @@ else:
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
 A_B_dataset_val = A_B_dataset_val.batch(args.val_batch_size)
 
+z_std = tf.Variable(initial_value=1.0, trainable=False, dtype=tf.float32)
+
 # ==============================================================================
 # =                                   models                                   =
 # ==============================================================================
@@ -142,7 +144,6 @@ else:
                         )
 if args.LDM:
     unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
-    z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
     # Initiate unet
     if args.only_mag:
         hgt_ls = dec_mag.input_shape[1]
@@ -182,7 +183,7 @@ else:
 
 
 # @tf.function
-def sample(A):
+def sample(A,Z_std):
     # Turn complex-valued CSE-MR image into only-magnitude
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     # A_pha = -1.5 * np.pi
@@ -193,6 +194,7 @@ def sample(A):
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
     if args.LDM:
+        Z = tf.math.multiply_no_nan(Z,Z_std)
         inference_range = range(0, args.n_timesteps)
         # Forward diffusion
         rng, tsrng = np.random.randint(0, 100000, size=(2,))
@@ -202,6 +204,7 @@ def sample(A):
             t = np.expand_dims(inference_range[i], 0)
             pred_noise = unet(A2Z, t)
             A2Z = dm.ddpm(A2Z, pred_noise, t, alpha, alpha_bar, beta)
+        Z = tf.math.multiply_no_nan(Z,Z_std)
     # Reconstruct to synthesize missing phase
     if args.only_mag:
         A2Z2B_mag = dec_mag(A2Z, training=False)
@@ -228,7 +231,7 @@ ssim_scores = []
 k = 0
 for A, B in A_B_dataset_val:
     # Get only-magnitude latent space
-    A2B, A2B2A = sample(A)
+    A2B, A2B2A = sample(A,z_std)
 
     # SSIM metrics for pairs of synthetic data within batch
     # idx_pairs = list(itertools.combinations(range(A.shape[0]), 2))
