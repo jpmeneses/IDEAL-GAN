@@ -3,13 +3,12 @@ import itertools
 
 import random
 import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
 
-import tensorflow as tf
-import tensorflow.keras as keras
 import tf2lib as tl
-import tf2gan as gan
 import DLlib as dl
+import DMlib as dm
 import pylib as py
 import wflib as wf
 import data
@@ -20,6 +19,8 @@ import data
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--te_input', type=bool, default=False)
+py.arg('--LDM', type=bool, default=False)
+py.arg('--infer_steps', type=int, default=10)
 py.arg('--n_samples', type=int, default=60)
 py.arg('--val_batch_size', type=int, default=1)
 test_args = py.args()
@@ -139,6 +140,34 @@ else:
                         output_activation=None,
                         NL_self_attention=args.NL_SelfAttention
                         )
+if args.LDM:
+    unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
+    z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+    # Initiate unet
+    if args.only_mag:
+        hgt_ls = dec_mag.input_shape[1]
+        wdt_ls = dec_mag.input_shape[2]
+    else:
+        hgt_ls = dec_w.input_shape[1]
+        wdt_ls = dec_w.input_shape[2]
+    test_images = tf.ones((1, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
+    test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
+    k = unet(test_images, test_timestamps)
+    # Checkpoint
+    tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
+    # create a fixed beta schedule
+    if args.scheduler == 'linear':
+        beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
+        # this will be used as discussed in the reparameterization trick
+        alpha = 1 - beta
+        alpha_bar = np.cumprod(alpha, 0)
+        alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
+    elif args.scheduler == 'cosine':
+        x = np.linspace(0, args.n_timesteps, args.n_timesteps + 1)
+        alpha_bar = np.cos(((x / args.n_timesteps) + args.s_value) / (1 + args.s_value) * np.pi * 0.5) ** 2
+        alpha_bar /= alpha_bar[0]
+        alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
+        beta = 1.0 - alpha
 
 if args.only_mag:
     IDEAL_op = wf.IDEAL_mag_Layer()
@@ -152,7 +181,7 @@ else:
     tl.Checkpoint(dict(enc=enc, dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 
-@tf.function
+# @tf.function
 def sample(A):
     # Turn complex-valued CSE-MR image into only-magnitude
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
@@ -163,6 +192,16 @@ def sample(A):
     if args.VQ_encoder:
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
+    if args.LDM:
+        inference_range = range(0, args.n_timesteps)
+        # Forward diffusion
+        rng, tsrng = np.random.randint(0, 100000, size=(2,))
+        A2Z, noise = dm.forward_noise(rng, A2Z, args.infer_steps, alpha_bar)
+        # Reverse diffusion
+        for index, i in enumerate(reversed(range(args.infer_steps))):
+            t = np.expand_dims(inference_range[i], 0)
+            pred_noise = unet(A2Z, t)
+            A2Z = dm.ddpm(A2Z, pred_noise, t, alpha, alpha_bar, beta)
     # Reconstruct to synthesize missing phase
     if args.only_mag:
         A2Z2B_mag = dec_mag(A2Z, training=False)
