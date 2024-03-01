@@ -30,16 +30,13 @@ py.arg('--n_G_filt_list', default='')
 py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
 py.arg('--div_decod', type=bool, default=True)
-py.arg('--n_groups_PM', type=int, default=2)
 py.arg('--encoded_size', type=int, default=256)
-py.arg('--ls_mean_activ', default='leaky_relu', choices=['leaky_relu','relu','tanh','None'])
 py.arg('--VQ_encoder', type=bool, default=False)
 py.arg('--VQ_num_embed', type=int, default=64)
 py.arg('--VQ_commit_cost', type=float, default=0.5)
 py.arg('--adv_train', type=bool, default=False)
 py.arg('--cGAN', type=bool, default=False)
 py.arg('--n_D_filters', type=int, default=72)
-py.arg('--n_groups_D', type=int, default=1)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--epochs', type=int, default=100)
 py.arg('--epoch_decay', type=int, default=100)  # epoch to start decaying learning rate
@@ -158,7 +155,7 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
                 sd_out=not(args.VQ_encoder),
-                ls_mean_activ=args.ls_mean_activ,
+                ls_mean_activ=None,
                 ls_reg_weight=args.ls_reg_weight,
                 NL_self_attention=args.NL_SelfAttention
                 )
@@ -199,7 +196,7 @@ else:
                         )
     dec_xi = dl.decoder(encoded_dims=args.encoded_size,
                         output_shape=(hgt,wdt,n_ch),
-                        n_groups=args.n_groups_PM,
+                        n_groups=2,
                         filters=nfd,
                         num_layers=args.n_downsamplings,
                         num_res_blocks=args.n_res_blocks,
@@ -210,7 +207,6 @@ else:
 D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch),
                 cGAN=args.cGAN,
                 multi_echo=True,
-                n_groups=args.n_groups_D,
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
 

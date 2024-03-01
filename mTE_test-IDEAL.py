@@ -10,7 +10,6 @@ import data
 import matplotlib.pyplot as plt
 import tqdm
 import xlsxwriter
-from skimage.metrics import structural_similarity
 
 # ==============================================================================
 # =                                   param                                    =
@@ -74,7 +73,7 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 if args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
-    dataset_hdf5 = args.dataset + '_GC_192_128_complex_2D.hdf5'
+    dataset_hdf5 = args.dataset + '_RF_192_128_complex_2D.hdf5'
 else:
     dataset_hdf5 = args.dataset + '_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 
@@ -457,17 +456,17 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     ws_MAE.write(i+1,4,MAE_fm)
 
     # SSIM
-    w_ssim = structural_similarity(w_aux,wn_aux,multichannel=False)
-    f_ssim = structural_similarity(f_aux,fn_aux,multichannel=False)
-    pdff_ssim = structural_similarity(PDFF_aux,PDFFn_aux,multichannel=False)
-    r2_ssim = structural_similarity(r2_aux,r2n_aux,multichannel=False)
-    fm_ssim = structural_similarity(field_aux,fieldn_aux,multichannel=False)
+    # w_ssim = tf.image.ssim(w_aux,wn_aux,1)
+    # f_ssim = tf.image.ssim(f_aux,fn_aux,1)
+    # pdff_ssim = tf.image.ssim(PDFF_aux,PDFFn_aux,1)
+    # r2_ssim = tf.image.ssim(r2_aux/r2_sc,r2n_aux/r2_sc,1)
+    # fm_ssim = tf.image.ssim(field_aux/fm_sc,fieldn_aux/fm_sc,1)
 
-    ws_SSIM.write(i+1,0,w_ssim)
-    ws_SSIM.write(i+1,1,f_ssim)
-    ws_SSIM.write(i+1,2,pdff_ssim)
-    ws_SSIM.write(i+1,3,r2_ssim)
-    ws_SSIM.write(i+1,4,fm_ssim)
+    # ws_SSIM.write(i+1,0,w_ssim)
+    # ws_SSIM.write(i+1,1,f_ssim)
+    # ws_SSIM.write(i+1,2,pdff_ssim)
+    # ws_SSIM.write(i+1,3,r2_ssim)
+    # ws_SSIM.write(i+1,4,fm_ssim)
     
     i += 1
 
