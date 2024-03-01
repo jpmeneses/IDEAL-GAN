@@ -24,6 +24,7 @@ py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--rand_ne', type=bool, default=False)
 py.arg('--rand_ph_offset', type=bool, default=False)
 py.arg('--only_mag', type=bool, default=False)
+py.arg('--no_GC', type=bool, default=False)
 py.arg('--rem_R2', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_G_filt_list', default='')
@@ -320,12 +321,16 @@ def train_G(A, B):
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
-        if args.only_mag:
-            B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
-            B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,1:], A2B[:,1:,:,:,1:]) * args.FM_loss_weight # PHASE
+        if args.no_GC:
+            A2B2A_cycle_loss += cycle_loss_fn(A, A2B2A)
+            B2A2B_cycle_loss = tf.constant(0.0,dtype=tf.float32)
         else:
-            B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-            B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
+            if args.only_mag:
+                B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
+                B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,1:], A2B[:,1:,:,:,1:]) * args.FM_loss_weight # PHASE
+            else:
+                B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
+                B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
         A2B2A_f_cycle_loss = msle_loss(A_f, A2B2A_f)
         A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
 
@@ -463,12 +468,16 @@ def sample(A, B):
                 val_A2B2A_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
-    if args.only_mag:
-        val_B2A2B_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:])
-        val_B2A2B_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight
+    if args.no_GC:
+        val_A2B2A_loss += cycle_loss_fn(A, A2B2A)
+        val_B2A2B_loss = tf.constant(0.0,dtype=tf.float32)
     else:
-        val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-        val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
+        if args.only_mag:
+            val_B2A2B_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:])
+            val_B2A2B_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight
+        else:
+            val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
+            val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_A2B2A_f_loss = msle_loss(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
