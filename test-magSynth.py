@@ -186,22 +186,21 @@ else:
 def sample(A,Z_std):
     # Turn complex-valued CSE-MR image into only-magnitude
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-    # A_pha = -1.5 * np.pi
-    A_pha = tf.random.uniform(A_mag.shape,minval=-np.pi,maxval=np.pi,seed=0)
+    A_pha = 0.25 * np.pi
+    # A_pha = tf.random.uniform(A_mag.shape,minval=-np.pi,maxval=np.pi,seed=0)
     A = tf.concat([A_mag*tf.math.cos(A_pha),A_mag*tf.math.sin(A_pha)],axis=-1)
     A2Z = enc(A, training=False)
     if args.VQ_encoder:
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
     if args.LDM:
-        A2Z = tf.math.multiply_no_nan(A2Z,Z_std)
-        inference_range = range(0, args.n_timesteps)
+        A2Z = tf.math.divide_no_nan(A2Z,Z_std)
         # Forward diffusion
         rng, tsrng = np.random.randint(0, 100000, size=(2,))
         A2Z, noise = dm.forward_noise(rng, A2Z, args.infer_steps, alpha_bar)
         # Reverse diffusion
-        for index, i in enumerate(reversed(range(args.infer_steps))):
-            t = np.expand_dims(inference_range[i], 0)
+        for i in range(args.infer_steps-1):
+            t = np.expand_dims(np.array(args.infer_steps-i-1, np.int32), 0)
             pred_noise = unet(A2Z, t)
             A2Z = dm.ddpm(A2Z, pred_noise, t, alpha, alpha_bar, beta)
         A2Z = tf.math.multiply_no_nan(A2Z,Z_std)
