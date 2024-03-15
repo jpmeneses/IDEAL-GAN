@@ -31,6 +31,13 @@ class ItemPool:
         return tf.stack(out_items, axis=0)
 
 
+def unwrap_slices(x):
+    y = np.zeros_like(x)
+    for i in range(x.shape[0]):
+        y[i,:,:] = unwrap_phase(x[i,:,:],wrap_around=True)
+    return np.expand_dims(y,axis=-1)
+
+
 def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_slice_list=None,
             remove_non_central=False,acqs_data=True,te_data=False,complex_data=False,
             remove_zeros=True, MEBCRN=False, mag_and_phase=False):
@@ -83,13 +90,13 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
             out_w_mag = np.sqrt(np.sum(out_maps[:,:,:,:2]**2,axis=-1,keepdims=True))
             out_f_mag = np.sqrt(np.sum(out_maps[:,:,:,2:4]**2,axis=-1,keepdims=True))
             out_w_pha = np.arctan2(out_maps[:,:,:,1],out_maps[:,:,:,0])
-            out_w_pha = np.expand_dims(unwrap_phase(out_w_pha,wrap_around=True),axis=-1)
+            out_w_pha = unwrap_slices(out_w_pha)
             out_f_pha = np.arctan2(out_maps[:,:,:,3],out_maps[:,:,:,2])
-            out_f_pha = np.expand_dims(unwrap_phase(out_f_pha,wrap_around=True),axis=-1)
+            out_f_pha = unwrap_slices(out_f_pha)
             out_wf_pha = np.nan_to_num((out_w_mag*out_w_pha+out_f_mag*out_f_pha)/(out_w_mag+out_f_mag))
-            # out_wf_pha = np.expand_dims(out_wf_pha,axis=-1)
+            # out_wf_pha = np.expand_dims(out_wf_pha,axis=-1)/(2*np.pi)
             out_mag = np.expand_dims(np.concatenate((out_w_mag,out_f_mag,out_maps[:,:,:,4:5]),axis=-1),axis=1)
-            out_pha = np.expand_dims(np.concatenate((np.zeros_like(out_wf_pha),out_wf_pha/(2*np.pi),out_maps[:,:,:,5:]),axis=-1),axis=1)
+            out_pha = np.expand_dims(np.concatenate((np.zeros_like(out_wf_pha),out_wf_pha/(3*np.pi),out_maps[:,:,:,5:]),axis=-1),axis=1)
             out_maps = np.concatenate((out_mag,out_pha),axis=1)
             ns,_,hgt,wdt,_ = out_maps.shape
         else:

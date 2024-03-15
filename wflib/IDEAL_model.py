@@ -263,7 +263,7 @@ def IDEAL_mag(out_maps, params):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
-    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,1]) * 2*np.pi
+    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,1]) * 3*np.pi
     pha_rho_rav = tf.reshape(pha_rho, [n_batch, -1]) # (nb,nv)
     pha_rho_rav = tf.expand_dims(pha_rho_rav,1) # (nb,1,nv)
     exp_ph = tf.linalg.matmul(tf.ones([n_batch,ne,1],dtype=tf.complex64), pha_rho_rav) # (nb,ne,nv)
@@ -312,7 +312,7 @@ def IDEAL_mag(out_maps, params):
 
         # Phi gradient
         dphi = tf.linalg.diag(tf.math.exp(tf.complex(0.0,tf.ones([n_batch,ne],dtype=tf.float32)))) # (nb,ne,ne)
-        ds_dphi = tf.linalg.matmul(dphi,Smtx) * 2*np.pi # (nb,ne,nv)
+        ds_dphi = tf.linalg.matmul(dphi,Smtx) * 3*np.pi # (nb,ne,nv)
         ds_dphi = tf.expand_dims(tf.transpose(ds_dphi,perm=[0,2,1]),axis=-2) ## (nb,nv,1,ne) I3
         grad_res_phi = tf.math.real(tf.linalg.matvec(ds_dphi, upstream)) # (nb,nv,1)
 
