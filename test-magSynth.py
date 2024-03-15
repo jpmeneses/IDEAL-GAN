@@ -353,7 +353,7 @@ for A, B in A_B_dataset_val:
     axs[2,2].axis('off')
 
     Fp_unet = axs[2,3].imshow(fn_p_aux, cmap='twilight',
-                            interpolation='none', vmin=-2, vmax=2)
+                            interpolation='none', vmin=-1, vmax=1)
     fig.colorbar(Fp_unet, ax=axs[2,3])
     axs[2,3].axis('off')
 
