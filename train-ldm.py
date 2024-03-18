@@ -356,11 +356,12 @@ for ep in range(args.epochs_ldm):
         checkpoint_ldm.save(ep)
 
     # Validation inference
-    Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
-    if args.VQ_encoder:
-        Z2B, Z2B2A = validation_step(Z)
-    else:
-        Z2B, Z2B2A = validation_step(Z, z_std)
+    if (((ep+1) % 20) == 0) or ((ep+1)==args.epochs_ldm):
+        Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
+        if args.VQ_encoder:
+            Z2B, Z2B2A = validation_step(Z)
+        else:
+            Z2B, Z2B2A = validation_step(Z, z_std)
 
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
@@ -371,30 +372,30 @@ for ep in range(args.epochs_ldm):
     im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
     im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
     im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
-    
+
     # Acquisitions in the first row
-    acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
-                          interpolation='none', vmin=0, vmax=1)
+    acq_ech1 =  axs[0,0].imshow(im_ech1, cmap='gist_earth',
+                                interpolation='none', vmin=0, vmax=1)
     axs[0,0].set_title('1st Echo')
     axs[0,0].axis('off')
-    acq_ech2 = axs[0,1].imshow(im_ech2, cmap='gist_earth',
-                          interpolation='none', vmin=0, vmax=1)
+    acq_ech2 =  axs[0,1].imshow(im_ech2, cmap='gist_earth',
+                                interpolation='none', vmin=0, vmax=1)
     axs[0,1].set_title('2nd Echo')
     axs[0,1].axis('off')
-    acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
-                              interpolation='none', vmin=0, vmax=1)
+    acq_ech3 =  axs[0,2].imshow(im_ech3, cmap='gist_earth',
+                                interpolation='none', vmin=0, vmax=1)
     axs[0,2].set_title('3rd Echo')
     axs[0,2].axis('off')
-    acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
-                              interpolation='none', vmin=0, vmax=1)
+    acq_ech4 =  axs[0,3].imshow(im_ech4, cmap='gist_earth',
+                                interpolation='none', vmin=0, vmax=1)
     axs[0,3].set_title('4th Echo')
     axs[0,3].axis('off')
-    acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
-                              interpolation='none', vmin=0, vmax=1)
+    acq_ech5 =  axs[0,4].imshow(im_ech5, cmap='gist_earth',
+                                interpolation='none', vmin=0, vmax=1)
     axs[0,4].set_title('5th Echo')
     axs[0,4].axis('off')
-    acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
-                              interpolation='none', vmin=0, vmax=1)
+    acq_ech6 =  axs[0,5].imshow(im_ech6, cmap='gist_earth',
+                                interpolation='none', vmin=0, vmax=1)
     axs[0,5].set_title('6th Echo')
     axs[0,5].axis('off')
 
@@ -418,7 +419,7 @@ for ep in range(args.epochs_ldm):
     fig.colorbar(W_ok, ax=axs[1,0])
     axs[1,0].axis('off')
 
-    Wp_ok =  axs[1,1].imshow(w_p_aux, cmap='twilight',
+    Wp_ok = axs[1,1].imshow(w_p_aux, cmap='twilight',
                             interpolation='none', vmin=-1, vmax=1)
     fig.colorbar(Wp_ok, ax=axs[1,1])
     axs[1,1].axis('off')
@@ -447,4 +448,4 @@ for ep in range(args.epochs_ldm):
     tl.make_space_above(axs,topmargin=0.8)
     plt.savefig(py.join(sample_dir, 'ep-%05d.png' % (ep+1)), bbox_inches = 'tight', pad_inches = 0)
     plt.close(fig)
-
+    
