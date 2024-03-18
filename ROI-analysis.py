@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import tensorflow as tf
 
@@ -19,8 +20,8 @@ from matplotlib.ticker import PercentFormatter
 # =                                   param                                    =
 # ==============================================================================
 
-py.arg('--experiment_dir',default='output/WF-sep')
-py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani'])
+py.arg('--experiment_dir',default='output/WF-IDEAL')
+py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani','Attilio'])
 py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--te_input', type=bool, default=False)
@@ -97,7 +98,7 @@ else:
   num_slice_list = None
   rnc = False
 
-if args.dataset == 'JGalgani' or args.dataset == '3ech':
+if args.dataset == 'JGalgani' or args.dataset == '3ech' or args.dataset == 'Attilio':
   testX, testY = data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=rnc,
                                 acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True)
   TEs = np.ones((testX.shape[0],1),dtype=np.float32)
@@ -147,7 +148,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                             filters=args.n_G_filters,
                             R2_self_attention=args.D1_SelfAttention,
                             FM_self_attention=args.D2_SelfAttention)
-elif args.G_model == 'U-Net':
+elif args.G_model == 'U-Net' or args.G_model == '':
   if args.out_vars == 'WF-PM':
     n_out = 4
   else:
@@ -172,7 +173,8 @@ elif args.G_model == 'MEBCRN':
                     self_attention=args.D1_SelfAttention)
 
 # restore
-tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+if len(args.G_model) > 0:
+  tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
 def sample(A, B, TE=None):
@@ -253,7 +255,9 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   A = tf.expand_dims(A,axis=0)
   B = tf.expand_dims(B,axis=0)
   TE= tf.expand_dims(TE,axis=0)
-  if args.dataset == 'JGalgani' or args.dataset == '3ech':
+  if len(args.G_model) <= 0:
+    A2B = B
+  elif args.dataset == 'JGalgani' or args.dataset == '3ech':
     A2B = sample(A,B)
   else:
     A2B = sample(A,B,TE)

@@ -12,8 +12,6 @@ import tqdm
 import xlsxwriter
 
 import matplotlib.pyplot as plt
-from matplotlib import colors
-from matplotlib.ticker import PercentFormatter
 from time import process_time
 
 py.arg('--experiment_dir',default='output/WF-sep')
