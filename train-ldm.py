@@ -363,89 +363,89 @@ for ep in range(args.epochs_ldm):
         else:
             Z2B, Z2B2A = validation_step(Z, z_std)
 
-    fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
+        fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
-    # Magnitude of recon MR images at each echo
-    im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
-    im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
-    im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
-    im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
-    im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
-    im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
+        # Magnitude of recon MR images at each echo
+        im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
+        im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
+        im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
+        im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
+        im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
+        im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
 
-    # Acquisitions in the first row
-    acq_ech1 =  axs[0,0].imshow(im_ech1, cmap='gist_earth',
+        # Acquisitions in the first row
+        acq_ech1 =  axs[0,0].imshow(im_ech1, cmap='gist_earth',
+                                    interpolation='none', vmin=0, vmax=1)
+        axs[0,0].set_title('1st Echo')
+        axs[0,0].axis('off')
+        acq_ech2 =  axs[0,1].imshow(im_ech2, cmap='gist_earth',
+                                    interpolation='none', vmin=0, vmax=1)
+        axs[0,1].set_title('2nd Echo')
+        axs[0,1].axis('off')
+        acq_ech3 =  axs[0,2].imshow(im_ech3, cmap='gist_earth',
+                                    interpolation='none', vmin=0, vmax=1)
+        axs[0,2].set_title('3rd Echo')
+        axs[0,2].axis('off')
+        acq_ech4 =  axs[0,3].imshow(im_ech4, cmap='gist_earth',
+                                    interpolation='none', vmin=0, vmax=1)
+        axs[0,3].set_title('4th Echo')
+        axs[0,3].axis('off')
+        acq_ech5 =  axs[0,4].imshow(im_ech5, cmap='gist_earth',
+                                    interpolation='none', vmin=0, vmax=1)
+        axs[0,4].set_title('5th Echo')
+        axs[0,4].axis('off')
+        acq_ech6 =  axs[0,5].imshow(im_ech6, cmap='gist_earth',
+                                    interpolation='none', vmin=0, vmax=1)
+        axs[0,5].set_title('6th Echo')
+        axs[0,5].axis('off')
+
+        # A2B maps in the second row
+        if args.only_mag:
+            w_m_aux = np.squeeze(Z2B[:,0,:,:,0])
+            w_p_aux = np.squeeze(Z2B[:,1,:,:,0])
+            f_m_aux = np.squeeze(Z2B[:,0,:,:,1])
+            f_p_aux = np.squeeze(Z2B[:,1,:,:,1])
+            r2_aux = np.squeeze(Z2B[:,0,:,:,2])
+            field_aux = np.squeeze(Z2B[:,1,:,:,2])
+        else:
+            w_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
+            w_p_aux = np.squeeze(np.arctan2(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]))/np.pi
+            f_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,1,:,:,0],Z2B[:,1,:,:,1])))
+            f_p_aux = np.squeeze(np.arctan2(Z2B[:,1,:,:,1],Z2B[:,1,:,:,0]))/np.pi
+            r2_aux = np.squeeze(Z2B[:,2,:,:,1])
+            field_aux = np.squeeze(Z2B[:,2,:,:,0])
+        W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
-    axs[0,0].set_title('1st Echo')
-    axs[0,0].axis('off')
-    acq_ech2 =  axs[0,1].imshow(im_ech2, cmap='gist_earth',
+        fig.colorbar(W_ok, ax=axs[1,0])
+        axs[1,0].axis('off')
+
+        Wp_ok = axs[1,1].imshow(w_p_aux, cmap='twilight',
+                                interpolation='none', vmin=-1, vmax=1)
+        fig.colorbar(Wp_ok, ax=axs[1,1])
+        axs[1,1].axis('off')
+
+        F_ok =  axs[1,2].imshow(f_m_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
-    axs[0,1].set_title('2nd Echo')
-    axs[0,1].axis('off')
-    acq_ech3 =  axs[0,2].imshow(im_ech3, cmap='gist_earth',
-                                interpolation='none', vmin=0, vmax=1)
-    axs[0,2].set_title('3rd Echo')
-    axs[0,2].axis('off')
-    acq_ech4 =  axs[0,3].imshow(im_ech4, cmap='gist_earth',
-                                interpolation='none', vmin=0, vmax=1)
-    axs[0,3].set_title('4th Echo')
-    axs[0,3].axis('off')
-    acq_ech5 =  axs[0,4].imshow(im_ech5, cmap='gist_earth',
-                                interpolation='none', vmin=0, vmax=1)
-    axs[0,4].set_title('5th Echo')
-    axs[0,4].axis('off')
-    acq_ech6 =  axs[0,5].imshow(im_ech6, cmap='gist_earth',
-                                interpolation='none', vmin=0, vmax=1)
-    axs[0,5].set_title('6th Echo')
-    axs[0,5].axis('off')
+        fig.colorbar(F_ok, ax=axs[1,2])
+        axs[1,2].axis('off')
 
-    # A2B maps in the second row
-    if args.only_mag:
-        w_m_aux = np.squeeze(Z2B[:,0,:,:,0])
-        w_p_aux = np.squeeze(Z2B[:,1,:,:,0])
-        f_m_aux = np.squeeze(Z2B[:,0,:,:,1])
-        f_p_aux = np.squeeze(Z2B[:,1,:,:,1])
-        r2_aux = np.squeeze(Z2B[:,0,:,:,2])
-        field_aux = np.squeeze(Z2B[:,1,:,:,2])
-    else:
-        w_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
-        w_p_aux = np.squeeze(np.arctan2(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]))/np.pi
-        f_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,1,:,:,0],Z2B[:,1,:,:,1])))
-        f_p_aux = np.squeeze(np.arctan2(Z2B[:,1,:,:,1],Z2B[:,1,:,:,0]))/np.pi
-        r2_aux = np.squeeze(Z2B[:,2,:,:,1])
-        field_aux = np.squeeze(Z2B[:,2,:,:,0])
-    W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
-                            interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(W_ok, ax=axs[1,0])
-    axs[1,0].axis('off')
+        Fp_ok = axs[1,3].imshow(f_p_aux, cmap='twilight',
+                                interpolation='none', vmin=-1, vmax=1)
+        fig.colorbar(Fp_ok, ax=axs[1,3])
+        axs[1,3].axis('off')
 
-    Wp_ok = axs[1,1].imshow(w_p_aux, cmap='twilight',
-                            interpolation='none', vmin=-1, vmax=1)
-    fig.colorbar(Wp_ok, ax=axs[1,1])
-    axs[1,1].axis('off')
+        r2_ok = axs[1,4].imshow(r2_aux*r2_sc, cmap='copper',
+                                interpolation='none', vmin=0, vmax=r2_sc)
+        fig.colorbar(r2_ok, ax=axs[1,4])
+        axs[1,4].axis('off')
 
-    F_ok =  axs[1,2].imshow(f_m_aux, cmap='pink',
-                            interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(F_ok, ax=axs[1,2])
-    axs[1,2].axis('off')
+        field_ok =  axs[1,5].imshow(field_aux*fm_sc, cmap='twilight',
+                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+        fig.colorbar(field_ok, ax=axs[1,5])
+        axs[1,5].axis('off')
 
-    Fp_ok = axs[1,3].imshow(f_p_aux, cmap='twilight',
-                            interpolation='none', vmin=-1, vmax=1)
-    fig.colorbar(Fp_ok, ax=axs[1,3])
-    axs[1,3].axis('off')
-
-    r2_ok = axs[1,4].imshow(r2_aux*r2_sc, cmap='copper',
-                            interpolation='none', vmin=0, vmax=r2_sc)
-    fig.colorbar(r2_ok, ax=axs[1,4])
-    axs[1,4].axis('off')
-
-    field_ok =  axs[1,5].imshow(field_aux*fm_sc, cmap='twilight',
-                                interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-    fig.colorbar(field_ok, ax=axs[1,5])
-    axs[1,5].axis('off')
-
-    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
-    tl.make_space_above(axs,topmargin=0.8)
-    plt.savefig(py.join(sample_dir, 'ep-%05d.png' % (ep+1)), bbox_inches = 'tight', pad_inches = 0)
-    plt.close(fig)
+        plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+        tl.make_space_above(axs,topmargin=0.8)
+        plt.savefig(py.join(sample_dir, 'ep-%05d.png' % (ep+1)), bbox_inches = 'tight', pad_inches = 0)
+        plt.close(fig)
     
