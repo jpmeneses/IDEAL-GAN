@@ -1,16 +1,14 @@
 import functools
 
 import random
-import tensorflow as tf
-import tensorflow.keras as keras
 import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
 import tqdm
 
+import tf2lib as tl
 import DLlib as dl
 import pylib as py
-import tf2lib as tl
-import tf2gan as gan
 import wflib as wf
 import data
 
@@ -25,9 +23,12 @@ import pydicom._storage_sopclass_uids
 # ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
+py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani'])
+py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--is_GC',type=bool,default=False)
 py.arg('--te_input', type=bool, default=False)
+py.arg('--ME_layer', type=bool, default=False)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
 test_args = py.args()
@@ -73,7 +74,7 @@ def gen_ds(idx):
 	ds.is_implicit_VR = False
 
 	ds.SOPClassUID = pydicom._storage_sopclass_uids.MRImageStorage
-	ds.PatientName = "Volunteer^" + str(idx+1).zfill(3) + "^-" + method_prefix
+	ds.PatientName = "Volunteer^" + str(idx).zfill(3) + "^-" + method_prefix
 	ds.PatientID = str(idx).zfill(6) # "123456"
 
 	ds.Modality = "MR"
@@ -99,24 +100,25 @@ def gen_ds(idx):
 
 	return ds
 
-def write_dicom(ds, pixel_array, filename, level, slices):
-	image2d = np.squeeze(pixel_array)*255
-	image2d = image2d.astype(np.uint16)
+def write_dicom(ds, pixel_array, nvol, filename, level, slices):
+  image2d = np.squeeze(pixel_array)*255
+  image2d = image2d.astype(np.uint16)
 
-	path = args.experiment_dir + "/out_dicom/"
-	suffix = "_s" + str(level).zfill(2) + ".dcm"
+  path = py.join(args.experiment_dir,"out_dicom",args.map,nvol)
+  py.mkdir(path)
+  suffix = "_s" + str(level).zfill(2) + ".dcm"
 
-	filename_endian= path + filename + suffix
+  filename_endian= py.join(path, filename + suffix)
 
-	ds.ImagesInAcquisition = str(slices)
-	ds.InstanceNumber = level
+  ds.ImagesInAcquisition = str(slices)
+  ds.InstanceNumber = level
 
-	ds.Columns = image2d.shape[0]
-	ds.Rows = image2d.shape[1]
-	ds.PixelData = image2d.tobytes()
+  ds.Columns = image2d.shape[0]
+  ds.Rows = image2d.shape[1]
+  ds.PixelData = image2d.tobytes()
 
-	ds.save_as(filename_endian)
-	return
+  ds.save_as(filename_endian)
+  return
 
 
 #################################################################################
@@ -127,12 +129,56 @@ def write_dicom(ds, pixel_array, filename, level, slices):
 ech_idx = args.n_echoes * 2
 r2_sc,fm_sc = 200,300
 
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
-dataset_hdf5 = 'multiTE_GC_192_complex_2D.hdf5'
-testX, testY, TEs =data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,acqs_data=True,
-                                  te_data=True,complex_data=(args.G_model=='complex'),
-                                  remove_zeros=False,MEBCRN=(args.G_model=='MEBCRN'))
-testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=(args.G_model=='MEBCRN'))
+dataset_dir = '../datasets/'
+dataset_hdf5 = args.dataset + '_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+
+if args.dataset == 'JGalgani':
+  num_slice_list = [0,21,20,24,24,21,24,21,21,24,21,21,22,27,23,22,20,24,21,21,22,20]
+  rnc = True
+elif args.dataset == 'multiTE':
+  ini_idxs = [0,84,204,300,396,484,580,680,776,848,932,1028, 1100,1142,1190,1232,1286,1334,1388,1460]
+  delta_idxs = [21,24,24,24,22,24,25,24,18,21,24,18, 21,24,21,18,16,18,24,21]
+  # First Patient
+  if args.TE1 == 0.0014 and args.dTE == 0.0022:
+    k_idxs = [(0,1),(2,3)]
+  elif args.TE1 == 0.0013 and args.dTE == 0.0023:
+    k_idxs = [(0,1),(3,4)]
+  else:
+    k_idxs = [(0,2)]
+  for k in k_idxs:
+    custom_list = [a for a in range(ini_idxs[0]+k[0]*delta_idxs[0],ini_idxs[0]+k[1]*delta_idxs[0])]
+  # Rest of the patients
+  for i in range(1,len(ini_idxs)):
+    if (i<=11) and args.TE1 == 0.0013 and args.dTE == 0.0022:
+      k_idxs = [(0,1),(2,3)]
+    elif (i<=11) and args.TE1 == 0.0014 and args.dTE == 0.0022:
+      k_idxs = [(0,1),(3,4)]
+    elif (i==1) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+      k_idxs = [(0,1),(4,5)]
+    elif (i==15 or i==16) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+      k_idxs = [(0,1),(2,3)]
+    elif (i>=17) and args.TE1 == 0.0013 and args.dTE == 0.0024:
+      k_idxs = [(0,1),(2,3)]
+    else:
+      k_idxs = [(0,2)]
+    for k in k_idxs:
+      custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
+else:
+  num_slice_list = None
+  rnc = False
+
+if args.dataset == 'JGalgani' or args.dataset == '3ech':
+  testX, testY=data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=None,remove_non_central=rnc,
+                              acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=False)
+  TEs = np.ones((testX.shape[0],1),dtype=np.float32)
+elif args.dataset == 'multiTE':
+  testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
+                                      acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=False)
+else:
+  testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
+                                      te_data=True,remove_zeros=True,MEBCRN=False)
+if args.dataset == 'multiTE':
+  testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=False)
 
 len_dataset,hgt,wdt,n_out = np.shape(testY)
 
@@ -168,11 +214,12 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                               FM_self_attention=args.D3_SelfAttention)
   else:
     G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,ech_idx),
-                          filters=args.n_G_filters,
-                          te_input=args.te_input,
-                          te_shape=(args.n_echoes,),
-                          R2_self_attention=args.D1_SelfAttention,
-                          FM_self_attention=args.D2_SelfAttention)
+                            te_input=args.te_input,
+                            te_shape=(args.n_echoes,),
+                            ME_layer=args.ME_layer,
+                            filters=args.n_G_filters,
+                            R2_self_attention=args.D1_SelfAttention,
+                            FM_self_attention=args.D2_SelfAttention)
 elif args.G_model == 'U-Net':
   if args.out_vars == 'WF-PM':
     n_out = 4
@@ -251,7 +298,7 @@ def sample(A, B, TE=None):
       A2B_FM = (A2B_FM - 0.5) * 2
       A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
       A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
-    A2B_WF = wf.get_rho(A,A2B_PM)
+    A2B_WF = wf.get_rho(A,A2B_PM,MEBCRN=False)
     A2B_WF_real = A2B_WF[:,:,:,0::2]
     A2B_WF_imag = A2B_WF[:,:,:,1::2]
     A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
@@ -310,24 +357,31 @@ else:
 
 save_dir = py.join(args.experiment_dir, 'out_dicom', args.map)
 py.mkdir(save_dir)
-pre_filename = args.map + '/' + args.map + '_' + prot_prefix + '_v'
+pre_filename = args.map + '_' + prot_prefix + '_'
 end_filename = '_' + method_prefix
 
-n_slices = [21,24,24,24,22,24,25,24,18,21,24,18,21,24,21,18,16,18,24,21]
+# n_slices = [21,24,24,24,22,24,25,24,18,21,24,18,21,24,21,18,16,18,24,21]
+if args.dataset == 'JGalgani':
+  n_slices = num_slice_list
+  ini_idx = 0
+else:
+  n_slices = delta_idxs
+  ini_idx = 22
 cont = 0
 for idx in range(len(n_slices)):
-	ini = cont
-	fin = cont + n_slices[idx]
-	cont = cont + n_slices[idx]
+  ini = cont
+  fin = cont + n_slices[idx]
+  cont = cont + n_slices[idx]
 
-	filename = pre_filename + str(idx).zfill(3) + end_filename
+  volun_name = 'v' + str(idx+ini_idx).zfill(3)
+  filename = pre_filename + volun_name + end_filename
 
-	# image3d = np.squeeze(out_maps[0:21,:,:,0])
-	image3d = np.squeeze(X[ini:fin,:,:])
-	image3d = np.moveaxis(image3d,0,-1)
+  # image3d = np.squeeze(out_maps[0:21,:,:,0])
+  image3d = np.squeeze(X[ini:fin,:,:])
+  image3d = np.moveaxis(image3d,0,-1)
 
-	# Populate required values for file meta information
-	ds = gen_ds(idx)
+  # Populate required values for file meta information
+  ds = gen_ds(idx+ini_idx)
 
-	for i in range(0, np.shape(image3d)[2]):
-		write_dicom(ds, image3d[:,:,i], filename, i, np.shape(image3d)[2])
+  for i in range(0, np.shape(image3d)[2]):
+    write_dicom(ds, image3d[:,:,i], volun_name, filename, i, np.shape(image3d)[2])
