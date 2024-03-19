@@ -163,7 +163,8 @@ elif args.dataset == 'multiTE':
       k_idxs = [(0,2)]
     for k in k_idxs:
       custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
-else:
+elif args.dataset == '3ech':
+  delta_idxs = [21,24,24,24,22,24,25,24,18,21,24,18, 21,24,21,18,16,18,24,21]
   num_slice_list = None
   rnc = False
 
@@ -364,9 +365,12 @@ end_filename = '_' + method_prefix
 if args.dataset == 'JGalgani':
   n_slices = num_slice_list
   ini_idx = 0
-else:
+elif args.dataset == 'multiTE':
   n_slices = delta_idxs
   ini_idx = 22
+elif args.dataset == '3ech':
+  n_slices = delta_idxs
+  ini_idx = 24
 cont = 0
 for idx in range(len(n_slices)):
   ini = cont
