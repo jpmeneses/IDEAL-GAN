@@ -38,11 +38,6 @@ if not(hasattr(args,'div_decod')):
     dec_args = py.args()
     args.__dict__.update(dec_args.__dict__)
 
-if not(hasattr(args,'ls_mean_activ')):
-    py.arg('--ls_mean_activ', default='leaky_relu', choices=['leaky_relu','relu','tanh','None'])
-    lsa_args = py.args()
-    args.__dict__.update(lsa_args.__dict__)
-
 if hasattr(args,'n_G_filt_list'):
     if len(args.n_G_filt_list) > 0:
         filt_list = [int(a_i) for a_i in args.n_G_filt_list.split(',')]
