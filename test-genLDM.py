@@ -171,10 +171,9 @@ loss_fn = tf.losses.MeanSquaredError()
 
 def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
     # Create a range of inference steps that the output should be sampled at
-    if args.DDIM:
-        inference_range = range(0, args.n_timesteps, args.n_timesteps // inference_timesteps)
-    else:
-        inference_range = range(0, args.n_timesteps, args.n_timesteps)
+    if not args.DDIM:
+        inference_timesteps = args.n_timesteps
+    inference_range = range(0, args.n_timesteps, args.n_timesteps // inference_timesteps)
     for index, i in tqdm.tqdm(enumerate(reversed(range(inference_timesteps))), desc='Sample '+str(ns).zfill(3), total=inference_timesteps):
         t = np.expand_dims(inference_range[i], 0)
 
