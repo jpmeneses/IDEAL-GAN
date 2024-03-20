@@ -100,11 +100,11 @@ def gen_ds(idx):
 
 	return ds
 
-def write_dicom(ds, pixel_array, nvol, filename, level, slices):
+def write_dicom(ds, pixel_array, nvol, meth, filename, level, slices):
   image2d = np.squeeze(pixel_array)*255
   image2d = image2d.astype(np.uint16)
 
-  path = py.join(args.experiment_dir,"out_dicom",args.map,nvol)
+  path = py.join(args.experiment_dir,"out_dicom",args.map,'Volunteer-'+nvol[1:],'Method-'+meth[1:])
   py.mkdir(path)
   suffix = "_s" + str(level).zfill(2) + ".dcm"
 
@@ -388,4 +388,4 @@ for idx in range(len(n_slices)):
   ds = gen_ds(idx+ini_idx)
 
   for i in range(0, np.shape(image3d)[2]):
-    write_dicom(ds, image3d[:,:,i], volun_name, filename, i, np.shape(image3d)[2])
+    write_dicom(ds, image3d[:,:,i], volun_name, method_prefix, filename, i, np.shape(image3d)[2])
