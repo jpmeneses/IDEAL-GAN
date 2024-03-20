@@ -17,7 +17,9 @@ import data
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--LDM', type=bool, default=False)
-py.arg('--te_input', type=bool, default=False)
+py.arg('--DDIM', type=bool, default=False)
+py.arg('--infer_steps', type=int, default=10)
+py.arg('--infer_sigma', type=float, default=0.0)
 py.arg('--val_batch_size', type=int, default=1)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
@@ -120,10 +122,12 @@ else:
     tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
     hgt_ls = dec_w.input_shape[1]
     wdt_ls = dec_w.input_shape[2]
+
+z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+
 if args.LDM:
     # create our unet model
     unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
-    z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
     # Initiate unet
     test_images = tf.ones((1, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
     test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
@@ -156,13 +160,23 @@ def encode(A):
 	return A2Z
 
 
-def sample(Z,denoise=False,TE=None):
+def sample(Z,denoise=False,Z_std=1.0,inference_timesteps=10,TE=None):
     if denoise:
-        for i in range(args.n_timesteps-1):
-            t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
+        if args.DDIM:
+            its = inference_timesteps
+            inference_range = range(0, args.n_timesteps, args.n_timesteps // its)
+        else:
+            its = args.n_timesteps-1
+            inference_range = range(1, args.n_timesteps)
+        for index, i in enumerate(reversed(range(its))):
+            t = np.expand_dims(inference_range[i], 0)
             pred_noise = unet(Z, t)
-            Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
+            if args.DDIM:
+                Z = dm.ddim(Z, pred_noise, t, args.infer_sigma, alpha, alpha_bar)
+            else:
+                Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
     # Z2B2A Cycle
+    Z = tf.math.multiply_no_nan(Z,Z_std)
     if args.only_mag:
         Z2B_mag = dec_mag(Z, training=True)
         Z2B_pha = dec_pha(Z, training=True)
@@ -194,7 +208,7 @@ for A in A_dataset_val:
     # Generate some synthetic images using the defined model
     z_shape = (A.shape[0],hgt_ls,wdt_ls,args.encoded_size)
     Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
-    Z2B2A = sample(Z, denoise=args.LDM)
+    Z2B2A = sample(Z, denoise=args.LDM, Z_std=z_std, inference_timesteps=args.infer_steps)
 
     # Get the features for the real data
     real_eval_feats = get_features(A)
