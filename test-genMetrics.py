@@ -220,9 +220,7 @@ for A in A_dataset_val:
 
     # SSIM metrics for pairs of synthetic data within batch
     idx_pairs = list(itertools.combinations(range(A.shape[0]), 2))
-    print(idx_pairs)
     for idx_a, idx_b in idx_pairs:
-        print('\t',idx_a, idx_b)
         ms_ssim_scores.append(tf.image.ssim_multiscale(Z2B2A[idx_a]+1.0, Z2B2A[idx_b]+1.0, 2))
         ssim_scores.append(tf.image.ssim(Z2B2A[idx_a]+1.0, Z2B2A[idx_b]+1.0, 2))
 
@@ -244,7 +242,6 @@ print(f"FID Score: {fid_res.numpy():.4f}")
 mmd_res = mmd_scores[-1] / len_dataset
 print(f"MMD Score: {mmd_res.numpy():.4f}")
 
-print(ms_ssim_scores)
 ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
 print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
 
