@@ -242,6 +242,7 @@ print(f"FID Score: {fid_res.numpy():.4f}")
 mmd_res = mmd_scores[-1] / len_dataset
 print(f"MMD Score: {mmd_res.numpy():.4f}")
 
+print(ms_ssim_scores)
 ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
 print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
 
