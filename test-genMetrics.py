@@ -70,7 +70,7 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 num_layers=args.n_downsamplings,
                 num_res_blocks=args.n_res_blocks,
                 sd_out=not(args.VQ_encoder),
-                ls_mean_activ=args.ls_mean_activ,
+                ls_mean_activ=None,
                 NL_self_attention=args.NL_SelfAttention)
 if args.only_mag:
     dec_mag = dl.decoder(encoded_dims=args.encoded_size,
