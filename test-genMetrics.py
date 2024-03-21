@@ -220,7 +220,9 @@ for A in A_dataset_val:
 
     # SSIM metrics for pairs of synthetic data within batch
     idx_pairs = list(itertools.combinations(range(A.shape[0]), 2))
+    print(idx_pairs)
     for idx_a, idx_b in idx_pairs:
+        print('\t',idx_a, idx_b)
         ms_ssim_scores.append(tf.image.ssim_multiscale(Z2B2A[idx_a]+1.0, Z2B2A[idx_b]+1.0, 2))
         ssim_scores.append(tf.image.ssim(Z2B2A[idx_a]+1.0, Z2B2A[idx_b]+1.0, 2))
 
