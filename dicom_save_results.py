@@ -324,25 +324,28 @@ def sample(A, B, TE=None):
 
   return A2B_abs
 
-if not(args.is_GC):
-	all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
-	i = 0
-	for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
-		A = tf.expand_dims(A,axis=0)
-		B = tf.expand_dims(B,axis=0)
-		TE= tf.expand_dims(TE,axis=0)
-		A2B = sample(A,B,TE)
-		all_test_ans[i,:,:,:] = A2B
-		i += 1
+@tf.function
+def sample_GC(B):
+  w_all_ans = tf.abs(tf.complex(B[...,:1],B[...,1:2]))
+  f_all_ans = tf.abs(tf.complex(B[...,2:3],B[...,3:4]))
+  return tf.concat([w_all_ans,f_all_ans,B[...,4:]],axis=-1)
 
-	w_all_ans = all_test_ans[:,:,:,0]
-	f_all_ans = all_test_ans[:,:,:,1]
-	r2_all_ans = all_test_ans[:,:,:,2]*r2_sc
-else:
-	# Ground truth
-	w_all_ans = np.abs(tf.complex(testY[:,:,:,0],testY[:,:,:,1]))
-	f_all_ans = np.abs(tf.complex(testY[:,:,:,2],testY[:,:,:,3]))
-	r2_all_ans = testY[:,:,:,4]*r2_sc
+all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
+i = 0
+for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
+  A = tf.expand_dims(A,axis=0)
+  B = tf.expand_dims(B,axis=0)
+  TE= tf.expand_dims(TE,axis=0)
+  if args.is_GC:
+    A2B = sample_GC(B)
+  else:
+    A2B = sample(A,B,TE)
+  all_test_ans[i,:,:,:] = A2B
+  i += 1
+
+w_all_ans = all_test_ans[:,:,:,0]
+f_all_ans = all_test_ans[:,:,:,1]
+r2_all_ans = all_test_ans[:,:,:,2]*r2_sc
 
 if args.map == 'PDFF':
   PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
