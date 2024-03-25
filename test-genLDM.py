@@ -323,13 +323,13 @@ for k in range(args.n_samples):
 
     # Show Q-maps 
     q_fig, q_axs = plt.subplots(figsize=(13,3), nrows=1, ncols=3)
-    Fp_unet = q_axs[0].imshow(fn_p_aux*3, cmap='twilight', vmin=-3, vmax=3)
+    Fp_unet = q_axs[0].imshow(f_p_aux*3, cmap='twilight', vmin=-3, vmax=3)
     q_fig.colorbar(Fp_unet, ax=q_axs[0])
     q_axs[0].axis('off')
-    r2_unet = q_axs[1].imshow(r2n_aux*r2_sc, cmap='copper', vmin=0, vmax=r2_sc)
+    r2_unet = q_axs[1].imshow(r2_aux*r2_sc, cmap='copper', vmin=0, vmax=r2_sc)
     q_fig.colorbar(r2_unet, ax=q_axs[1])
     q_axs[1].axis('off')
-    field_unet = q_axs[2].imshow(fieldn_aux*fm_sc, cmap='twilight', vmin=-fm_sc/2, vmax=fm_sc/2)
+    field_unet = q_axs[2].imshow(field_aux*fm_sc, cmap='twilight', vmin=-fm_sc/2, vmax=fm_sc/2)
     q_fig.colorbar(field_unet, ax=q_axs[2])
     q_axs[2].axis('off')
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
