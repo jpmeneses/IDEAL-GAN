@@ -229,35 +229,35 @@ for k in range(args.n_samples):
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
     # Magnitude of recon MR images at each echo
-    im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
-    im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
-    im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
-    im_ech4 = np.squeeze(np.abs(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1])))
-    im_ech5 = np.squeeze(np.abs(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1])))
-    im_ech6 = np.squeeze(np.abs(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1])))
+    im_ech1 = np.squeeze(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1]))
+    im_ech2 = np.squeeze(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1]))
+    im_ech3 = np.squeeze(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1]))
+    im_ech4 = np.squeeze(tf.complex(Z2B2A[:,3,:,:,0],Z2B2A[:,3,:,:,1]))
+    im_ech5 = np.squeeze(tf.complex(Z2B2A[:,4,:,:,0],Z2B2A[:,4,:,:,1]))
+    im_ech6 = np.squeeze(tf.complex(Z2B2A[:,5,:,:,0],Z2B2A[:,5,:,:,1]))
     
     # Acquisitions in the first row
-    acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
+    acq_ech1 = axs[0,0].imshow(np.abs(im_ech1), cmap='gist_earth',
                           interpolation='none', vmin=0, vmax=1)
     axs[0,0].set_title('1st Echo')
     axs[0,0].axis('off')
-    acq_ech2 = axs[0,1].imshow(im_ech2, cmap='gist_earth',
+    acq_ech2 = axs[0,1].imshow(np.abs(im_ech2), cmap='gist_earth',
                           interpolation='none', vmin=0, vmax=1)
     axs[0,1].set_title('2nd Echo')
     axs[0,1].axis('off')
-    acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
+    acq_ech3 = axs[0,2].imshow(np.abs(im_ech3), cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
     axs[0,2].set_title('3rd Echo')
     axs[0,2].axis('off')
-    acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
+    acq_ech4 = axs[0,3].imshow(np.abs(im_ech4), cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
     axs[0,3].set_title('4th Echo')
     axs[0,3].axis('off')
-    acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
+    acq_ech5 = axs[0,4].imshow(np.abs(im_ech5), cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
     axs[0,4].set_title('5th Echo')
     axs[0,4].axis('off')
-    acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
+    acq_ech6 = axs[0,5].imshow(np.abs(im_ech6), cmap='gist_earth',
                               interpolation='none', vmin=0, vmax=1)
     axs[0,5].set_title('6th Echo')
     axs[0,5].axis('off')
@@ -320,4 +320,37 @@ for k in range(args.n_samples):
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
     plt.savefig(wf_dir+'/wf_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
     plt.close(wf_fig)
+
+    # Show Q-maps 
+    q_fig, q_axs = plt.subplots(figsize=(13,3), nrows=1, ncols=3)
+    Fp_unet = q_axs[0].imshow(fn_p_aux*3, cmap='twilight', vmin=-3, vmax=3)
+    q_fig.colorbar(Fp_unet, ax=q_axs[0])
+    q_axs[0].axis('off')
+    r2_unet = q_axs[1].imshow(r2n_aux*r2_sc, cmap='copper', vmin=0, vmax=r2_sc)
+    q_fig.colorbar(r2_unet, ax=q_axs[1])
+    q_axs[1].axis('off')
+    field_unet = q_axs[2].imshow(fieldn_aux*fm_sc, cmap='twilight', vmin=-fm_sc/2, vmax=fm_sc/2)
+    q_fig.colorbar(field_unet, ax=q_axs[2])
+    q_axs[2].axis('off')
+    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+    plt.savefig(qmap_dir+'/qmap_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.close(q_fig)
+
+    # Show all-echo magnitude
+    all_echo = np.concatenate([im_ech1,im_ech2,im_ech3,im_ech4,im_ech5,im_ech6],axis=1)
+    mag_fig, mag_ax = plt.subplots(figsize=(18,3))
+    mag_ax.imshow(np.abs(all_echo), cmap='gray')
+    mag_ax.axis('off')
+    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+    plt.savefig(mag_dir+'/im_mag_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.close(mag_fig)
+
+    # Show all-echo unwrapped phase
+    pha_fig, pha_ax = plt.subplots(figsize=(18,3))
+    im_pha = pha_ax.imshow(unwrap_phase(np.angle(all_echo))/np.pi, cmap='twilight', vmin=-4, vmax=4)
+    pha_fig.colorbar(im_pha, ax=pha_ax)
+    pha_ax.axis('off')
+    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+    plt.savefig(pha_dir+'/im_phase_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.close(pha_fig)
 
