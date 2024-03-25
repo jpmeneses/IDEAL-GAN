@@ -346,7 +346,7 @@ for k in range(args.n_samples):
     plt.close(mag_fig)
 
     # Show all-echo unwrapped phase
-    pha_fig, pha_ax = plt.subplots(figsize=(18,3))
+    pha_fig, pha_ax = plt.subplots(figsize=(21,3))
     im_pha = pha_ax.imshow(unwrap_phase(np.angle(all_echo))/np.pi, cmap='twilight', vmin=-4, vmax=4)
     pha_fig.colorbar(im_pha, ax=pha_ax)
     pha_ax.axis('off')
