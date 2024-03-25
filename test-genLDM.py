@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import tqdm
+from skimage.restoration import unwrap_phase
 
 import tf2lib as tl
 import DLlib as dl
@@ -206,8 +207,16 @@ z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
 tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
 
 # sample
-sample_dir = py.join(output_dir, 'samples_ldm_testing')
+sample_dir = py.join(output_dir, 'samples_ldm_testing', 'all')
+wf_dir = py.join(output_dir, 'samples_ldm_testing', 'wf')
+qmap_dir = py.join(output_dir, 'samples_ldm_testing', 'qmap')
+mag_dir = py.join(output_dir, 'samples_ldm_testing', 'im_mag')
+pha_dir = py.join(output_dir, 'samples_ldm_testing', 'im_phase')
 py.mkdir(sample_dir)
+py.mkdir(wf_dir)
+py.mkdir(qmap_dir)
+py.mkdir(mag_dir)
+py.mkdir(pha_dir)
 
 # main loop
 for k in range(args.n_samples):
@@ -302,4 +311,13 @@ for k in range(args.n_samples):
     tl.make_space_above(axs,topmargin=0.8)
     plt.savefig(sample_dir+'/sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
     plt.close(fig)
+
+    # WF-imshow
+    wf_fig, wf_ax = plt.subplots(figsize=(9,3))
+    wf_all = np.concatenate([w_m_aux,f_m_aux],axis=1)
+    wf_ax.imshow(wf_all, cmap='gray')
+    wf_ax.axis('off')
+    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+    plt.savefig(wf_dir+'/wf_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.close(wf_fig)
 
