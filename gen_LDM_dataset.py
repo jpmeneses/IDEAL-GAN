@@ -20,6 +20,7 @@ py.arg('--te_input', type=bool, default=False)
 py.arg('--DDIM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=10)
 py.arg('--infer_sigma', type=float, default=0.0)
+py.arg('--batch_size', type=int, default=1)
 py.arg('--n_samples', type=int, default=2000)
 py.arg('--seed', type=int, default=0)
 ldm_args = py.args()
@@ -214,21 +215,21 @@ writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 
 # main loop
 for k in range(args.n_samples):
-    Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), seed=args.seed, dtype=tf.float32)
+    Z = tf.random.normal((args.batch_size,hgt_ls,wdt_ls,args.encoded_size), seed=args.seed, dtype=tf.float32)
     if args.VQ_encoder:
         Z2B, Z2B2A = sample(Z)
     else:
         Z2B, Z2B2A = sample(Z, z_std, inference_timesteps=args.infer_steps, ns=k)
 
-    Z2B = tf.squeeze(Z2B)
-    Z2B2A = tf.squeeze(Z2B2A)
+    for i in range(Z2B.shape[0]):
+        acqs_i = Z2B2A[i,...]
+        out_maps_i = Z2B[i,...]
+        features = {'acqs': _bytes_feature(tf.io.serialize_tensor(acqs_i)),
+                    'acq_shape': _int64_feature(list(acqs_i.shape)),
+                    'out_maps': _bytes_feature(tf.io.serialize_tensor(out_maps_i)),
+                    'out_shape': _int64_feature(list(out_maps_i.shape))}
 
-    features = {'acqs': data._bytes_feature(tf.io.serialize_tensor(Z2B2A)),
-                'acq_shape': data._int64_feature(list(Z2B2A.shape)),
-                'out_maps': data._bytes_feature(tf.io.serialize_tensor(Z2B)),
-                'out_shape': data._int64_feature(list(Z2B.shape))}
-
-    example = tf.train.Example(features=tf.train.Features(feature=features))
-    writer.write(example.SerializeToString())
+        example = tf.train.Example(features=tf.train.Features(feature=features))
+        writer.write(example.SerializeToString())
 
 writer.close()
