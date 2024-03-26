@@ -1,8 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
-import tqdm
-from skimage.restoration import unwrap_phase
 
 import tf2lib as tl
 import DLlib as dl
@@ -16,6 +13,7 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir', default='output/GAN-100')
+py.arg('--ds_filename', default='LDM_ds')
 py.arg('--te_input', type=bool, default=False)
 py.arg('--DDIM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=10)
@@ -174,7 +172,7 @@ def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
     else:
         its = args.n_timesteps-1
         inference_range = range(1, args.n_timesteps)
-    for index, i in tqdm.tqdm(enumerate(reversed(range(its))), desc='Sample '+str(ns).zfill(3), total=its):
+    for index, i in enumerate(reversed(range(its))):
         t = np.expand_dims(inference_range[i], 0)
 
         pred_noise = unet(Z, t)
@@ -209,7 +207,7 @@ tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpo
 
 # sample
 ds_dir = 'tfrecord'
-ds_filename = 'LDM_ds'
+ds_filename = args.ds_filename
 py.mkdir(ds_dir)
 writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 
