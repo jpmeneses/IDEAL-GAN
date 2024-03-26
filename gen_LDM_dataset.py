@@ -212,7 +212,7 @@ py.mkdir(ds_dir)
 writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 
 # main loop
-for k in range(args.n_samples):
+for k in range(args.n_samples//args.batch_size):
     Z = tf.random.normal((args.batch_size,hgt_ls,wdt_ls,args.encoded_size), seed=args.seed, dtype=tf.float32)
     if args.VQ_encoder:
         Z2B, Z2B2A = sample(Z)
