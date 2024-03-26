@@ -222,10 +222,10 @@ for k in range(args.n_samples//args.batch_size):
     for i in range(Z2B.shape[0]):
         acqs_i = Z2B2A[i,...]
         out_maps_i = Z2B[i,...]
-        features = {'acqs': _bytes_feature(tf.io.serialize_tensor(acqs_i)),
-                    'acq_shape': _int64_feature(list(acqs_i.shape)),
-                    'out_maps': _bytes_feature(tf.io.serialize_tensor(out_maps_i)),
-                    'out_shape': _int64_feature(list(out_maps_i.shape))}
+        features = {'acqs': data._bytes_feature(tf.io.serialize_tensor(acqs_i)),
+                    'acq_shape': data._int64_feature(list(acqs_i.shape)),
+                    'out_maps': data._bytes_feature(tf.io.serialize_tensor(out_maps_i)),
+                    'out_shape': data._int64_feature(list(out_maps_i.shape))}
 
         example = tf.train.Example(features=tf.train.Features(feature=features))
         writer.write(example.SerializeToString())
