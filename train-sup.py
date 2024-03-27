@@ -154,7 +154,7 @@ elif args.G_model == 'U-Net':
                     filters=args.n_G_filters,
                     output_activation=out_activ,
                     self_attention=args.D1_SelfAttention)
-    if args.out_vars == 'WF':
+    if args.out_vars != 'WF':
         trainY[:,:,:,-1]    = 0.5*trainY[:,:,:,-1] + 0.5
         valY[:,:,:,-1]      = 0.5*valY[:,:,:,-1] + 0.5
 
