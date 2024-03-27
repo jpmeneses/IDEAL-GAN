@@ -19,12 +19,6 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
-py.arg('--DL_experiment_dir', default='output/GAN-238')
-py.arg('--n_per_epoch', type=int, default=10000)
-py.arg('--gen_noise', type=float, default=0.1)
-py.arg('--DL_LDM', type=bool, default=False)
-py.arg('--DDIM', type=bool, default=False)
-py.arg('--infer_steps', type=int, default=25)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -71,8 +65,11 @@ r2_sc,fm_sc = 200.0,300.0
 dataset_dir = '../datasets/'
 
 dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+
+A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
+A_B_dataset_val.batch(1)
 
 if not(args.DL_gen):
     dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
@@ -87,51 +84,43 @@ if not(args.DL_gen):
     acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
                                         acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-################################################################################
-############################# DATASET PARTITIONS ###############################
-################################################################################
-
-if args.DL_gen:
-    trainX = np.zeros((args.n_per_epoch,1,1,1),dtype=np.float32)
-    if args.G_model == 'MEBCRN':
-        trainX = np.expand_dims(trainX, axis=-1)
-else:
     trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
-valX = acqs_1
-
-if args.DL_gen:
-    trainY = np.zeros((args.n_per_epoch,1,1,1),dtype=np.float32)
-    if args.G_model == 'MEBCRN':
-        trainY = np.expand_dims(trainY, axis=-1)
-else:
     trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
-valY = out_maps_1
 
-# Overall dataset statistics
-if args.G_model == 'MEBCRN':
-    len_dataset,_,_,_,_ = np.shape(trainY)
-    _,n_out,hgt,wdt,n_ch = np.shape(valY)
+    if args.G_model == 'MEBCRN':
+        len_dataset,_,_,_,_ = np.shape(trainY)
+        _,n_out,hgt,wdt,n_ch = np.shape(valY)
+    else:
+        len_dataset,_,_,_ = np.shape(trainY)
+        _,hgt,wdt,n_out = np.shape(valY)
+        n_ch = 2
+
+    A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
+
 else:
-    len_dataset,_,_,_ = np.shape(trainY)
-    _,hgt,wdt,n_out = np.shape(valY)
-    n_ch = 2
+    recordPath = py.join('tfrecord','LDM_ds')
+    tfr_dataset = tf.data.TFRecordDataset([recordPath])
+    # Create a description of the features.
+    feature_description = {
+        'acqs': tf.io.FixedLenFeature([], tf.string),
+        'acq_shape': tf.io.FixedLenFeature([4], tf.int64),
+        'out_maps': tf.io.FixedLenFeature([], tf.string),
+        'out_shape': tf.io.FixedLenFeature([4], tf.int64),
+        }
 
-print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:', args.n_echoes)
-print('Output Maps:', n_out)
+    def _parse_function(example_proto):
+        # Parse the input `tf.train.Example` proto using the dictionary above.
+        return tf.io.parse_example(example_proto, feature_description)
 
-# Input and output dimensions (training data)
-print('Training input shape:', trainX.shape)
-print('Training output shape:', trainY.shape)
+    A_B_dataset = tfr_dataset.map(_parse_function)
 
-# Input and output dimensions (validations data)
-print('Validation input shape:', valX.shape)
-print('Validation output shape:', valY.shape)
+    for parsed_record in A_B_dataset.take(1):
+        out_shape = parsed_record['out_shape'].numpy()
+    n_out,hgt,wdt,n_ch = out_shape
+    len_dataset = 2400
 
-A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
-A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
-A_B_dataset_val.batch(1)
+
 
 # ==============================================================================
 # =                                   models                                   =
