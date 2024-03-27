@@ -49,9 +49,6 @@ py.mkdir(output_dir)
 # save settings
 py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 
-if args.DL_gen:
-    DL_args = py.args_from_yaml(py.join(args.DL_experiment_dir, 'settings.yml'))
-
 # ==============================================================================
 # =                                    data                                    =
 # ==============================================================================
@@ -179,100 +176,7 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
-if args.DL_gen:
-    if DL_args.div_decod:
-        if DL_args.only_mag:
-            nd = 2
-        else:
-            nd = 3
-    else:
-        nd = 1
-    if len(DL_args.n_G_filt_list) == (DL_args.n_downsamplings+1):
-        nfd = [a//nd for a in filt_list]
-        nfd2 = [a//(nd+1) for a in filt_list]
-    else:
-        nfd = DL_args.n_G_filters//nd
-        nfd2= DL_args.n_G_filters//(nd+1)
-    if DL_args.only_mag:
-        dec_mag = dl.decoder(encoded_dims=DL_args.encoded_size,
-                            output_shape=(hgt,wdt,3),
-                            filters=nfd,
-                            num_layers=DL_args.n_downsamplings,
-                            num_res_blocks=DL_args.n_res_blocks,
-                            output_activation='relu',
-                            output_initializer='he_normal',
-                            NL_self_attention=DL_args.NL_SelfAttention
-                            )
-        dec_pha = dl.decoder(encoded_dims=DL_args.encoded_size,
-                            output_shape=(hgt,wdt,2),
-                            filters=nfd2,
-                            num_layers=DL_args.n_downsamplings,
-                            num_res_blocks=DL_args.n_res_blocks,
-                            output_activation='tanh',
-                            NL_self_attention=DL_args.NL_SelfAttention
-                            )
-        tl.Checkpoint(dict(dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
-        hgt_ls = dec_mag.input_shape[1]
-        wdt_ls = dec_mag.input_shape[2]
-    else:
-        dec_w =  dl.decoder(encoded_dims=DL_args.encoded_size,
-                            output_shape=(hgt,wdt,n_ch),
-                            filters=nfd,
-                            num_layers=DL_args.n_downsamplings,
-                            num_res_blocks=DL_args.n_res_blocks,
-                            output_activation=None,
-                            NL_self_attention=DL_args.NL_SelfAttention
-                            )
-        dec_f =  dl.decoder(encoded_dims=DL_args.encoded_size,
-                            output_shape=(hgt,wdt,n_ch),
-                            filters=nfd,
-                            num_layers=DL_args.n_downsamplings,
-                            num_res_blocks=DL_args.n_res_blocks,
-                            output_activation=None,
-                            NL_self_attention=DL_args.NL_SelfAttention
-                            )
-        dec_xi = dl.decoder(encoded_dims=DL_args.encoded_size,
-                            output_shape=(hgt,wdt,n_ch),
-                            n_groups=DL_args.n_groups_PM,
-                            filters=nfd,
-                            num_layers=args.n_downsamplings,
-                            num_res_blocks=args.n_res_blocks,
-                            output_activation=None,
-                            NL_self_attention=args.NL_SelfAttention
-                            )
-        tl.Checkpoint(dict(dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
-        hgt_ls = dec_w.input_shape[1]
-        wdt_ls = dec_w.input_shape[2]
-    if args.DL_LDM:
-        unet = dl.denoise_Unet(dim=DL_args.n_ldm_filters, dim_mults=(1,2,4), channels=DL_args.encoded_size)
-        z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
-        # Initiate unet
-        test_images = tf.ones((1, hgt_ls, wdt_ls, DL_args.encoded_size), dtype=tf.float32)
-        test_timestamps = dm.generate_timestamp(0, 1, DL_args.n_timesteps)
-        k = unet(test_images, test_timestamps)
-        # Checkpoint
-        tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.DL_experiment_dir, 'checkpoints_ldm')).restore()
-        # create a fixed beta schedule
-        if DL_args.scheduler == 'linear':
-            beta = np.linspace(DL_args.beta_start, DL_args.beta_end, DL_args.n_timesteps)
-            # this will be used as discussed in the reparameterization trick
-            alpha = 1 - beta
-            alpha_bar = np.cumprod(alpha, 0)
-            alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
-        elif DL_args.scheduler == 'cosine':
-            x = np.linspace(0, DL_args.n_timesteps, DL_args.n_timesteps + 1)
-            alpha_bar = np.cos(((x / DL_args.n_timesteps) + DL_args.s_value) / (1 + DL_args.s_value) * np.pi * 0.5) ** 2
-            alpha_bar /= alpha_bar[0]
-            alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
-            beta = 1.0 - alpha
-
 sup_loss_fn = tf.losses.MeanAbsoluteError()
-
-if args.DL_gen:
-    if DL_args.only_mag:
-        IDEAL_op = wf.IDEAL_mag_Layer()
-    else:
-        IDEAL_op = wf.IDEAL_Layer()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
@@ -485,56 +389,6 @@ def validation_step(A, B):
     A2B_abs, val_sup_dict = sample(A, B)
     return A2B_abs, val_sup_dict
 
-if args.DL_gen:
-    # @tf.function
-    def gen_sample(Z,TE=None):
-        if args.DL_LDM:
-            inference_range = range(0, DL_args.n_timesteps, DL_args.n_timesteps // args.infer_steps)
-            for index, i in enumerate(reversed(range(args.infer_steps))):
-                t = np.expand_dims(inference_range[i], 0)
-                pred_noise = unet(Z, t)
-                if args.DDIM:
-                    Z = dm.ddim(Z, pred_noise, t, 0, alpha, alpha_bar)
-                else:
-                    Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
-        # Z2B2A Cycle
-        if DL_args.only_mag:
-            Z2B_mag = dec_mag(Z, training=True)
-            Z2B_pha = dec_pha(Z, training=True)
-            Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
-            Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
-        else:
-            Z2B_w = dec_w(Z, training=False)
-            Z2B_f = dec_f(Z, training=False)
-            Z2B_xi= dec_xi(Z, training=False)
-            Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
-        # Calculate CSE-MRI data (in non-MEBCRN format)
-        Z2B2A = IDEAL_op(Z2B, te=TE, training=False)
-        # rho_hat = tf.transpose(rho_hat, perm=[0,2,3,1])
-        Re_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
-        Im_rho = tf.transpose(Z2B2A[:,:,:,:,1], perm=[0,2,3,1])
-        zero_fill = tf.zeros_like(Re_rho)
-        re_stack = tf.stack([Re_rho,zero_fill],4)
-        re_aux = tf.reshape(re_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
-        im_stack = tf.stack([zero_fill,Im_rho],4)
-        im_aux = tf.reshape(im_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
-        Z2B2A = re_aux + im_aux
-        Z2B2A = tf.keras.layers.GaussianNoise(stddev=args.gen_noise)(Z2B2A)
-        # Turn Z2B into non-MEBCRN format
-        if DL_args.only_mag:
-            Z2B_W_r = Z2B_mag[:,0,:,:,:1] * tf.math.cos(Z2B_pha[:,0,:,:,1:2]*np.pi)
-            Z2B_W_i = Z2B_mag[:,0,:,:,:1] * tf.math.sin(Z2B_pha[:,0,:,:,1:2]*np.pi)
-            Z2B_F_r = Z2B_mag[:,0,:,:,1:2]* tf.math.cos(Z2B_pha[:,0,:,:,1:2]*np.pi)
-            Z2B_F_i = Z2B_mag[:,0,:,:,1:2]* tf.math.sin(Z2B_pha[:,0,:,:,1:2]*np.pi)
-            Z2B_r2 = Z2B_mag[:,0,:,:,2:]
-            Z2B_fm = Z2B_pha[:,0,:,:,2:]
-            Z2B = tf.concat([Z2B_W_r,Z2B_W_i,Z2B_F_r,Z2B_F_i,Z2B_r2,Z2B_fm],axis=-1)
-        else:
-            Z2B= tf.concat([tf.squeeze(Z2B_w,axis=1),
-                            tf.squeeze(Z2B_f,axis=1),
-                            tf.squeeze(Z2B_xi,axis=1)],axis=-1)
-        return Z2B, Z2B2A
-
 
 # ==============================================================================
 # =                                    run                                     =
@@ -574,15 +428,6 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
-        if args.DL_gen:
-            # Generate TE array
-            te_var=wf.gen_TEvar(args.n_echoes, bs=B.shape[0], TE_ini_min=args.TE1,
-                                TE_ini_d=None, d_TE_min=args.dTE, d_TE_d=None)
-            hls = hgt//(2**(DL_args.n_downsamplings))
-            wls = wdt//(2**(DL_args.n_downsamplings))
-            z_shape = (A.shape[0],hls,wls,DL_args.encoded_size)
-            Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
-            B, A = gen_sample(Z,te_var)
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
