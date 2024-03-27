@@ -100,9 +100,7 @@ else:
     # Create a description of the features.
     feature_description = {
         'acqs': tf.io.FixedLenFeature([], tf.string),
-        'acq_shape': tf.io.FixedLenFeature([4], tf.int64),
         'out_maps': tf.io.FixedLenFeature([], tf.string),
-        'out_shape': tf.io.FixedLenFeature([4], tf.int64),
         }
 
     def _parse_function(example_proto):
@@ -112,8 +110,8 @@ else:
     A_B_dataset = tfr_dataset.map(_parse_function)
 
     for parsed_record in A_B_dataset.take(1):
-        out_shape = parsed_record['out_shape'].numpy()
-    n_out,hgt,wdt,n_ch = out_shape
+        out_maps = tf.io.parse_tensor(parsed_record['out_maps'], out_type=tf.float32)
+    n_out,hgt,wdt,n_ch = out_maps.shape
     len_dataset = 2400
 
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
