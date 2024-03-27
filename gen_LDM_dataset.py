@@ -15,6 +15,7 @@ import data
 py.arg('--experiment_dir', default='output/GAN-100')
 py.arg('--ds_filename', default='LDM_ds')
 py.arg('--te_input', type=bool, default=False)
+py.arg('--MEBCRN', type=bool, default=True)
 py.arg('--DDIM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=10)
 py.arg('--infer_sigma', type=float, default=0.0)
@@ -196,6 +197,27 @@ def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
         Z2B_xi= dec_xi(Z, training=False)
         Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
     Z2B2A = IDEAL_op(Z2B, training=False)
+    if not(args.MEBCRN):
+        if args.only_mag:
+            Z2B_W_r = Z2B_mag[:,0,:,:,:1] * tf.math.cos(Z2B_pha[:,0,:,:,1:2]*np.pi)
+            Z2B_W_i = Z2B_mag[:,0,:,:,:1] * tf.math.sin(Z2B_pha[:,0,:,:,1:2]*np.pi)
+            Z2B_F_r = Z2B_mag[:,0,:,:,1:2]* tf.math.cos(Z2B_pha[:,0,:,:,1:2]*np.pi)
+            Z2B_F_i = Z2B_mag[:,0,:,:,1:2]* tf.math.sin(Z2B_pha[:,0,:,:,1:2]*np.pi)
+            Z2B_r2 = Z2B_mag[:,0,:,:,2:]
+            Z2B_fm = Z2B_pha[:,0,:,:,2:]
+            Z2B = tf.concat([Z2B_W_r,Z2B_W_i,Z2B_F_r,Z2B_F_i,Z2B_r2,Z2B_fm],axis=-1)
+        else:
+            Z2B =tf.concat([tf.squeeze(Z2B_w,axis=1),
+                            tf.squeeze(Z2B_f,axis=1),
+                            tf.squeeze(Z2B_xi,axis=1)], axis=-1)
+        Re_rho = tf.transpose(Z2B2A[:,:,:,:,0], perm=[0,2,3,1])
+        Im_rho = tf.transpose(Z2B2A[:,:,:,:,1], perm=[0,2,3,1])
+        zero_fill = tf.zeros_like(Re_rho)
+        re_stack = tf.stack([Re_rho,zero_fill],4)
+        re_aux = tf.reshape(re_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
+        im_stack = tf.stack([zero_fill,Im_rho],4)
+        im_aux = tf.reshape(im_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
+        Z2B2A = re_aux + im_aux
 
     return Z2B, Z2B2A
 
