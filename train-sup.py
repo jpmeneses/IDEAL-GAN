@@ -425,7 +425,20 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for A, B in A_B_dataset:
+    for AB in A_B_dataset:
+        if args.DL_gen:
+            A = list()
+            B = list()
+            for j in range(len(AB['acqs'])):
+                A_j = tf.io.parse_tensor(AB['acqs'][j], out_type=tf.float32)
+                A.append(tf.expand_dims(A_j,axis=0))
+                B_j = tf.io.parse_tensor(AB['out_maps'][j], out_type=tf.float32)
+                B.append(tf.expand_dims(B_j,axis=0))
+            A = tf.concat(A,axis=0)
+            B = tf.concat(B,axis=0)
+        else:
+            A = AB[0]
+            B = AB[1]
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
