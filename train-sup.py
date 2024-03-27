@@ -436,6 +436,13 @@ for ep in range(args.epochs):
                 B.append(tf.expand_dims(B_j,axis=0))
             A = tf.concat(A,axis=0)
             B = tf.concat(B,axis=0)
+            B_W_r = B[:,0,:,:,:1] * tf.math.cos(B[:,1,:,:,1:2]*np.pi)
+            B_W_i = B[:,0,:,:,:1] * tf.math.sin(B[:,1,:,:,1:2]*np.pi)
+            B_F_r = B[:,0,:,:,1:2]* tf.math.cos(B[:,1,:,:,1:2]*np.pi)
+            B_F_i = B[:,0,:,:,1:2]* tf.math.sin(B[:,1,:,:,1:2]*np.pi)
+            B_r2 = B[:,0,:,:,2:]
+            B_fm = B[:,1,:,:,2:]
+            B = tf.concat([B_W_r,B_W_i,B_F_r,B_F_i,B_r2,B_fm],axis=-1)
         else:
             A = AB[0]
             B = AB[1]
