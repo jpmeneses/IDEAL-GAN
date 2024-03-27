@@ -105,13 +105,13 @@ else:
 
     def _parse_function(example_proto):
         # Parse the input `tf.train.Example` proto using the dictionary above.
-        return tf.io.parse_example(example_proto, feature_description)
+        parsed_ds = tf.io.parse_example(example_proto, feature_description)
+        return tf.io.parse_tensor(parsed_ds['acqs'], out_type=tf.float32), tf.io.parse_tensor(parsed_ds['out_maps'], out_type=tf.float32)
 
     A_B_dataset = tfr_dataset.map(_parse_function)
 
-    for parsed_record in A_B_dataset.take(1):
-        out_maps = tf.io.parse_tensor(parsed_record['out_maps'], out_type=tf.float32)
-    n_out,hgt,wdt,n_ch = out_maps.shape
+    for A, B in A_B_dataset.take(1):
+        n_out,hgt,wdt,n_ch = B.shape
     len_dataset = 2400
 
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
@@ -425,15 +425,8 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for AB in A_B_dataset:
+    for A, B in A_B_dataset:
         if args.DL_gen:
-            A = list()
-            B = list()
-            for j in range(len(AB['acqs'])):
-                A.append(tf.io.parse_tensor(AB['acqs'][j], out_type=tf.float32))
-                B.append(tf.io.parse_tensor(AB['out_maps'][j], out_type=tf.float32))
-            # A = tf.concat(A,axis=0)
-            # B = tf.concat(B,axis=0)
             B_W_r = B[:,0,:,:,:1] * tf.math.cos(B[:,1,:,:,1:2]*np.pi)
             B_W_i = B[:,0,:,:,:1] * tf.math.sin(B[:,1,:,:,1:2]*np.pi)
             B_F_r = B[:,0,:,:,1:2]* tf.math.cos(B[:,1,:,:,1:2]*np.pi)
@@ -441,9 +434,6 @@ for ep in range(args.epochs):
             B_r2 = B[:,0,:,:,2:]
             B_fm = B[:,1,:,:,2:]
             B = tf.concat([B_W_r,B_W_i,B_F_r,B_F_i,B_r2,B_fm],axis=-1)
-        else:
-            A = AB[0]
-            B = AB[1]
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
