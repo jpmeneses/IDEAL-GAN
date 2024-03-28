@@ -19,6 +19,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
+py.arg('--DL_filename', default='LDM_ds')
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -95,7 +96,7 @@ if not(args.DL_gen):
     A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
 
 else:
-    recordPath = py.join('tfrecord','LDM_ds')
+    recordPath = py.join('tfrecord', args.DL_filename)
     tfr_dataset = tf.data.TFRecordDataset([recordPath])
     # Create a description of the features.
     feature_description = {
