@@ -427,14 +427,6 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
-        if args.DL_gen:
-            B_W_r = B[:,0,:,:,:1] * tf.math.cos(B[:,1,:,:,1:2]*np.pi)
-            B_W_i = B[:,0,:,:,:1] * tf.math.sin(B[:,1,:,:,1:2]*np.pi)
-            B_F_r = B[:,0,:,:,1:2]* tf.math.cos(B[:,1,:,:,1:2]*np.pi)
-            B_F_i = B[:,0,:,:,1:2]* tf.math.sin(B[:,1,:,:,1:2]*np.pi)
-            B_r2 = B[:,0,:,:,2:]
-            B_fm = B[:,1,:,:,2:]
-            B = tf.concat([B_W_r,B_W_i,B_F_r,B_F_i,B_r2,B_fm],axis=-1)
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
