@@ -214,9 +214,9 @@ def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
         Im_rho = tf.transpose(Z2B2A[:,:,:,:,1], perm=[0,2,3,1])
         zero_fill = tf.zeros_like(Re_rho)
         re_stack = tf.stack([Re_rho,zero_fill],4)
-        re_aux = tf.reshape(re_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
+        re_aux = tf.reshape(re_stack,[Z.shape[0],hgt,wdt,2*Z2B2A.shape[1]])
         im_stack = tf.stack([zero_fill,Im_rho],4)
-        im_aux = tf.reshape(im_stack,[Z.shape[0],hgt,wdt,2*args.n_echoes])
+        im_aux = tf.reshape(im_stack,[Z.shape[0],hgt,wdt,2*Z2B2A.shape[1]])
         Z2B2A = re_aux + im_aux
 
     return Z2B, Z2B2A
