@@ -112,7 +112,7 @@ else:
     A_B_dataset = tfr_dataset.map(_parse_function)
 
     for A, B in A_B_dataset.take(1):
-        n_out,hgt,wdt,n_ch = B.shape
+        hgt,wdt,_ = B.shape
     len_dataset = 2400
 
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
