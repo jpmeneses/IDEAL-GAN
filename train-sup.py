@@ -20,6 +20,7 @@ py.arg('--dataset', default='WF-sup')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
 py.arg('--DL_filename', default='LDM_ds')
+py.arg('--sigma_noise', type=float, default=0.0)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -428,19 +429,10 @@ for ep in range(args.epochs):
     # train for an epoch
     for A, B in A_B_dataset:
         # ==============================================================================
-        # =                             DATA AUGMENTATION                              =
+        # =                             NOISE ADDITION                                 =
         # ==============================================================================
-        # p = np.random.rand()
-        # if p <= 0.4:
-        #     # Random 90 deg rotations
-        #     for _ in range(np.random.randint(3)):
-        #         B = tf.image.rot90(B)
-
-        #     # Random horizontal reflections
-        #     B = tf.image.random_flip_left_right(B)
-
-        #     # Random vertical reflections
-        #     B = tf.image.random_flip_up_down(B)
+        if args.sigma_noise > 0.0:
+            A = tf.keras.layers.GaussianNoise(stddev=args.sigma_noise)(A, training=True)
         # ==============================================================================
         
         G_loss_dict = train_step(A, B)
