@@ -176,6 +176,8 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
+IDEAL_op = wf.IDEAL_Layer(field=args.field)
+
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
@@ -186,7 +188,14 @@ G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args
 # ==============================================================================
 
 @tf.function
-def train_G(A, B):
+def train_G(A, B, te=None):
+    if (args.TE1 != 0.0013) and (args.dTE != 0.0021):
+        B_aux = data.B_to_MEBCRN(B)
+        A = IDEAL_op(B_aux, te=te, training=False)
+        if args.G_model!='MEBCRN':
+            A = data.A_from_MEBCRN(A)
+    if args.sigma_noise > 0.0:
+        A = tf.keras.layers.GaussianNoise(stddev=args.sigma_noise)(A, training=True)
     B_WF = B[:,:,:,:4]
     B_PM = B[:,:,:,4:]
     B_WF_abs = tf.abs(tf.complex(B_WF[:,:,:,0::2],B_WF[:,:,:,1::2]))
@@ -428,14 +437,13 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for A, B in A_B_dataset:
-        # ==============================================================================
-        # =                             NOISE ADDITION                                 =
-        # ==============================================================================
-        if args.sigma_noise > 0.0:
-            A = tf.keras.layers.GaussianNoise(stddev=args.sigma_noise)(A, training=True)
+        if (args.TE1 == 0.0013) and (args.dTE == 0.0021):
+            te = None
+        else:
+            te = wf.gen_TEvar(args.n_echoes, bs=B.shape[0], TE_ini_d=args.TE1, d_TE_min=args.dTE)
         # ==============================================================================
         
-        G_loss_dict = train_step(A, B)
+        G_loss_dict = train_step(A, B, te)
 
         # # summary
         with train_summary_writer.as_default():
