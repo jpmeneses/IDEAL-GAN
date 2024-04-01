@@ -321,8 +321,8 @@ def train_G(A, B, te=None):
             'L1_FM': FM_L1}
 
 
-def train_step(A, B):
-    G_loss_dict = train_G(A, B)
+def train_step(A, B, te=None):
+    G_loss_dict = train_G(A, B, te)
     return G_loss_dict
 
 
