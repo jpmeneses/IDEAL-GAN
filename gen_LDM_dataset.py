@@ -14,7 +14,6 @@ import data
 
 py.arg('--experiment_dir', default='output/GAN-100')
 py.arg('--ds_filename', default='LDM_ds')
-py.arg('--te_input', type=bool, default=False)
 py.arg('--MEBCRN', type=bool, default=True)
 py.arg('--DDIM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=10)
