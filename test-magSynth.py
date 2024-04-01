@@ -18,7 +18,8 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
-py.arg('--te_input', type=bool, default=False)
+py.arg('--n_echoes', type=int, default=6)
+py.arg('--remove_imag', type=bool, default=False)
 py.arg('--LDM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=10)
 py.arg('--n_samples', type=int, default=60)
@@ -58,7 +59,7 @@ r2_sc = 200.0
 
 dataset_dir = '../datasets/'
 dataset_hdf5_2 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, 12, end=args.n_samples,
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, 2*args.n_echoes, end=args.n_samples,
                             MEBCRN=True, mag_and_phase=args.only_mag)
 
 len_dataset,ne,hgt,wdt,n_ch = valX.shape
@@ -184,13 +185,10 @@ else:
 
 # @tf.function
 def sample(A,Z_std):
-    # Turn complex-valued CSE-MR image into only-magnitude
-    # A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-    # A_pha = 0.25 * np.pi
-    # A_pha = tf.random.uniform(A_mag.shape,minval=-np.pi,maxval=np.pi,seed=0)
-    # A = tf.concat([A_mag*tf.math.cos(A_pha),A_mag*tf.math.sin(A_pha)],axis=-1)
-    A_real = A[:,:,:,:,:1]
-    A = tf.concat([A_real,tf.zeros_like(A_real)],axis=-1)
+    # Turn complex-valued CSE-MR image into only-real
+    if args.remove_imag:
+        A_real = A[:,:,:,:,:1]
+        A = tf.concat([A_real,tf.zeros_like(A_real)],axis=-1)
     A2Z = enc(A, training=False)
     if args.VQ_encoder:
         vq_dict = vq_op(A2Z)
@@ -218,7 +216,7 @@ def sample(A,Z_std):
         A2Z2B_xi= dec_xi(A2Z, training=False)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     # Reconstructed multi-echo images
-    A2B2A = IDEAL_op(A2B)
+    A2B2A = IDEAL_op(A2B,ne=args.n_echoes)
 
     return A2B, A2B2A
 
@@ -230,16 +228,67 @@ ms_ssim_scores = []
 ssim_scores = []
 
 k = 0
+# sample
+sample_dir = py.join(output_dir, 'samples_ldm_testing', 'all')
+wf_dir = py.join(output_dir, 'samples_ldm_testing', 'wf')
+qmap_dir = py.join(output_dir, 'samples_ldm_testing', 'qmap')
+mag_dir = py.join(output_dir, 'samples_ldm_testing', 'im_mag')
+pha_dir = py.join(output_dir, 'samples_ldm_testing', 'im_phase')
+py.mkdir(sample_dir)
+py.mkdir(wf_dir)
+py.mkdir(qmap_dir)
+py.mkdir(mag_dir)
+py.mkdir(pha_dir)
+
+# main loop
 for A, B in A_B_dataset_val:
     # Get only-magnitude latent space
     A2B, A2B2A = sample(A,z_std)
 
-    # SSIM metrics for pairs of synthetic data within batch
-    # idx_pairs = list(itertools.combinations(range(A.shape[0]), 2))
-    # for idx_a, idx_b in idx_pairs:
-    #     ms_ssim_scores.append(tf.image.ssim_multiscale(Z2B2A[idx_a]+1.0, Z2B2A[idx_b]+1.0, 2))
-    #     ssim_scores.append(tf.image.ssim(Z2B2A[idx_a]+1.0, Z2B2A[idx_b]+1.0, 2))
+    fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
+    # Magnitude of recon MR images at each echo
+    im_ech1 = np.squeeze(tf.complex(A[:,0,:,:,0],A[:,0,:,:,1]))
+    im_ech2 = np.squeeze(tf.complex(A[:,1,:,:,0],A[:,1,:,:,1]))
+    im_ech3 = np.squeeze(tf.complex(A[:,2,:,:,0],A[:,2,:,:,1]))
+    im_ech4 = np.squeeze(tf.complex(A[:,3,:,:,0],A[:,3,:,:,1]))
+    im_ech5 = np.squeeze(tf.complex(A[:,4,:,:,0],A[:,4,:,:,1]))
+    im_ech6 = np.squeeze(tf.complex(A[:,5,:,:,0],A[:,5,:,:,1]))
+
+    recon_ech1 = np.squeeze(tf.complex(A2B2A[:,0,:,:,0],A2B2A[:,0,:,:,1]))
+    recon_ech2 = np.squeeze(tf.complex(A2B2A[:,1,:,:,0],A2B2A[:,1,:,:,1]))
+    recon_ech3 = np.squeeze(tf.complex(A2B2A[:,2,:,:,0],A2B2A[:,2,:,:,1]))
+    recon_ech4 = np.squeeze(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1]))
+    recon_ech5 = np.squeeze(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1]))
+    recon_ech6 = np.squeeze(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1]))
+    
+    # Acquisitions in the first row
+    acq_ech1 = axs[0,0].imshow(np.abs(recon_ech1), cmap='gist_earth',
+                          interpolation='none', vmin=0, vmax=1)
+    axs[0,0].set_title('1st Echo')
+    axs[0,0].axis('off')
+    acq_ech2 = axs[0,1].imshow(np.abs(recon_ech2), cmap='gist_earth',
+                          interpolation='none', vmin=0, vmax=1)
+    axs[0,1].set_title('2nd Echo')
+    axs[0,1].axis('off')
+    acq_ech3 = axs[0,2].imshow(np.abs(recon_ech3), cmap='gist_earth',
+                              interpolation='none', vmin=0, vmax=1)
+    axs[0,2].set_title('3rd Echo')
+    axs[0,2].axis('off')
+    acq_ech4 = axs[0,3].imshow(np.abs(recon_ech4), cmap='gist_earth',
+                              interpolation='none', vmin=0, vmax=1)
+    axs[0,3].set_title('4th Echo')
+    axs[0,3].axis('off')
+    acq_ech5 = axs[0,4].imshow(np.abs(recon_ech5), cmap='gist_earth',
+                              interpolation='none', vmin=0, vmax=1)
+    axs[0,4].set_title('5th Echo')
+    axs[0,4].axis('off')
+    acq_ech6 = axs[0,5].imshow(np.abs(recon_ech6), cmap='gist_earth',
+                              interpolation='none', vmin=0, vmax=1)
+    axs[0,5].set_title('6th Echo')
+    axs[0,5].axis('off')
+
+    # A2B maps in the second row
     if args.only_mag:
         w_m_aux = np.squeeze(A2B[:,0,:,:,0])
         w_p_aux = np.squeeze(A2B[:,1,:,:,0])
@@ -247,56 +296,35 @@ for A, B in A_B_dataset_val:
         f_p_aux = np.squeeze(A2B[:,1,:,:,1])
         r2_aux = np.squeeze(A2B[:,0,:,:,2])
         field_aux = np.squeeze(A2B[:,1,:,:,2])
+
+        wn_m_aux = np.squeeze(B[:,0,:,:,0])
+        wn_p_aux = np.squeeze(B[:,1,:,:,0])
+        fn_m_aux = np.squeeze(B[:,0,:,:,1])
+        fn_p_aux = np.squeeze(B[:,1,:,:,1])
+        r2n_aux = np.squeeze(B[:,0,:,:,2])
+        fieldn_aux = np.squeeze(B[:,1,:,:,2])
+
     else:
-        w_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
-        w_p_aux = np.squeeze(np.arctan2(A2B[:,0,:,:,1],A2B[:,0,:,:,0]))/np.pi
-        f_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
-        f_p_aux = np.squeeze(np.arctan2(A2B[:,1,:,:,1],A2B[:,1,:,:,0]))/np.pi
-        r2_aux = np.squeeze(A2B[:,2,:,:,1])
-        field_aux = np.squeeze(A2B[:,2,:,:,0])
+        w_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
+        w_p_aux = np.squeeze(np.arctan2(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]))/np.pi
+        f_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,1,:,:,0],Z2B[:,1,:,:,1])))
+        f_p_aux = np.squeeze(np.arctan2(Z2B[:,1,:,:,1],Z2B[:,1,:,:,0]))/np.pi
+        r2_aux = np.squeeze(Z2B[:,2,:,:,1])
+        field_aux = np.squeeze(Z2B[:,2,:,:,0])
 
-    im_ech1 = np.squeeze(np.abs(tf.complex(A2B2A[:,0,:,:,0],A2B2A[:,0,:,:,1])))
-    im_ech2 = np.squeeze(np.abs(tf.complex(A2B2A[:,1,:,:,0],A2B2A[:,1,:,:,1])))
-    im_ech3 = np.squeeze(np.abs(tf.complex(A2B2A[:,2,:,:,0],A2B2A[:,2,:,:,1])))
-    im_ech4 = np.squeeze(np.abs(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1])))
-    im_ech5 = np.squeeze(np.abs(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1])))
-    im_ech6 = np.squeeze(np.abs(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1])))
+        wn_m_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+        wn_p_aux = np.squeeze(np.arctan2(B[:,0,:,:,1],B[:,0,:,:,0]))/np.pi
+        fn_m_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+        fn_p_aux = np.squeeze(np.arctan2(B[:,1,:,:,1],B[:,1,:,:,0]))/np.pi
+        r2n_aux = np.squeeze(B[:,2,:,:,1])
+        fieldn_aux = np.squeeze(B[:,2,:,:,0])
 
-    fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
-
-    # Acquisitions in the first row
-    acq_ech1 = axs[0,0].imshow(im_ech1, cmap='gist_earth',
-                            interpolation='none', vmin=0, vmax=1)
-    axs[0,0].set_title('1st Echo')
-    axs[0,0].axis('off')
-    acq_ech2 = axs[0,1].imshow(im_ech2, cmap='gist_earth',
-                            interpolation='none', vmin=0, vmax=1)
-    axs[0,1].set_title('2nd Echo')
-    axs[0,1].axis('off')
-    acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
-                            interpolation='none', vmin=0, vmax=1)
-    axs[0,2].set_title('3rd Echo')
-    axs[0,2].axis('off')
-    acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
-                            interpolation='none', vmin=0, vmax=1)
-    axs[0,3].set_title('4th Echo')
-    axs[0,3].axis('off')
-    acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
-                            interpolation='none', vmin=0, vmax=1)
-    axs[0,4].set_title('5th Echo')
-    axs[0,4].axis('off')
-    acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
-                            interpolation='none', vmin=0, vmax=1)
-    axs[0,5].set_title('6th Echo')
-    axs[0,5].axis('off')
-
-    # Z2B maps in the second row
     W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
                             interpolation='none', vmin=0, vmax=1)
     fig.colorbar(W_ok, ax=axs[1,0])
     axs[1,0].axis('off')
 
-    Wp_ok = axs[1,1].imshow(w_p_aux, cmap='twilight',
+    Wp_ok =  axs[1,1].imshow(w_p_aux, cmap='twilight',
                             interpolation='none', vmin=-1, vmax=1)
     fig.colorbar(Wp_ok, ax=axs[1,1])
     axs[1,1].axis('off')
@@ -321,64 +349,94 @@ for A, B in A_B_dataset_val:
     fig.colorbar(field_ok, ax=axs[1,5])
     axs[1,5].axis('off')
 
-    # Ground-truth in the third row
-    if args.only_mag:
-        wn_m_aux = np.squeeze(B[:,0,:,:,0])
-        wn_p_aux = np.squeeze(B[:,1,:,:,0])
-        fn_m_aux = np.squeeze(B[:,0,:,:,1])
-        fn_p_aux = np.squeeze(B[:,1,:,:,1])
-        r2n_aux = np.squeeze(B[:,0,:,:,2])
-        fieldn_aux = np.squeeze(B[:,1,:,:,2])
-    else:
-        wn_m_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
-        wn_p_aux = np.squeeze(np.arctan2(B[:,0,:,:,1],B[:,0,:,:,0]))/np.pi
-        fn_m_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
-        fn_p_aux = np.squeeze(np.arctan2(B[:,1,:,:,1],B[:,1,:,:,0]))/np.pi
-        r2n_aux = np.squeeze(B[:,2,:,:,1])
-        fieldn_aux = np.squeeze(B[:,2,:,:,0])
-
-    W_unet = axs[2,0].imshow(wn_m_aux, cmap='bone',
+    W_gt =  axs[2,0].imshow(wn_m_aux, cmap='bone',
                             interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(W_unet, ax=axs[2,0])
+    fig.colorbar(W_gt, ax=axs[2,0])
     axs[2,0].axis('off')
 
-    Wp_unet = axs[2,1].imshow(wn_p_aux, cmap='twilight',
+    Wp_gt =  axs[2,1].imshow(wn_p_aux, cmap='twilight',
                             interpolation='none', vmin=-1, vmax=1)
-    fig.colorbar(Wp_unet, ax=axs[2,1])
+    fig.colorbar(Wp_gt, ax=axs[2,1])
     axs[2,1].axis('off')
 
-    F_unet = axs[2,2].imshow(fn_m_aux, cmap='pink',
+    F_gt =  axs[2,2].imshow(fn_m_aux, cmap='pink',
                             interpolation='none', vmin=0, vmax=1)
-    fig.colorbar(F_unet, ax=axs[2,2])
+    fig.colorbar(F_gt, ax=axs[2,2])
     axs[2,2].axis('off')
 
-    Fp_unet = axs[2,3].imshow(fn_p_aux, cmap='twilight',
+    Fp_gt = axs[2,3].imshow(fn_p_aux, cmap='twilight',
                             interpolation='none', vmin=-1, vmax=1)
-    fig.colorbar(Fp_unet, ax=axs[2,3])
+    fig.colorbar(Fp_gt, ax=axs[2,3])
     axs[2,3].axis('off')
 
-    r2_unet = axs[2,4].imshow(r2n_aux*r2_sc, cmap='copper',
+    r2_gt = axs[2,4].imshow(r2n_aux*r2_sc, cmap='copper',
                             interpolation='none', vmin=0, vmax=r2_sc)
-    fig.colorbar(r2_unet, ax=axs[2,4])
+    fig.colorbar(r2_gt, ax=axs[2,4])
     axs[2,4].axis('off')
 
-    field_unet = axs[2,5].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                            interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-    fig.colorbar(field_unet, ax=axs[2,5])
+    field_gt =  axs[2,5].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                                interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+    fig.colorbar(field_gt, ax=axs[2,5])
     axs[2,5].axis('off')
 
-    # fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE, axis=1))]), fontsize=16)
-
-    # plt.show()
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
     tl.make_space_above(axs,topmargin=0.8)
-    plt.savefig(save_dir+'/sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.savefig(sample_dir+'/sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
     plt.close(fig)
 
-    k+=1
+    # WF-imshow
+    wf_fig, wf_ax = plt.subplots(figsize=(9,6))
+    wf_ok = np.concatenate([w_m_aux,f_m_aux],axis=1)
+    wf_gt = np.concatenate([wn_m_aux,fn_m_aux],axis=1)
+    wf_all = np.concatenate([wf_ok,wf_gt],axis=0)
+    wf_ax.imshow(wf_all, cmap='gray')
+    wf_ax.axis('off')
+    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+    plt.savefig(wf_dir+'/wf_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.close(wf_fig)
 
-# ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
-# print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
+    # Show Q-maps 
+    q_fig, q_axs = plt.subplots(figsize=(13,6), nrows=1, ncols=3)
+    Fp_unet = q_axs[0,0].imshow(f_p_aux*3, cmap='twilight', vmin=-3, vmax=3)
+    q_fig.colorbar(Fp_unet, ax=q_axs[0,0])
+    q_axs[0,0].axis('off')
+    r2_unet = q_axs[0,1].imshow(r2_aux*r2_sc, cmap='copper', vmin=0, vmax=r2_sc)
+    q_fig.colorbar(r2_unet, ax=q_axs[0,1])
+    q_axs[0,1].axis('off')
+    field_unet = q_axs[0,2].imshow(field_aux*fm_sc, cmap='twilight', vmin=-fm_sc/2, vmax=fm_sc/2)
+    q_fig.colorbar(field_unet, ax=q_axs[0,2])
+    q_axs[0,2].axis('off')
+    Fp_gt = q_axs[1,0].imshow(fn_p_aux*3, cmap='twilight', vmin=-3, vmax=3)
+    q_fig.colorbar(Fp_gt, ax=q_axs[1,0])
+    q_axs[1,0].axis('off')
+    r2_gt = q_axs[1,1].imshow(r2n_aux*r2_sc, cmap='copper', vmin=0, vmax=r2_sc)
+    q_fig.colorbar(r2_gt, ax=q_axs[1,1])
+    q_axs[1,1].axis('off')
+    field_unet = q_axs[1,2].imshow(fieldn_aux*fm_sc, cmap='twilight', vmin=-fm_sc/2, vmax=fm_sc/2)
+    q_fig.colorbar(field_gt, ax=q_axs[1,2])
+    q_axs[1,2].axis('off')
+    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+    plt.savefig(qmap_dir+'/qmap_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.close(q_fig)
 
-# ssim_scores = tf.concat(ssim_scores,axis=0)
-# print(f"SSIM Score: {tf.reduce_mean(ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ssim_scores).numpy():.4f}")
+    # Show all-echo magnitude
+    orig_echo = np.concatenate([im_ech1,im_ech2,im_ech3,im_ech4,im_ech5,im_ech6],axis=1)
+    recon_echo = np.concatenate([recon_ech1,recon_ech2,recon_ech3,recon_ech4,recon_ech5,recon_ech6],axis=1)
+    all_echo = np.concatenate([orig_echo,recon_echo],axis=0)
+    mag_fig, mag_ax = plt.subplots(figsize=(18,6))
+    mag_ax.imshow(np.abs(all_echo), cmap='gray')
+    mag_ax.axis('off')
+    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+    plt.savefig(mag_dir+'/im_mag_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.close(mag_fig)
+
+    # Show all-echo unwrapped phase
+    pha_fig, pha_ax = plt.subplots(figsize=(21,6))
+    orig_pha = pha_ax.imshow(unwrap_phase(np.angle(orig_echo))/np.pi, cmap='twilight', vmin=-4, vmax=4)
+    recon_pha = pha_ax.imshow(unwrap_phase(np.angle(recon_echo))/np.pi, cmap='twilight', vmin=-4, vmax=4)
+    im_pha = np.concatenate([orig_pha,recon_pha],axis=0)
+    pha_fig.colorbar(im_pha, ax=pha_ax)
+    pha_ax.axis('off')
+    plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
+    plt.savefig(pha_dir+'/im_phase_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
+    plt.close(pha_fig)
