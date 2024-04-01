@@ -298,11 +298,21 @@ def B_to_MEBCRN(B,mode='WF-PM'):
         B_R2= B[:,:,:,2:3]
         B_FM= B[:,:,:,3:]
         B_PM= tf.concat([B_FM,B_R2],axis=-1)
-
         B_W = tf.expand_dims(B_W, axis=1)
         B_F = tf.expand_dims(B_F, axis=1)
         B_PM= tf.expand_dims(B_PM,axis=1)
-
+        return tf.concat([B_W,B_F,B_PM],axis=1)
+    elif mode == 'All':
+        B_W = B[:,:,:,:2]
+        B_W = tf.concat([B_W,tf.zeros_like(B_W)],axis=-1)
+        B_F = B[:,:,:,2:4]
+        B_F = tf.concat([B_F,tf.zeros_like(B_F)],axis=-1)
+        B_R2= B[:,:,:,4:5]
+        B_FM= B[:,:,:,5:]
+        B_PM= tf.concat([B_FM,B_R2],axis=-1)
+        B_W = tf.expand_dims(B_W, axis=1)
+        B_F = tf.expand_dims(B_F, axis=1)
+        B_PM= tf.expand_dims(B_PM,axis=1)
         return tf.concat([B_W,B_F,B_PM],axis=1)
 
 
