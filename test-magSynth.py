@@ -427,9 +427,9 @@ for A, B in A_B_dataset_val:
 
     # Show all-echo unwrapped phase
     pha_fig, pha_ax = plt.subplots(figsize=(21,6))
-    orig_pha = pha_ax.imshow(unwrap_phase(np.angle(orig_echo))/np.pi, cmap='twilight', vmin=-4, vmax=4)
-    recon_pha = pha_ax.imshow(unwrap_phase(np.angle(recon_echo))/np.pi, cmap='twilight', vmin=-4, vmax=4)
-    im_pha = np.concatenate([orig_pha,recon_pha],axis=0)
+    orig_pha = unwrap_phase(np.angle(orig_echo))/np.pi
+    recon_pha = unwrap_phase(np.angle(recon_echo))/np.pi
+    im_pha = pha_ax.imshow(np.concatenate([orig_pha,recon_pha],axis=0), cmap='twilight', vmin=-4, vmax=4)
     pha_fig.colorbar(im_pha, ax=pha_ax)
     pha_ax.axis('off')
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
