@@ -390,7 +390,7 @@ for A, B in A_B_dataset_val:
     plt.close(wf_fig)
 
     # Show Q-maps 
-    q_fig, q_axs = plt.subplots(figsize=(13,6), nrows=1, ncols=3)
+    q_fig, q_axs = plt.subplots(figsize=(13,6), nrows=2, ncols=3)
     Fp_unet = q_axs[0,0].imshow(f_p_aux*3, cmap='twilight', vmin=-3, vmax=3)
     q_fig.colorbar(Fp_unet, ax=q_axs[0,0])
     q_axs[0,0].axis('off')
