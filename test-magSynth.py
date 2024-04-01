@@ -221,19 +221,13 @@ def sample(A,Z_std):
     return A2B, A2B2A
 
 # run
-save_dir = py.join(args.experiment_dir, 'samples_testing', 'phase_synth')
-py.mkdir(save_dir)
-
-ms_ssim_scores = []
-ssim_scores = []
-
 k = 0
 # sample
-sample_dir = py.join(output_dir, 'samples_ldm_testing', 'all')
-wf_dir = py.join(output_dir, 'samples_ldm_testing', 'wf')
-qmap_dir = py.join(output_dir, 'samples_ldm_testing', 'qmap')
-mag_dir = py.join(output_dir, 'samples_ldm_testing', 'im_mag')
-pha_dir = py.join(output_dir, 'samples_ldm_testing', 'im_phase')
+sample_dir = py.join(args.experiment_dir, 'samples_testing', 'all')
+wf_dir = py.join(args.experiment_dir, 'samples_testing', 'wf')
+qmap_dir = py.join(args.experiment_dir, 'samples_testing', 'qmap')
+mag_dir = py.join(args.experiment_dir, 'samples_testing', 'im_mag')
+pha_dir = py.join(args.experiment_dir, 'samples_testing', 'im_phase')
 py.mkdir(sample_dir)
 py.mkdir(wf_dir)
 py.mkdir(qmap_dir)
@@ -440,3 +434,5 @@ for A, B in A_B_dataset_val:
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
     plt.savefig(pha_dir+'/im_phase_sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
     plt.close(pha_fig)
+
+    k+=1
