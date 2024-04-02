@@ -221,7 +221,7 @@ def sample(A,Z_std):
         A2Z2B_xi= dec_xi(A2Z, training=False)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     # Reconstructed multi-echo images
-    A2B2A = IDEAL_op(A2B,ne=args.n_echoes)
+    A2B2A = IDEAL_op(A2B)
 
     return A2B, A2B2A
 
