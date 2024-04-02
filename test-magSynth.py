@@ -69,6 +69,10 @@ if args.only_mag:
 else:
     _,n_out,_,_,_ = np.shape(valY)
 
+print('Acquisition Dimensions:', hgt, wdt)
+print('Echoes:', ne)
+print('Output Maps:', n_out)
+
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
 A_B_dataset_val = A_B_dataset_val.batch(args.val_batch_size)
 
