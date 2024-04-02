@@ -266,18 +266,9 @@ for A, B in A_B_dataset_val:
     recon_ech1 = np.squeeze(tf.complex(A2B2A[:,0,:,:,0],A2B2A[:,0,:,:,1]))
     recon_ech2 = np.squeeze(tf.complex(A2B2A[:,1,:,:,0],A2B2A[:,1,:,:,1]))
     recon_ech3 = np.squeeze(tf.complex(A2B2A[:,2,:,:,0],A2B2A[:,2,:,:,1]))
-    if args.n_echoes > 3:
-        recon_ech4 = np.squeeze(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1]))
-    else:
-        recon_ech4 = np.zeros_like(recon_ech3)
-    if args.n_echoes > 4:
-        recon_ech5 = np.squeeze(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1]))
-    else:
-        recon_ech5 = np.zeros_like(recon_ech3)
-    if args.n_echoes > 5:
-        recon_ech6 = np.squeeze(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1]))
-    else:
-        recon_ech6 = np.zeros_like(recon_ech3)
+    recon_ech4 = np.squeeze(tf.complex(A2B2A[:,3,:,:,0],A2B2A[:,3,:,:,1]))
+    recon_ech5 = np.squeeze(tf.complex(A2B2A[:,4,:,:,0],A2B2A[:,4,:,:,1]))
+    recon_ech6 = np.squeeze(tf.complex(A2B2A[:,5,:,:,0],A2B2A[:,5,:,:,1]))
     
     # Acquisitions in the first row
     acq_ech1 = axs[0,0].imshow(np.abs(recon_ech1), cmap='gist_earth',
