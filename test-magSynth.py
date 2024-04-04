@@ -239,10 +239,18 @@ py.mkdir(qmap_dir)
 py.mkdir(mag_dir)
 py.mkdir(pha_dir)
 
+ms_ssim_scores = []
+ssim_scores = []
+
 # main loop
 for A, B in A_B_dataset_val:
     # Get only-magnitude latent space
     A2B, A2B2A = sample(A,z_std)
+
+    # Save A2B2A cycle's SSIM 
+    for idx_a in range(A.shape[0]):
+        ms_ssim_scores.append(tf.image.ssim_multiscale(A[idx_a]+1.0, A2B2A[idx_b]+1.0, 2))
+        ssim_scores.append(tf.image.ssim(A[idx_a]+1.0, A2B2A[idx_b]+1.0, 2))
 
     fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
@@ -450,3 +458,9 @@ for A, B in A_B_dataset_val:
     plt.close(pha_fig)
 
     k+=1
+
+ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
+print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
+
+ssim_scores = tf.concat(ssim_scores,axis=0)
+print(f"SSIM Score: {tf.reduce_mean(ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ssim_scores).numpy():.4f}")
