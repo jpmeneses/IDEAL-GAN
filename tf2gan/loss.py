@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow.keras as keras
 from tensorflow.keras.losses import Loss
 
 def get_gan_losses_fn():
@@ -130,12 +131,8 @@ class VarMeanSquaredError(tf.keras.losses.Loss):
         idx = y_pred.shape[-1]//2
         var_map = y_pred[...,idx:]
         y_pred = y_pred[...,:idx]
-        if var_map.shape[-1] > 1:
-            var_map = tf.reduce_sum(var_map, axis=-1, keepdims=True)
         std_map = tf.math.sqrt(var_map)
-        tf.debugging.assert_type(std_map, tf_type=tf.float32, message='Complex values obtained after sqrt op')
-        msd = tf.reduce_mean(tf.math.square(y_true - y_pred), axis=-1, keepdims=True)
-        STDw_msd = tf.math.divide_no_nan(msd, std_map)
         log_std = tf.where(std_map!=0.0, tf.math.log(std_map), 0.0)
-        STDw_msd += log_std
-        return tf.reduce_mean(STDw_msd, axis=-1)
+        msd = tf.square(y_true - y_pred)
+        STDw_msd = tf.math.divide_no_nan(msd, std_map)
+        return tf.reduce_mean(STDw_msd + log_std)

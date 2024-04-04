@@ -295,38 +295,51 @@ def UNet(
     if bayesian:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
+        # out_var = keras.layers.concatenate([output,out_var])
         # if output_activation == 'sigmoid':
         #     out_var = tf.keras.layers.Lambda(lambda x: x*0.001)(out_var)
-        x_prob = tf.concat([output,out_var],axis=-1)
-        if output_activation == 'tanh':
-            out_prob = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.Normal(
-                            loc=t[...,:n_out],
-                            scale=tf.math.sqrt(t[...,n_out:])),
-                        )(x_prob)
-        else:
+        # x_prob = tf.concat([output,out_var],axis=-1)
+        # if output_activation == 'tanh':
+        #     out_prob = tfp.layers.DistributionLambda(
+        #                 lambda t: tfp.distributions.Normal(
+        #                     loc=t[...,:n_out],
+        #                     scale=tf.math.sqrt(t[...,n_out:])),
+        #                 )(x_prob)
+        # else:
             # Based on: https://en.wikipedia.org/wiki/Rice_distribution#Related_distributions
-            x_prob = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.Poisson(
-                            rate=tf.math.divide_no_nan(tf.square(t[...,:n_out]),2*tf.math.sqrt(t[...,n_out:]))),
-                        )(x_prob)
-            out_prob = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.Chi2(
-                            df=2*t+2),
-                        )(x_prob)
+            # x_prob = tfp.layers.DistributionLambda(
+            #             lambda t: tfp.distributions.Poisson(
+            #                 rate=tf.math.divide_no_nan(tf.square(t[...,:n_out]),2*tf.math.sqrt(t[...,n_out:]))),
+            #             )(x_prob)
+            # out_prob = tfp.layers.DistributionLambda(
+            #             lambda t: tfp.distributions.Chi2(
+            #                 df=2*t+2),
+            #             )(x_prob)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
         out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
-        out_prob = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_prob)
+        # out_prob = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_prob)
 
     if te_input and bayesian:
-        return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_var])
+        return keras.Model(inputs=[inputs1,inputs2], outputs=[output,out_var])
     elif te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)
     elif bayesian:
-        return keras.Model(inputs=inputs1, outputs=[out_prob,output,out_var])
+        return keras.Model(inputs=inputs1, outputs=[output,out_var])
     else:
         return keras.Model(inputs=inputs1, outputs=output)
+
+
+def PDF_sample(input_shape):
+    mean = inputs1 = keras.Input(input_shape)
+    std = inputs2 = keras.Input(input_shape)
+    x_prob = keras.layers.concatenate([mean, std])
+    out_prob = tfp.layers.DistributionLambda(
+                lambda t: tfp.distributions.Normal(
+                    loc=t[...,:input_shape[-1]],
+                    scale=tf.math.sqrt(t[...,input_shape[-1]:])),
+                )(x_prob)
+    return keras.Model(inputs=[inputs1,inputs2], outputs=out_prob)
 
 
 def MDWF_Generator(

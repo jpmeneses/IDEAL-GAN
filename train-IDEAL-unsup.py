@@ -97,12 +97,6 @@ valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
 trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
-# Over-correct data type
-trainX = trainX.astype(np.float32)
-trainY = trainY.astype(np.float32)
-valX = valX.astype(np.float32)
-valY = valY.astype(np.float32)
-
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
 _,n_out,_,_,_ = np.shape(valY)
@@ -136,7 +130,7 @@ if args.G_model == 'U-Net':
                     self_attention=args.D1_SelfAttention)
     if args.out_vars == 'R2s' or args.out_vars == 'PM':
         G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
-                        bayesian=args.UQ,
+                        bayesian=False,
                         ME_layer=args.ME_layer,
                         te_input=False,
                         te_shape=(args.n_echoes,),
@@ -153,7 +147,11 @@ elif args.G_model == 'MEBCRN':
 else:
     raise(NameError('Unrecognized Generator Architecture'))
 
+if args.UQ:
+    A_sampler = dl.PDF_sample(input_shape=(ne,hgt,wdt,n_ch))
+
 cycle_loss_fn = tf.losses.MeanSquaredError()
+uncertain_loss = gan.VarMeanSquaredError()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
@@ -169,7 +167,7 @@ def train_G(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         if args.UQ:
-            A2B_FM, _, A2B_FM_var = G_A2B(A, training=True) # Randomly sampled FM
+            A2B_FM, A2B_FM_var = G_A2B(A, training=True) # Randomly sampled FM
         else:
             A2B_FM = G_A2B(A, training=True)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -177,18 +175,11 @@ def train_G(A, B):
         if args.out_vars == 'PM':
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
             # Compute R2s map from only-mag images
-            if args.UQ:
-                # _, A2B_R2, A2B_R2_var = G_A2R2(A_abs, training=True) # Mean R2s
-                A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=(args.out_vars=='PM')) # Randomly sampled R2s
-            else:
-                A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
-                A2B_R2_var = None
+            A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
             A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
         else:
             A2B_R2 = tf.zeros_like(A2B_FM)
-            if args.UQ:
-                A2B_R2_var = tf.zeros_like(A2B_FM_var, dtype=tf.float32)
 
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
@@ -196,18 +187,17 @@ def train_G(A, B):
         A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
 
-        # Variance map mask
+        # Variance map mask and attach to recon-A
         if args.UQ:
             A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-            A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
-            A2B_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
+            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
+            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[-1], axis=-1) # shape: [nb,ne,hgt,wdt,2] = A.shape
+            A2B2A_sampled = A_sampler([A2B2A, A2B_FM_var], training=False)
+            A2B2A_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
-            if args.out_vars == 'FM':
-                A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
-            else:
-                A2B2A_cycle_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
+            A2B2A_cycle_loss = uncertain_loss(A, A2B2A_sampled_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
@@ -327,14 +317,11 @@ def train_step(A, B):
 def sample(A, B):
     if args.out_vars == 'FM':
         if args.UQ:
-            A2B_FM, A2B_FM_mean, A2B_FM_var = G_A2B(A, training=False)
+            A2B_FM, A2B_FM_var = G_A2B(A, training=False)
             A2B_R2_var = tf.zeros_like(A2B_FM_var)
         else:
             A2B_FM = G_A2B(A, training=False)
             A2B_FM_var = None
-        
-        # A2B Masks
-        A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         # Build A2B_PM array with zero-valued R2*
         A2B_R2 = tf.zeros_like(A2B_FM)
@@ -344,6 +331,14 @@ def sample(A, B):
 
         # Magnitude of water/fat images
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
+
+        # Variance map mask and attach to recon-A
+        if args.UQ:
+            A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
+            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
+            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[-1], axis=-1) # shape: [nb,ne,hgt,wdt,2] = A.shape
+            A2B2A_sampled = A_sampler([A2B2A, A2B_FM_var], training=False)
+            A2B2A_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
@@ -373,8 +368,6 @@ def sample(A, B):
     # Variance map mask
     if args.UQ:
         A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-        A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
-        A2B_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
     else:
         A2B_var = None
 
@@ -387,7 +380,7 @@ def sample(A, B):
     if args.UQ:
         if args.out_vars == 'FM':
             val_A2B2A_R2_loss = 0
-            val_A2B2A_FM_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_FM_var)
+            val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
         elif args.out_vars == 'R2s':
             val_A2B2A_R2_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
             val_A2B2A_FM_loss = 0
@@ -414,7 +407,7 @@ def sample(A, B):
                     'R2_loss': R2_loss,
                     'FM_loss': FM_loss}
 
-    return A2B, A2B_var, val_FM_dict, val_R2_dict
+    return A2B, A2B_FM_var, val_FM_dict, val_R2_dict
 
 def validation_step(A, B):
     A2B, A2B_var, val_FM_dict, val_R2_dict = sample(A, B)
