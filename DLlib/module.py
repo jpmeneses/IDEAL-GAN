@@ -317,7 +317,8 @@ def UNet(
             #             )(x_prob)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
-        out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
+        if bayesian:
+            out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
         # out_prob = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_prob)
 
     if te_input and bayesian:
