@@ -236,16 +236,12 @@ def train_G_R2(A, B):
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
 
         # Compute R2s map from only-mag images
-        if args.UQ:
-            A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=True) # Randomly-sampled R2s
-        else:
-            A2B_R2 = G_A2R2(A_abs, training=True)
-            A2B_R2_var = None
+        A2B_R2 = G_A2R2(A_abs, training=True)
         A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
         # Compute FM using complex-valued images and pre-trained model
         if args.UQ:
-            _, A2B_FM, A2B_FM_var = G_A2B(A, training=False) # Mean FM
+            A2B_FM, A2B_FM_var = G_A2B(A, training=False) # Mean FM
         else:
             A2B_FM = G_A2B(A, training=False)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -256,16 +252,17 @@ def train_G_R2(A, B):
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
         A2B2A_abs = wf.IDEAL_mag(A2B_WF_abs, A2B_PM, ne=args.n_echoes)
         
-        # Variance map mask
+        # Variance map mask and attach to recon-A
         if args.UQ:
             A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-            A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
-            A2B_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
+            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
+            A2B2A_sampled = A_sampler([A2B2A_abs, A2B_FM_var], training=False)
+            A2B2A_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
         # CHECK
         if args.UQ:
-            A2B2A_cycle_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
+            A2B2A_cycle_loss = uncertain_loss(A_abs, A2B2A_sampled_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
 
@@ -322,6 +319,7 @@ def sample(A, B):
         else:
             A2B_FM = G_A2B(A, training=False)
             A2B_FM_var = None
+        A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         # Build A2B_PM array with zero-valued R2*
         A2B_R2 = tf.zeros_like(A2B_FM)
