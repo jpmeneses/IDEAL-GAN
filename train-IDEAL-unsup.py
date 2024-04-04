@@ -362,12 +362,10 @@ def sample(A, B):
     # Variance map mask
     if args.UQ:
         A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-        A2B_R2_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
-        A2B_FM_var = tf.repeat(A2B_R2_var, A.shape[-1], axis=-1) # shape: [nb,ne,hgt,wdt,2] = A.shape
+        A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
+        A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[-1], axis=-1) # shape: [nb,ne,hgt,wdt,2] = A.shape
         A2B2A_sampled = A_sampler([A2B2A, A2B_FM_var], training=False)
         A2B2A_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
-        A2B2A_abs_sampled = A_sampler([A2B2A_abs, A2B_R2_var], training=False)
-        A2B2A_abs_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
     else:
         A2B_var = None
 
@@ -385,7 +383,8 @@ def sample(A, B):
             val_A2B2A_R2_loss = uncertain_loss(A_abs, A2B2A_abs_sampled_var)
             val_A2B2A_FM_loss = 0
         else:
-            val_A2B2A_R2_loss = uncertain_loss(A_abs, A2B2A_abs_sampled_var)
+            # val_A2B2A_R2_loss = uncertain_loss(A_abs, A2B2A_abs_sampled_var)
+            val_A2B2A_R2_loss = 0
             val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
     else:
         if args.out_vars == 'FM':
