@@ -341,16 +341,12 @@ def sample(A, B):
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
         # Compute R2s maps using only-mag images
-        if args.UQ:
-            A2B_R2, A2B_R2_mean, A2B_R2_var = G_A2R2(A_abs, training=False) 
-        else:
-            A2B_R2 = G_A2R2(A_abs, training=False)
-            A2B_R2_var = None
+        A2B_R2 = G_A2R2(A_abs, training=False)
         A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
         # Compute FM from complex-valued images
         if args.UQ:
-            A2B_FM, A2B_FM_mean, A2B_FM_var = G_A2B(A, training=False)
+            A2B_FM, A2B_FM_var = G_A2B(A, training=False)
         else:
             A2B_FM = G_A2B(A, training=False)
             A2B_FM_var = None
@@ -366,6 +362,12 @@ def sample(A, B):
     # Variance map mask
     if args.UQ:
         A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
+        A2B_R2_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
+        A2B_FM_var = tf.repeat(A2B_R2_var, A.shape[-1], axis=-1) # shape: [nb,ne,hgt,wdt,2] = A.shape
+        A2B2A_sampled = A_sampler([A2B2A, A2B_FM_var], training=False)
+        A2B2A_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
+        A2B2A_abs_sampled = A_sampler([A2B2A_abs, A2B_R2_var], training=False)
+        A2B2A_abs_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
     else:
         A2B_var = None
 
@@ -380,11 +382,11 @@ def sample(A, B):
             val_A2B2A_R2_loss = 0
             val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
         elif args.out_vars == 'R2s':
-            val_A2B2A_R2_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
+            val_A2B2A_R2_loss = uncertain_loss(A_abs, A2B2A_abs_sampled_var)
             val_A2B2A_FM_loss = 0
         else:
-            val_A2B2A_R2_loss = gan.VarMeanSquaredError(A_abs, A2B2A_abs, A2B_R2_var)
-            val_A2B2A_FM_loss = gan.VarMeanSquaredError(A, A2B2A, A2B_var)
+            val_A2B2A_R2_loss = uncertain_loss(A_abs, A2B2A_abs_sampled_var)
+            val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
     else:
         if args.out_vars == 'FM':
             val_A2B2A_R2_loss = 0
