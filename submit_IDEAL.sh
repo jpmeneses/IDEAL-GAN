@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=v812-GAN
-#SBATCH --output=out_GAN_812.txt
+#SBATCH --job-name=v315-sup
+#SBATCH --output=out_sup_315.txt
 #SBATCH --partition=gpus
 #SBATCH --gres=gpu:quadro_rtx_8000:1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl
 
-python train-IDEAL-GAN.py --dataset GAN-812 --data_size 384 --rand_ne True --rand_ph_offset False --only_mag True --n_G_filt_list 36,72,144,144,288,288 --n_downsamplings 5 --div_decod True  --encoded_size 24 --adv_train True --cGAN True --batch_size 2 --epochs 200 --epoch_decay 200 --epoch_ckpt 50 --lr 0.001 --FM_loss_weight 0.5 --ls_reg_weight 1e-6
+python train-sup.py --dataset Sup-315 --data_size 384 --DL_gen True --DL_filename LDM_ds_noMEBCRN --TE1 0.0012 --dTE 0.0018 --G_model U-Net --batch_size 16 --lr 0.001
