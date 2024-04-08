@@ -67,40 +67,35 @@ dataset_hdf5_1 = 'JGalgani_GC_384_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, end=100,
                             acqs_data=True, te_data=False, MEBCRN=True)
 
-# dataset_hdf5_2 = 'INTA_GC_384_complex_2D.hdf5'
-# acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-#                             acqs_data=True, te_data=False, MEBCRN=True)
+dataset_hdf5_2 = 'INTA_GC_384_complex_2D.hdf5'
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=True)
 
-# dataset_hdf5_3 = 'INTArest_GC_384_complex_2D.hdf5'
-# acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-#                             acqs_data=True, te_data=False, MEBCRN=True)
+dataset_hdf5_3 = 'INTArest_GC_384_complex_2D.hdf5'
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=True)
 
-# dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
-# acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-#                             acqs_data=True, te_data=False, MEBCRN=True)
+dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=True)
 
-# dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
-# acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-#                             acqs_data=True, te_data=False, MEBCRN=True)
+dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+                            acqs_data=True, te_data=False, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-# trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-# trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
-# k_divs = [0,832,1694,2547,3409,len(trainX)]
+trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+k_divs = [0,832,1694,2547,3409,len(trainX)]
 
-# valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
-# valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
 
-# trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
-# trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
-
-trainX = acqs_1[:80,:,::8,::8,:]
-trainY = out_maps_1[:80,:,::8,::8,:]
-valX = acqs_1[80:,:,::8,::8,:]
-valY = out_maps_1[80:,:,::8,::8,:]
+trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
