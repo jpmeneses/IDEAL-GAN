@@ -532,7 +532,7 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True):
     return res_rho_var
 
 
-@tf.function
+#@tf.function
 def acq_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=False):
     if MEBCRN:
         n_batch,ne,hgt,wdt,_ = acqs.shape
