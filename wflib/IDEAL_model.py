@@ -566,10 +566,10 @@ def acq_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fals
     else:
         Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # (nb,ne,nv)
 
-    r2s = mean_maps[...,0] * r2_sc
-    phi = mean_maps[...,1] * fm_sc
-    r2s_unc = var_maps[...,0] * (r2_sc**2)
-    phi_unc = var_maps[...,1] * (fm_sc**2)
+    r2s = mean_maps[...,1] * r2_sc
+    phi = mean_maps[...,0] * fm_sc
+    r2s_unc = var_maps[...,1] * (r2_sc**2)
+    phi_unc = var_maps[...,0] * (fm_sc**2)
 
     r2s_rav = tf.reshape(tf.complex(r2s,0.0),[n_batch,-1])
     r2s_rav = tf.expand_dims(r2s_rav,1) # (nb,1,nv)
