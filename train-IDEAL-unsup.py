@@ -64,38 +64,43 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_384_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, end=100,
                             acqs_data=True, te_data=False, MEBCRN=True)
 
-dataset_hdf5_2 = 'INTA_GC_384_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+# dataset_hdf5_2 = 'INTA_GC_384_complex_2D.hdf5'
+# acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+#                             acqs_data=True, te_data=False, MEBCRN=True)
 
-dataset_hdf5_3 = 'INTArest_GC_384_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+# dataset_hdf5_3 = 'INTArest_GC_384_complex_2D.hdf5'
+# acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+#                             acqs_data=True, te_data=False, MEBCRN=True)
 
-dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+# dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
+# acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+#                             acqs_data=True, te_data=False, MEBCRN=True)
 
-dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+# dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
+# acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+#                             acqs_data=True, te_data=False, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
 ################################################################################
 
-trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
-k_divs = [0,832,1694,2547,3409,len(trainX)]
+# trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+# trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+# k_divs = [0,832,1694,2547,3409,len(trainX)]
 
-valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
-valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+# valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+# valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
 
-trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
-trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+# trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+# trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+
+trainX = acqs_1[:80,:,::8,::8,:]
+trainY = out_maps_1[:80,:,::8,::8,:]
+valX = acqs_1[80:,:,::8,::8,:]
+valY = out_maps_1[80:,:,::8,::8,:]
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
@@ -130,7 +135,7 @@ if args.G_model == 'U-Net':
                     self_attention=args.D1_SelfAttention)
     if args.out_vars == 'R2s' or args.out_vars == 'PM':
         G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
-                        bayesian=False,
+                        bayesian=args.UQ,
                         ME_layer=args.ME_layer,
                         te_input=False,
                         te_shape=(args.n_echoes,),
@@ -146,9 +151,6 @@ elif args.G_model == 'MEBCRN':
                     self_attention=args.D1_SelfAttention)
 else:
     raise(NameError('Unrecognized Generator Architecture'))
-
-if args.UQ:
-    A_sampler = dl.PDF_sample(input_shape=(ne,hgt,wdt,n_ch))
 
 cycle_loss_fn = tf.losses.MeanSquaredError()
 uncertain_loss = gan.VarMeanSquaredError()
@@ -167,7 +169,7 @@ def train_G(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         if args.UQ:
-            A2B_FM, A2B_FM_var = G_A2B(A, training=True) # Randomly sampled FM
+            A2B_FM, _, A2B_FM_var = G_A2B(A, training=True) # Randomly sampled FM
         else:
             A2B_FM = G_A2B(A, training=True)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -175,11 +177,17 @@ def train_G(A, B):
         if args.out_vars == 'PM':
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
             # Compute R2s map from only-mag images
-            A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
+            if args.UQ:
+                A2B_R2, _, A2B_R2_var = G_A2R2(A_abs, training=(args.out_vars=='PM')) # Randomly sampled R2s
+            else:
+                A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
+                A2B_R2_var = None
             A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
         else:
             A2B_R2 = tf.zeros_like(A2B_FM)
+            if args.UQ:
+                A2B_R2_var = tf.zeros_like(A2B_FM_var)
 
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
@@ -190,10 +198,10 @@ def train_G(A, B):
         # Variance map mask and attach to recon-A
         if args.UQ:
             A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
-            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[-1], axis=-1) # shape: [nb,ne,hgt,wdt,2] = A.shape
-            A2B2A_sampled = A_sampler([A2B2A, A2B_FM_var], training=False)
-            A2B2A_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
+            A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
+            A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
+            A2B2A_var = wf.acq_uncertainty(A, A2B_PM, A2B_PM_var, rem_R2=True)
+            A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
@@ -314,7 +322,7 @@ def train_step(A, B):
 def sample(A, B):
     if args.out_vars == 'FM':
         if args.UQ:
-            A2B_FM, A2B_FM_var = G_A2B(A, training=False)
+            A2B_FM, _, A2B_FM_var = G_A2B(A, training=False)
             A2B_R2_var = tf.zeros_like(A2B_FM_var)
         else:
             A2B_FM = G_A2B(A, training=False)
@@ -329,14 +337,6 @@ def sample(A, B):
 
         # Magnitude of water/fat images
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
-
-        # Variance map mask and attach to recon-A
-        if args.UQ:
-            A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
-            A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[-1], axis=-1) # shape: [nb,ne,hgt,wdt,2] = A.shape
-            A2B2A_sampled = A_sampler([A2B2A, A2B_FM_var], training=False)
-            A2B2A_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
@@ -359,15 +359,13 @@ def sample(A, B):
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
         A2B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=True))
     
-    # Variance map mask
+    # Variance map mask and attach to recon-A
     if args.UQ:
         A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-        A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[1], axis=1) # shape: [nb,ne,hgt,wdt,1]
-        A2B_FM_var = tf.repeat(A2B_FM_var, A.shape[-1], axis=-1) # shape: [nb,ne,hgt,wdt,2] = A.shape
-        A2B2A_sampled = A_sampler([A2B2A, A2B_FM_var], training=False)
-        A2B2A_sampled_var = tf.concat([A2B2A_sampled, A2B_FM_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
-    else:
-        A2B_var = None
+        A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
+        A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
+        A2B2A_var = wf.acq_uncertainty(A, A2B_PM, A2B_PM_var)
+        A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
     ########### Splitted R2s and FM Losses ############
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
@@ -406,7 +404,7 @@ def sample(A, B):
                     'R2_loss': R2_loss,
                     'FM_loss': FM_loss}
 
-    return A2B, A2B_FM_var, val_FM_dict, val_R2_dict
+    return A2B, A2B_PM_var, val_FM_dict, val_R2_dict
 
 def validation_step(A, B):
     A2B, A2B_var, val_FM_dict, val_R2_dict = sample(A, B)
