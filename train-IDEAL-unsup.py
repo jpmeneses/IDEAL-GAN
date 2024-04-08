@@ -359,7 +359,7 @@ def sample(A, B):
         A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
         A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
         A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
-        A2B2A_var = wf.acq_uncertainty(A, A2B_PM, A2B_PM_var)
+        A2B2A_var = wf.acq_uncertainty(A, A2B_PM, A2B_PM_var, rem_R2=True)
         A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
     ########### Splitted R2s and FM Losses ############
