@@ -595,7 +595,8 @@ def acq_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fals
     # Reshape to original images dimensions
     if MEBCRN:
         S_var = tf.reshape(WpMMWmZS, [n_batch,ne,hgt,wdt,1])
-        res_S_var = tf.concat([tf.math.real(S_var), tf.math.imag(S_var)],axis=-1)
+        # res_S_var = tf.concat([tf.math.real(S_var), tf.math.imag(S_var)],axis=-1)
+        res_S_var = tf.concat([tf.abs(S_var), tf.abs(S_var)],axis=-1)
     else:
         S_var = tf.reshape(tf.transpose(WpMMWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
         Re_S_var = tf.math.real(S_var)
