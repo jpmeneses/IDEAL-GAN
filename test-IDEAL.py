@@ -70,14 +70,14 @@ dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
 dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
 
 if args.k_fold == 1:
-    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx, end=50,
+    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx
                                 acqs_data=True, te_data=False, MEBCRN=True,
                                 complex_data=(args.G_model=='complex'))
-    # acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-    #                             end=320, acqs_data=True, te_data=False, MEBCRN=True,
-    #                             complex_data=(args.G_model=='complex'))
-    testX = acqs_1[:,:,::8,::8,:] # np.concatenate((acqs_1,acqs_2),axis=0)
-    testY = out_maps_1[:,:,::8,::8,:] # np.concatenate((out_maps_1,out_maps_2),axis=0)
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                end=320, acqs_data=True, te_data=False, MEBCRN=True,
+                                complex_data=(args.G_model=='complex'))
+    testX = np.concatenate((acqs_1,acqs_2),axis=0) # acqs_1[:,:,::8,::8,:]
+    testY = np.concatenate((out_maps_1,out_maps_2),axis=0) # out_maps_1[:,:,::8,::8,:]
 
 elif args.k_fold == 2:
     acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
@@ -194,10 +194,10 @@ else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 # restore
-# if args.out_vars == 'R2s':
-#     tl.Checkpoint(dict(G_A2B=G_A2B,G_A2R2=G_A2R2), py.join(args.experiment_dir, 'checkpoints')).restore()
-# else:
-#     tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+if args.out_vars == 'R2s':
+    tl.Checkpoint(dict(G_A2B=G_A2B,G_A2R2=G_A2R2), py.join(args.experiment_dir, 'checkpoints')).restore()
+else:
+    tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
 def sample(A, B, TE=None):
