@@ -1,16 +1,15 @@
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras as keras
-
-import DLlib as dl
-import pylib as py
-import tf2lib as tl
-import wflib as wf
-import data
-
-import matplotlib.pyplot as plt
 import tqdm
 import xlsxwriter
+import matplotlib.pyplot as plt
+
+import tf2lib as tl
+import DLlib as dl
+import wflib as wf
+import pylib as py
+import data
+
 from matplotlib.colors import LogNorm
 from skimage.metrics import structural_similarity
 
@@ -63,7 +62,7 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/' #'../datasets/'
+dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
 dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
 dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
@@ -202,31 +201,13 @@ else:
 
 @tf.function
 def sample(A, B, TE=None):
-    indx_B = tf.concat([tf.zeros_like(B[:,:,:,:4],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-    indx_B_abs = tf.concat([tf.zeros_like(B[:,:,:,:2],dtype=tf.int32),
-                            tf.ones_like(B[:,:,:,4:],dtype=tf.int32)],axis=-1)
-    indx_PM =tf.concat([tf.zeros_like(B[:,:,:,:1],dtype=tf.int32),
-                        tf.ones_like(B[:,:,:,:1],dtype=tf.int32)],axis=-1)
-    # Split B
-    B_WF,B_PM = tf.dynamic_partition(B,indx_B,num_partitions=2)
-    B_WF = tf.reshape(B_WF,B[:,:,:,:4].shape)
-    B_PM = tf.reshape(B_PM,B[:,:,:,4:].shape)
-    # Magnitude of water/fat images
-    B_WF_real = B_WF[:,:,:,0::2]
-    B_WF_imag = B_WF[:,:,:,1::2]
-    B_WF_abs = tf.abs(tf.complex(B_WF_real,B_WF_imag))
-    # Split B param maps
-    B_R2, B_FM = tf.dynamic_partition(B_PM,indx_PM,num_partitions=2)
-    B_R2 = tf.reshape(B_R2,B[:,:,:,:1].shape)
-    B_FM = tf.reshape(B_FM,B[:,:,:,:1].shape)
     # Estimate A2B
     if args.out_vars == 'WF':
         if args.te_input:
             A2B_WF_abs = G_A2B([A,TE], training=True)
         else:
             A2B_WF_abs = G_A2B(A, training=True)
-        A2B_WF_abs = tf.where(A[:,:,:,:2]!=0.0,A2B_WF_abs,0.0)
+        A2B_WF_abs = tf.where(A[:,:2,:,:,:]!=0.0,A2B_WF_abs,0.0)
         A2B_PM = tf.zeros_like(B_PM)
         # Split A2B param maps
         A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
@@ -239,14 +220,12 @@ def sample(A, B, TE=None):
             A2B_PM = G_A2B([A,TE], training=True)
         else:
             A2B_PM = G_A2B(A, training=True)
-        A2B_PM = tf.where(B_PM!=0.0,A2B_PM,0.0)
-        A2B_R2, A2B_FM = tf.dynamic_partition(A2B_PM,indx_PM,num_partitions=2)
-        A2B_R2 = tf.reshape(A2B_R2,B[:,:,:,:1].shape)
-        A2B_FM = tf.reshape(A2B_FM,B[:,:,:,:1].shape)
+        A2B_PM = tf.where(B[:,2:,:,:,:]!=0.0,A2B_PM,0.0)
+        A2B_FM = A2B_PM[:,:,:,:,:1]
         if args.G_model=='U-Net' or args.G_model=='MEBCRN':
             A2B_FM = (A2B_FM - 0.5) * 2
-            A2B_FM = tf.where(B_PM[:,:,:,1:]!=0.0,A2B_FM,0.0)
-            A2B_PM = tf.concat([A2B_R2,A2B_FM],axis=-1)
+            A2B_FM = tf.where(B[:,2:,:,:,:1]!=0.0,A2B_FM,0.0)
+            A2B_PM = tf.concat([A2B_FM,A2B_PM[:,:,:,:,1:]],axis=-1)
         A2B_WF = wf.get_rho(A,A2B_PM)
         A2B_WF_real = A2B_WF[:,:,:,0::2]
         A2B_WF_imag = A2B_WF[:,:,:,1::2]
@@ -273,30 +252,26 @@ def sample(A, B, TE=None):
         A2B_var = None
     elif args.out_vars == 'FM':
         if args.UQ:
-            _, A2B_FM, A2B_var = G_A2B(A, training=False)
+            _, A2B_FM, A2B_FM_var = G_A2B(A, training=False)
         else:
             A2B_FM = G_A2B(A, training=False)
-            A2B_var = None
-        
+            A2B_FM_var = None
         # A2B Masks
-        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
-        if args.UQ:
-            A2B_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+        A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         # Build A2B_PM array with zero-valued R2*
-        A2B_PM = tf.concat([tf.zeros_like(A2B_FM),A2B_FM], axis=-1)
-        if args.fat_char:
-            A2B_P, A2B2A = fa.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-            A2B_WF = A2B_P[:,:,:,0:4]
-        else:
-            A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
-        A2B = tf.concat([A2B_WF,A2B_PM],axis=-1)
+        A2B_PM = tf.concat([A2B_FM,tf.zeros_like(A2B_FM)], axis=-1)
+        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
 
-        # Magnitude of water/fat images
-        A2B_WF_real = A2B_WF[:,:,:,0::2]
-        A2B_WF_imag = A2B_WF[:,:,:,1::2]
-        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
-        A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+        # Variance map mask and attach to recon-A
+        if args.UQ:
+            A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
+            A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
+            A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
+            A2B_WF_var = wf.PDFF_uncertainty(A,A2B_PM,A2B_PM_var)
+            A2B_var = tf.concat([A2B_WF_var,A2B_PM_var],axis=1)
+
     elif args.out_vars == 'R2s':
         if not(args.G_model == 'complex'):
             A_real = A[:,:,:,0::2]
@@ -342,7 +317,7 @@ def sample(A, B, TE=None):
         else:
             A2B_var = None
 
-    return A2B_abs, A2B_var
+    return A2B_abs, A2B_PM_var
 
 
 # run
@@ -350,25 +325,22 @@ save_dir = py.join(args.experiment_dir, 'samples_testing', 'A2B')
 py.mkdir(save_dir)
 i = 0
 
-if args.te_input:
-    TE = wf.gen_TEvar(args.n_echoes,args.batch_size,orig=True)
-
 for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
     A = tf.expand_dims(A,axis=0)
     B = tf.expand_dims(B,axis=0)
-    A2B, A2B_var = sample(A,B)
+    A2B, A2B_PM_var = sample(A,B)
 
-    r2_aux = np.squeeze(A2B[:,:,:,2])
-    field_aux = np.squeeze(A2B[:,:,:,3])
+    r2_aux = np.squeeze(A2B[:,2,:,:,1])
+    field_aux = np.squeeze(A2B[:,2,:,:,0])
 
     if args.UQ:
         # Get water/fat uncertainties
-        w_aux = np.squeeze(A2B[:,:,:,0])
-        f_aux = np.squeeze(A2B[:,:,:,1])
-        W_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,:,:,0],A2B_var[:,:,:,1])))
-        F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,:,:,2],A2B_var[:,:,:,3])))
-        r2s_var = np.squeeze(A2B_var[:,:,:,4])*(r2_sc**2)
-        field_var = np.squeeze(A2B_var[:,:,:,5])*(fm_sc**2)
+        w_aux = np.squeeze(tf.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+        f_aux = np.squeeze(tf.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
+        W_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,0,:,:,0],A2B_var[:,0,:,:,1])))
+        F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,1,:,:,0],A2B_var[:,1,:,:,1])))
+        r2s_var = np.squeeze(A2B_var[:,2,:,:,1])*(r2_sc**2)
+        field_var = np.squeeze(A2B_var[:,2,:,:,0])*(fm_sc**2)
         hgt_plt, wdt_plt, nr, nc = 10, 20, 3, 5
     else:
         w_aux = np.squeeze(A2B[:,:,:,0])
@@ -381,10 +353,10 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     PDFF_aux = f_aux/(w_aux+f_aux)
     PDFF_aux[np.isnan(PDFF_aux)] = 0.0
 
-    wn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,0],B[:,:,:,1])))
-    fn_aux = np.squeeze(np.abs(tf.complex(B[:,:,:,2],B[:,:,:,3])))
-    r2n_aux = np.squeeze(B[:,:,:,4])
-    fieldn_aux = np.squeeze(B[:,:,:,5])
+    wn_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+    fn_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+    r2n_aux = np.squeeze(B[:,2,:,:,1])
+    fieldn_aux = np.squeeze(B[:,2,:,:,0])
     PDFFn_aux = fn_aux/(wn_aux+fn_aux)
     PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
     
