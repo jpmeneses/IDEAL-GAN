@@ -70,7 +70,7 @@ dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
 dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
 
 if args.k_fold == 1:
-    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx
+    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx,
                                 acqs_data=True, te_data=False, MEBCRN=True,
                                 complex_data=(args.G_model=='complex'))
     acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
