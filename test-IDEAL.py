@@ -164,6 +164,7 @@ elif args.G_model == 'U-Net':
     G_A2B = dl.UNet(input_shape=(ne,hgt,wdt,n_ch),
                     n_out=n_out,
                     bayesian=args.UQ,
+                    ME_layer=args.ME_layer,
                     te_input=args.te_input,
                     te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
