@@ -63,11 +63,11 @@ r2_sc,fm_sc = 200.0,300.0
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'JGalgani_GC_192_complex_2D.hdf5'
-dataset_hdf5_2 = 'INTA_GC_192_complex_2D.hdf5'
-dataset_hdf5_3 = 'INTArest_GC_192_complex_2D.hdf5'
-dataset_hdf5_4 = 'Volunteers_GC_192_complex_2D.hdf5'
-dataset_hdf5_5 = 'Attilio_GC_192_complex_2D.hdf5'
+dataset_hdf5_1 = 'JGalgani_GC_384_complex_2D.hdf5'
+dataset_hdf5_2 = 'INTA_GC_384_complex_2D.hdf5'
+dataset_hdf5_3 = 'INTArest_GC_384_complex_2D.hdf5'
+dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
+dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
 
 if args.k_fold == 1:
     acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx,
@@ -253,9 +253,9 @@ def sample(A, B, TE=None):
     elif args.out_vars == 'FM':
         if args.UQ:
             _, A2B_FM, A2B_FM_var = G_A2B(A, training=False)
+            A2B_R2_var = tf.zeros_like(A2B_FM_var)
         else:
             A2B_FM = G_A2B(A, training=False)
-            A2B_FM_var = None
         # A2B Masks
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
@@ -269,8 +269,10 @@ def sample(A, B, TE=None):
             A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
             A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
             A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
-            A2B_WF_var = wf.PDFF_uncertainty(A,A2B_PM,A2B_PM_var)
+            A2B_WF_var = wf.PDFF_uncertainty(A, A2B_PM, A2B_PM_var)
             A2B_var = tf.concat([A2B_WF_var,A2B_PM_var],axis=1)
+        else:
+            A2B_var = None
 
     elif args.out_vars == 'R2s':
         if not(args.G_model == 'complex'):
@@ -317,7 +319,7 @@ def sample(A, B, TE=None):
         else:
             A2B_var = None
 
-    return A2B_abs, A2B_PM_var
+    return A2B, A2B_var
 
 
 # run
@@ -328,10 +330,10 @@ i = 0
 for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
     A = tf.expand_dims(A,axis=0)
     B = tf.expand_dims(B,axis=0)
-    A2B, A2B_PM_var = sample(A,B)
+    A2B, A2B_var = sample(A,B)
 
-    r2_aux = np.squeeze(A2B[:,2,:,:,1])
-    field_aux = np.squeeze(A2B[:,2,:,:,0])
+    r2_aux = np.squeeze(A2B[:,2,:,:,1])*r2_sc
+    field_aux = np.squeeze(A2B[:,2,:,:,0])*fm_sc
 
     if args.UQ:
         # Get water/fat uncertainties
@@ -387,12 +389,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.colorbar(F_ok, ax=axs[0,2])
             axs[0,2].axis('off')
 
-            r2_ok = axs[0,3].imshow(r2n_aux*r2_sc, cmap='copper',
+            r2_ok = axs[0,3].imshow(r2n_aux, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[0,3])
             axs[0,3].axis('off')
 
-            field_ok =  axs[0,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
+            field_ok =  axs[0,4].imshow(fieldn_aux, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[0,4])
             axs[0,4].axis('off')
@@ -408,12 +410,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.colorbar(F_est, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_est= axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
+            r2_est= axs[1,3].imshow(r2_aux, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_est, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_est = axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
+            field_est = axs[1,4].imshow(field_aux, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_est, ax=axs[1,4])
             axs[1,4].axis('off')
@@ -432,12 +434,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             axs[2,2].axis('off')
 
             r2s_uq=axs[2,3].matshow(r2s_var, cmap='gnuplot',
-                                    norm=LogNorm(vmin=10,vmax=0.1))
+                                    norm=LogNorm(vmin=.1,vmax=10))
             fig.colorbar(r2s_uq, ax=axs[2,3])
             axs[2,3].axis('off')
 
             field_uq = axs[2,4].matshow(field_var, cmap='gnuplot2',
-                                        norm=LogNorm(vmin=10,vmax=0.1))
+                                        norm=LogNorm(vmin=.1,vmax=10))
             fig.colorbar(field_uq, ax=axs[2,4])
             axs[2,4].axis('off')
         else:
