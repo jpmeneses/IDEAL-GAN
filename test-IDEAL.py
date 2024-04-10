@@ -261,7 +261,7 @@ def sample(A, B, TE=None):
 
         # Build A2B_PM array with zero-valued R2*
         A2B_PM = tf.concat([A2B_FM,tf.zeros_like(A2B_FM)], axis=-1)
-        A2B_WF, A2B2A = wf.acq_to_acq(A,A2B_PM,complex_data=(args.G_model=='complex'))
+        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
 
         # Variance map mask and attach to recon-A
