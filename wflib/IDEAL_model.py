@@ -493,10 +493,10 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True):
     else:
         Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # (nb,ne,nv)
 
-    r2s = mean_maps[...,0] * r2_sc
-    phi = mean_maps[...,1] * fm_sc
-    r2s_unc = var_maps[...,0] * (r2_sc**2)
-    phi_unc = var_maps[...,1] * (fm_sc**2)
+    r2s = mean_maps[...,1] * r2_sc
+    phi = mean_maps[...,0] * fm_sc
+    r2s_unc = var_maps[...,1] * (r2_sc**2)
+    phi_unc = var_maps[...,0] * (fm_sc**2)
 
     r2s_rav = tf.reshape(tf.complex(r2s,0.0),[n_batch,-1])
     r2s_rav = tf.expand_dims(r2s_rav,1) # (nb,1,nv)
@@ -518,16 +518,21 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True):
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
-    rho_var = tf.reshape(tf.transpose(MWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
-
-    Re_rho_var = tf.math.real(rho_var)
-    Im_rho_var = tf.math.imag(rho_var)
-    zero_fill = tf.zeros_like(Re_rho_var)
-    re_stack_var = tf.stack([Re_rho_var,zero_fill],4)
-    re_aux_var = tf.reshape(re_stack_var,[n_batch,hgt,wdt,2*ns])
-    im_stack_var = tf.stack([zero_fill,Im_rho_var],4)
-    im_aux_var = tf.reshape(im_stack_var,[n_batch,hgt,wdt,2*ns])
-    res_rho_var = re_aux_var + im_aux_var
+    if MEBCRN:
+        rho_var = tf.reshape(MWmZS,[n_batch,ns,hgt,wdt,1]) / rho_sc
+        Re_rho_var = tf.math.real(rho_var)
+        Im_rho_var = tf.math.imag(rho_var)
+        res_rho_var = tf.concat([Re_rho_var,Im_rho_var],axis=-1)
+    else:
+        rho_var = tf.reshape(tf.transpose(MWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
+        Re_rho_var = tf.math.real(rho_var)
+        Im_rho_var = tf.math.imag(rho_var)
+        zero_fill = tf.zeros_like(Re_rho_var)
+        re_stack_var = tf.stack([Re_rho_var,zero_fill],4)
+        re_aux_var = tf.reshape(re_stack_var,[n_batch,hgt,wdt,2*ns])
+        im_stack_var = tf.stack([zero_fill,Im_rho_var],4)
+        im_aux_var = tf.reshape(im_stack_var,[n_batch,hgt,wdt,2*ns])
+        res_rho_var = re_aux_var + im_aux_var
 
     return res_rho_var
 
