@@ -70,14 +70,14 @@ dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
 dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
 
 if args.k_fold == 1:
-    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx,
+    acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx, end=50,
                                 acqs_data=True, te_data=False, MEBCRN=True,
                                 complex_data=(args.G_model=='complex'))
-    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                end=320, acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
-    testX = np.concatenate((acqs_1,acqs_2),axis=0)
-    testY = np.concatenate((out_maps_1,out_maps_2),axis=0)
+    # acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+    #                             end=320, acqs_data=True, te_data=False, MEBCRN=True,
+    #                             complex_data=(args.G_model=='complex'))
+    testX = acqs_1[:,:,::8,::8,:] # np.concatenate((acqs_1,acqs_2),axis=0)
+    testY = out_maps_1[:,:,::8,::8,:] # np.concatenate((out_maps_1,out_maps_2),axis=0)
 
 elif args.k_fold == 2:
     acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
@@ -194,10 +194,10 @@ else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 # restore
-if args.out_vars == 'R2s':
-    tl.Checkpoint(dict(G_A2B=G_A2B,G_A2R2=G_A2R2), py.join(args.experiment_dir, 'checkpoints')).restore()
-else:
-    tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+# if args.out_vars == 'R2s':
+#     tl.Checkpoint(dict(G_A2B=G_A2B,G_A2R2=G_A2R2), py.join(args.experiment_dir, 'checkpoints')).restore()
+# else:
+#     tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
 def sample(A, B, TE=None):
@@ -424,19 +424,22 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.delaxes(axs[2,0]) # No PDFF variance map
 
             W_uq = axs[2,1].matshow(W_var, cmap='gnuplot2',
-                                    norm=LogNorm(vmin=1e-12,vmax=1e-8))
+                                    norm=LogNorm(vmin=1e-4,vmax=1e-1))
             fig.colorbar(W_uq, ax=axs[2,1])
             axs[2,1].axis('off')
 
             F_uq = axs[2,2].matshow(F_var, cmap='gnuplot2',
-                                    norm=LogNorm(vmin=1e-12,vmax=1e-8))
+                                    norm=LogNorm(vmin=1e-4,vmax=1e-1))
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            r2s_uq=axs[2,3].matshow(r2s_var, cmap='gnuplot',
-                                    norm=LogNorm(vmin=.1,vmax=10))
-            fig.colorbar(r2s_uq, ax=axs[2,3])
-            axs[2,3].axis('off')
+            if args.out_vars == 'WF' or args.out_vars == 'FM':
+                fig.delaxes(axs[2,3]) # No R2s variance map
+            else:
+                r2s_uq=axs[2,3].matshow(r2s_var, cmap='gnuplot',
+                                        norm=LogNorm(vmin=.1,vmax=10))
+                fig.colorbar(r2s_uq, ax=axs[2,3])
+                axs[2,3].axis('off')
 
             field_uq = axs[2,4].matshow(field_var, cmap='gnuplot2',
                                         norm=LogNorm(vmin=.1,vmax=10))
