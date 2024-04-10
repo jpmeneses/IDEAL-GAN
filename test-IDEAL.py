@@ -120,8 +120,7 @@ elif args.k_fold == 5:
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(testX)
-_,n_out,_,_ = np.shape(testY)
-echoes = int(d_ech/2)
+_,n_out,_,_,_ = np.shape(testY)
 
 print('Length dataset:', len_dataset)
 print('Acquisition Dimensions:', hgt,wdt)
@@ -147,7 +146,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
                                 R2_self_attention=args.D2_SelfAttention,
                                 FM_self_attention=args.D3_SelfAttention)
     else:
-        G_A2B = dl.PM_Generator(input_shape=(hgt,wdt,d_ech),
+        G_A2B = dl.PM_Generator(input_shape=(ne,hgt,wdt,n_ch),
                                 te_input=args.te_input,
                                 te_shape=(args.n_echoes,),
                                 filters=args.n_G_filters,
@@ -162,7 +161,7 @@ elif args.G_model == 'U-Net':
         n_out = 1
     else:
         n_out = 2
-    G_A2B = dl.UNet(input_shape=(hgt,wdt,d_ech),
+    G_A2B = dl.UNet(input_shape=(ne,hgt,wdt,n_ch),
                     n_out=n_out,
                     bayesian=args.UQ,
                     te_input=args.te_input,
@@ -170,7 +169,7 @@ elif args.G_model == 'U-Net':
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
     if args.out_vars == 'R2s':
-        G_A2R2= dl.UNet(input_shape=(hgt,wdt,d_ech//2),
+        G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
                         bayesian=args.UQ,
                         te_input=args.te_input,
                         te_shape=(args.n_echoes,),
