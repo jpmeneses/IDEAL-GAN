@@ -19,6 +19,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
+py.arg('--DL_partial_real', type=bool, default=False)
 py.arg('--DL_filename', default='LDM_ds')
 py.arg('--gen_samples', type=int, default=3330)
 py.arg('--sigma_noise', type=float, default=0.0)
@@ -113,9 +114,18 @@ else:
 
     A_B_dataset = tfr_dataset.map(_parse_function)
 
+    if args.DL_partial_real:
+        dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+        trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=200,
+                                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+        A_B_dataset_aux = tf.data.Dataset.from_tensor_slices((trainX,trainY))
+        A_B_dataset = A_B_dataset.concatenate(A_B_dataset_aux)
+
     for A, B in A_B_dataset.take(1):
         hgt,wdt,_ = B.shape
     len_dataset = args.gen_samples
+    if args.DL_partial_rea:
+        len_dataset += trainX.shape[0]
 
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
 
