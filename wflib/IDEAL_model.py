@@ -509,7 +509,7 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fal
     phi_unc_rav = tf.expand_dims(phi_unc_rav,1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wm_var_phi = tf.linalg.matmul((2*np.pi * te_real)**2, phi_unc_rav) # (nb,ne,nv)
+    Wm_var_phi = tf.linalg.matmul(-(2*np.pi * te_real)**2, phi_unc_rav) # (nb,ne,nv)
     Wm_var = Wm_var_phi * tf.math.exp(tf.linalg.matmul(-4*np.pi * te_complex, phi_rav))
     if not(rem_R2):
         r2s_var_aux = tf.linalg.matmul(te_real**2, r2s_unc_rav) # (nb,ne,nv)
