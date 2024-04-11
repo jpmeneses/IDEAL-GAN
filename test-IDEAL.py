@@ -266,10 +266,11 @@ def sample(A, B, TE=None):
 
         # Variance map mask and attach to recon-A
         if args.UQ:
-            A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
+            A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,1e-1/(fm_sc**2))
             A2B_R2_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_var,0.0)
             A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_var], axis=-1)
-            A2B_WF_var = wf.PDFF_uncertainty(A, A2B_PM, A2B_PM_var)
+            A2B_WF_var = wf.PDFF_uncertainty(A, A2B_PM, A2B_PM_var, rem_R2=True)
+            A2B_WF_var = tf.where(A[:,:2,:,:,:2]!=0.0,A2B_WF_var,1e-1)
             A2B_var = tf.concat([A2B_WF_var,A2B_PM_var],axis=1)
         else:
             A2B_var = None
