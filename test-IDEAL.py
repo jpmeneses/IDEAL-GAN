@@ -425,12 +425,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.delaxes(axs[2,0]) # No PDFF variance map
 
             W_uq = axs[2,1].matshow(W_var, cmap='gnuplot2',
-                                    norm=LogNorm(vmin=1e-1,vmax=1e1))
+                                    norm=LogNorm(vmin=1e-6,vmax=1e0))
             fig.colorbar(W_uq, ax=axs[2,1])
             axs[2,1].axis('off')
 
             F_uq = axs[2,2].matshow(F_var, cmap='gnuplot2',
-                                    norm=LogNorm(vmin=1e-1,vmax=1e1))
+                                    norm=LogNorm(vmin=1e-6,vmax=1e0))
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
