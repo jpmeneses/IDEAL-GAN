@@ -473,7 +473,7 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fal
 
     M, M_pinv = gen_M(te)
 
-    # te_complex = tf.expand_dims(tf.complex(0.0,te),-1)
+    te_complex = tf.complex(0.0,te)
     te_real = tf.complex(te,0.0)
 
     # Generate complex signal
