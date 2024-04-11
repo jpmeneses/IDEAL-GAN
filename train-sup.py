@@ -124,7 +124,7 @@ else:
     for A, B in A_B_dataset.take(1):
         hgt,wdt,_ = B.shape
     len_dataset = args.gen_samples
-    if args.DL_partial_rea:
+    if args.DL_partial_real:
         len_dataset += trainX.shape[0]
 
 A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
