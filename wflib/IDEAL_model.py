@@ -597,7 +597,7 @@ def acq_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fals
         Wm_var *= (1 - Wm_var_r2s) * Wm_unc_r2s
 
     # Matrix operations (variance)
-    WmZS = 2 * tf.square(Wm_var) * (Smtx * tf.math.conj(Smtx))
+    WmZS = 2 * tf.square(Wm_var) # * (Smtx * tf.math.conj(Smtx))
     # WpMMWmZS = Wm_var * tf.linalg.matmul(MM * tf.math.conj(MM), WmZS)
 
     # Extract corresponding Water/Fat signals
