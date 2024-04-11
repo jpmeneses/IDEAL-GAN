@@ -461,7 +461,7 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
 
 
 @tf.function
-def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True):
+def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=False):
     if MEBCRN:
         n_batch,ne,hgt,wdt,_ = acqs.shape
     else:
@@ -502,15 +502,20 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True):
     r2s_rav = tf.expand_dims(r2s_rav,1) # (nb,1,nv)
     r2s_unc_rav = tf.reshape(tf.complex(r2s_unc,0.0),[n_batch,-1])
     r2s_unc_rav = tf.expand_dims(r2s_unc_rav,1) # (nb,1,nv)
+
+    phi_rav = tf.reshape(tf.complex(phi,0.0),[n_batch,-1])
+    phi_rav = tf.expand_dims(phi_rav,1) # (nb,1,nv)
     phi_unc_rav = tf.reshape(tf.complex(phi_unc,0.0),[n_batch,-1])
     phi_unc_rav = tf.expand_dims(phi_unc_rav,1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    r2s_var_aux = tf.linalg.matmul(te_real**2, r2s_unc_rav) # (nb,ne,nv)
-    Wm_unc_r2s = tf.math.exp(tf.linalg.matmul(2*te_real, r2s_rav) + r2s_var_aux) # (nb,ne,nv)
-    Wm_var_r2s = tf.math.exp(r2s_var_aux)
-    Wm_var_phi = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, phi_unc_rav)) # (nb,ne,nv)
-    Wm_var = -(1 - Wm_var_phi) * (1 - Wm_var_r2s) * Wm_unc_r2s
+    Wm_var_phi = tf.linalg.matmul((2*np.pi * te_real)**2, phi_unc_rav) # (nb,ne,nv)
+    Wm_var = Wm_var_phi * tf.math.exp(tf.linalg.matmul(-4*np.pi * te_complex, phi_rav))
+    if not(rem_R2):
+        r2s_var_aux = tf.linalg.matmul(te_real**2, r2s_unc_rav) # (nb,ne,nv)
+        Wm_unc_r2s = tf.math.exp(tf.linalg.matmul(2*te_real, r2s_rav) + r2s_var_aux) # (nb,ne,nv)
+        Wm_var_r2s = tf.math.exp(r2s_var_aux)
+        Wm_var *= (1 - Wm_var_r2s) * Wm_unc_r2s
 
     # Matrix operations (variance)
     WmZS = Wm_var * (Smtx * tf.math.conj(Smtx))
@@ -584,8 +589,7 @@ def acq_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fals
     phi_unc_rav = tf.expand_dims(phi_unc_rav,1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wm_var_phi = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, phi_unc_rav)) # (nb,ne,nv)
-    Wm_var = -(1 - Wm_var_phi)
+    Wm_var = tf.linalg.matmul((2*np.pi * te_real)**2, phi_unc_rav) # (nb,ne,nv)
     if not(rem_R2):
         r2s_var_aux = tf.linalg.matmul(te_real**2, r2s_unc_rav) # (nb,ne,nv)
         Wm_unc_r2s = tf.math.exp(tf.linalg.matmul(2*te_real, r2s_rav) + r2s_var_aux) # (nb,ne,nv)
@@ -593,13 +597,13 @@ def acq_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fals
         Wm_var *= (1 - Wm_var_r2s) * Wm_unc_r2s
 
     # Matrix operations (variance)
-    WmZS = Wm_var * (Smtx * tf.math.conj(Smtx))
-    WpMMWmZS = Wm_var * tf.linalg.matmul(MM * tf.math.conj(MM), WmZS)
+    WmZS = 2 * tf.square(Wm_var) * (Smtx * tf.math.conj(Smtx))
+    # WpMMWmZS = Wm_var * tf.linalg.matmul(MM * tf.math.conj(MM), WmZS)
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
     if MEBCRN:
-        S_var = tf.reshape(WpMMWmZS, [n_batch,ne,hgt,wdt,1])
+        S_var = tf.reshape(WmZS, [n_batch,ne,hgt,wdt,1])
         # res_S_var = tf.concat([tf.math.real(S_var), tf.math.imag(S_var)],axis=-1)
         res_S_var = tf.concat([tf.abs(S_var), tf.abs(S_var)],axis=-1)
     else:
