@@ -228,7 +228,7 @@ tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpo
 
 # sample
 ds_dir = 'tfrecord'
-ds_filename = args.ds_filename
+ds_filename = args.ds_filename + '_' + str(args.n_samples)
 py.mkdir(ds_dir)
 writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 
