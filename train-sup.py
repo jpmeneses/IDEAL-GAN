@@ -21,7 +21,6 @@ py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
 py.arg('--DL_partial_real', type=bool, default=False)
 py.arg('--DL_filename', default='LDM_ds')
-py.arg('--gen_samples', type=int, default=3330)
 py.arg('--sigma_noise', type=float, default=0.0)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--TE1', type=float, default=0.0013)
@@ -123,7 +122,7 @@ else:
 
     for A, B in A_B_dataset.take(1):
         hgt,wdt,_ = B.shape
-    len_dataset = args.gen_samples
+    len_dataset = int(args.DL_filename.split('_')[-1])
     if args.DL_partial_real:
         len_dataset += trainX.shape[0]
 
