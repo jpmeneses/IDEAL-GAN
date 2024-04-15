@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl
 
-python gen_LDM_dataset.py --experiment_dir output/GAN-807 --ds_filename 'LDM_ds_noMEBCRN' --MEBCRN False --batch_size 16 --n_samples 8000
+python gen_LDM_dataset.py --experiment_dir output/GAN-807 --ds_filename 'LDM_ds_noMEBCRN' --MEBCRN False --batch_size 16 --n_samples 6660
