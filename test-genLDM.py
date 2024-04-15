@@ -207,7 +207,8 @@ def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
 z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
 
 # checkpoint
-tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
+if args.LDM:
+    tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
 
 # sample
 sample_dir = py.join(output_dir, 'samples_ldm_testing', 'all')
