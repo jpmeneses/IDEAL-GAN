@@ -22,6 +22,7 @@ py.arg('--DL_gen', type=bool, default=False)
 py.arg('--DL_partial_real', type=bool, default=False)
 py.arg('--DL_filename', default='LDM_ds')
 py.arg('--sigma_noise', type=float, default=0.0)
+py.arg('--shuffle', type=bool, default=True)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -126,7 +127,9 @@ else:
     if args.DL_partial_real:
         len_dataset += trainX.shape[0]
 
-A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
+A_B_dataset = A_B_dataset.batch(args.batch_size)
+if args.shuffle:
+    A_B_dataset = A_B_dataset.shuffle(len_dataset)
 
 
 # ==============================================================================

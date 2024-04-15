@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl
 
-python train-sup.py --dataset Sup-319 --data_size 384 --DL_gen True --DL_filename LDM_ds_noMEBCRN_6660 --G_model U-Net --batch_size 16 --lr 0.001
+python train-sup.py --dataset Sup-319 --data_size 384 --DL_gen True --DL_filename LDM_ds_noMEBCRN_6660 --shuffle False --G_model U-Net --batch_size 16 --lr 0.001
