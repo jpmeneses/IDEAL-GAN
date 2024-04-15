@@ -121,13 +121,14 @@ else:
                         )
 
 # create our unet model
+if not args.LDM:
 unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
+vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
 
 if args.only_mag:
     IDEAL_op = wf.IDEAL_mag_Layer()
 else:
     IDEAL_op = wf.IDEAL_Layer()
-vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
 
 if args.only_mag:
     tl.Checkpoint(dict(dec_mag=dec_mag,dec_pha=dec_pha,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
@@ -138,42 +139,43 @@ else:
 ########################### DIFFUSION TIMESTEPS ################################
 ################################################################################
 
-# create a fixed beta schedule
-if args.scheduler == 'linear':
-    beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
-    # this will be used as discussed in the reparameterization trick
-    alpha = 1 - beta
-    alpha_bar = np.cumprod(alpha, 0)
-    alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
-elif args.scheduler == 'cosine':
-    x = np.linspace(0, args.n_timesteps, args.n_timesteps + 1)
-    alpha_bar = np.cos(((x / args.n_timesteps) + args.s_value) / (1 + args.s_value) * np.pi * 0.5) ** 2
-    alpha_bar /= alpha_bar[0]
-    alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
-    beta = 1.0 - alpha
+if not args.LDM:
+    # create a fixed beta schedule
+    if args.scheduler == 'linear':
+        beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
+        # this will be used as discussed in the reparameterization trick
+        alpha = 1 - beta
+        alpha_bar = np.cumprod(alpha, 0)
+        alpha_bar = np.concatenate((np.array([1.]), alpha_bar[:-1]), axis=0)
+    elif args.scheduler == 'cosine':
+        x = np.linspace(0, args.n_timesteps, args.n_timesteps + 1)
+        alpha_bar = np.cos(((x / args.n_timesteps) + args.s_value) / (1 + args.s_value) * np.pi * 0.5) ** 2
+        alpha_bar /= alpha_bar[0]
+        alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
+        beta = 1.0 - alpha
 
-# initialize the model in the memory of our GPU
-if args.only_mag:
-    hgt_ls = dec_mag.input_shape[1]
-    wdt_ls = dec_mag.input_shape[2]
-else:
-    hgt_ls = dec_w.input_shape[1]
-    wdt_ls = dec_w.input_shape[2]
-test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
-test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
-k = unet(test_images, test_timestamps)
+    # initialize the model in the memory of our GPU
+    if args.only_mag:
+        hgt_ls = dec_mag.input_shape[1]
+        wdt_ls = dec_mag.input_shape[2]
+    else:
+        hgt_ls = dec_w.input_shape[1]
+        wdt_ls = dec_w.input_shape[2]
+    test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
+    test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
+    k = unet(test_images, test_timestamps)
 
 loss_fn = tf.losses.MeanSquaredError()
 
 def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
-    # Create a range of inference steps that the output should be sampled at
-    if args.DDIM:
-        its = inference_timesteps
-        inference_range = range(0, args.n_timesteps, args.n_timesteps // its)
-    else:
-        its = args.n_timesteps-1
-        inference_range = range(1, args.n_timesteps)
     if args.LDM:
+        # Create a range of inference steps that the output should be sampled at
+        if args.DDIM:
+            its = inference_timesteps
+            inference_range = range(0, args.n_timesteps, args.n_timesteps // its)
+        else:
+            its = args.n_timesteps-1
+            inference_range = range(1, args.n_timesteps)
         for index, i in enumerate(reversed(range(its))):
             t = np.expand_dims(inference_range[i], 0)
 
