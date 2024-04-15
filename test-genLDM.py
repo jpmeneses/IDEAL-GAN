@@ -16,7 +16,7 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir', default='output/GAN-100')
-py.arg('--te_input', type=bool, default=False)
+py.arg('--LDM', type=bool, default=True)
 py.arg('--DDIM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=10)
 py.arg('--infer_sigma', type=float, default=0.0)
@@ -173,14 +173,15 @@ def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
     else:
         its = args.n_timesteps-1
         inference_range = range(1, args.n_timesteps)
-    for index, i in tqdm.tqdm(enumerate(reversed(range(its))), desc='Sample '+str(ns).zfill(3), total=its):
-        t = np.expand_dims(inference_range[i], 0)
+    if args.LDM:
+        for index, i in enumerate(reversed(range(its))):
+            t = np.expand_dims(inference_range[i], 0)
 
-        pred_noise = unet(Z, t)
-        if args.DDIM:
-            Z = dm.ddim(Z, pred_noise, t, args.infer_sigma, alpha, alpha_bar)
-        else:
-            Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
+            pred_noise = unet(Z, t)
+            if args.DDIM:
+                Z = dm.ddim(Z, pred_noise, t, args.infer_sigma, alpha, alpha_bar)
+            else:
+                Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
     if args.VQ_encoder:
         vq_dict = vq_op(Z)
