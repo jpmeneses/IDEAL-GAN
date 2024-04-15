@@ -121,7 +121,7 @@ else:
                         )
 
 # create our unet model
-if not args.LDM:
+if args.LDM:
     unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
     vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
 
@@ -139,7 +139,7 @@ else:
 ########################### DIFFUSION TIMESTEPS ################################
 ################################################################################
 
-if not args.LDM:
+if args.LDM:
     # create a fixed beta schedule
     if args.scheduler == 'linear':
         beta = np.linspace(args.beta_start, args.beta_end, args.n_timesteps)
