@@ -169,7 +169,7 @@ if args.LDM:
 
 loss_fn = tf.losses.MeanSquaredError()
 
-def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
+def sample(Z, Z_std=1.0, inference_timesteps=10):
     if args.LDM:
         # Create a range of inference steps that the output should be sampled at
         if args.DDIM:
@@ -230,7 +230,7 @@ for k in range(args.n_samples):
     if args.VQ_encoder:
         Z2B, Z2B2A = sample(Z)
     else:
-        Z2B, Z2B2A = sample(Z, z_std, inference_timesteps=args.infer_steps, ns=k)
+        Z2B, Z2B2A = sample(Z, z_std, inference_timesteps=args.infer_steps)
 
     fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
