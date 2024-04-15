@@ -169,6 +169,7 @@ if args.LDM:
 
 loss_fn = tf.losses.MeanSquaredError()
 
+
 def sample(Z, Z_std=1.0, inference_timesteps=10):
     if args.LDM:
         # Create a range of inference steps that the output should be sampled at
@@ -205,8 +206,9 @@ def sample(Z, Z_std=1.0, inference_timesteps=10):
 
     return Z2B, Z2B2A
 
+
 # LS scaling factor
-z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+z_std = tf.Variable(initial_value=1.0, trainable=False, dtype=tf.float32)
 
 # checkpoint
 if args.LDM:
