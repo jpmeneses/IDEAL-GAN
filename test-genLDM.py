@@ -139,6 +139,14 @@ else:
 ########################### DIFFUSION TIMESTEPS ################################
 ################################################################################
 
+if args.only_mag:
+    hgt_ls = dec_mag.input_shape[1]
+    wdt_ls = dec_mag.input_shape[2]
+else:
+    hgt_ls = dec_w.input_shape[1]
+    wdt_ls = dec_w.input_shape[2]
+    
+
 if args.LDM:
     # create a fixed beta schedule
     if args.scheduler == 'linear':
@@ -155,12 +163,6 @@ if args.LDM:
         beta = 1.0 - alpha
 
     # initialize the model in the memory of our GPU
-    if args.only_mag:
-        hgt_ls = dec_mag.input_shape[1]
-        wdt_ls = dec_mag.input_shape[2]
-    else:
-        hgt_ls = dec_w.input_shape[1]
-        wdt_ls = dec_w.input_shape[2]
     test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
     test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
     k = unet(test_images, test_timestamps)
