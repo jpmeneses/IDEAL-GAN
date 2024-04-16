@@ -29,6 +29,7 @@ py.arg('--ME_layer', type=bool, default=False)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
 py.arg('--batch_size', type=int, default=1)
+py.arg('--display', type=bool, default=True)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
@@ -314,10 +315,11 @@ elif args.data_size == 384:
 fig, ax = plt.subplots(1, 1)
 tracker = IndexTracker(fig, ax, X, bool_PDFF, lims, wdt=ROI_wdt, npy_file=npy_file)
 
-fig.canvas.mpl_connect('scroll_event', tracker.onscroll)
-fig.canvas.mpl_connect('button_press_event', tracker.button_press)
-fig.canvas.mpl_connect('key_press_event', tracker.key_press)
-plt.show()
+if args.display:
+  fig.canvas.mpl_connect('scroll_event', tracker.onscroll)
+  fig.canvas.mpl_connect('button_press_event', tracker.button_press)
+  fig.canvas.mpl_connect('key_press_event', tracker.key_press)
+  plt.show()
 
 # Save slices indexes and crops coordinates
 with open(npy_file, 'wb') as f:
@@ -423,7 +425,8 @@ if args.map != 'Water':
     ax2.set_ylabel('Samples')
     print(np.max(XB_res_all),len(XB_res_all))
   # plt.savefig('out_images/ROI_histogram_R2.eps',format='eps')
-  plt.show()
+  if args.display:
+    plt.show()
   # Bland-Altman
   # f,(ax1,ax2) = plt.subplots(figsize=(8,7),nrows=2,ncols=1)
   # sm.graphics.mean_diff_plot(np.array(XA_res_all),np.array(XA_gt_all),ax=ax1)
