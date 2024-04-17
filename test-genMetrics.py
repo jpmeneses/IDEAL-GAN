@@ -123,7 +123,7 @@ else:
     hgt_ls = dec_w.input_shape[1]
     wdt_ls = dec_w.input_shape[2]
 
-z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
+z_std = tf.Variable(initial_value=1.0, trainable=False, dtype=tf.float32)
 
 if args.LDM:
     # create our unet model
