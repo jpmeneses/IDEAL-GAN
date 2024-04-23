@@ -77,6 +77,8 @@ def AdaIN(content_features, style_features, alpha=1.0, epsilon=1e-5):
     '''
     style_mean, style_variance = tf.nn.moments(style_features, [1], keepdims=True)
     content_mean, content_variance = tf.nn.moments(content_features, [1,2], keepdims=True)
+    style_mean = tf.reshape(style_mean, [-1,1,1,style_mean.shape[-1]])
+    style_variance = tf.reshape(style_variance, [-1,1,1,style_variance.shape[-1]])
     normalized_content_features = tf.nn.batch_normalization(content_features, content_mean,
                                                             content_variance, style_mean, 
                                                             tf.sqrt(style_variance), epsilon)
