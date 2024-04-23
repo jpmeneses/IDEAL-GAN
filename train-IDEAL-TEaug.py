@@ -564,13 +564,13 @@ for ep in range(args.epochs):
             # Magnitude of recon MR images at each echo
             im_ech1 = np.squeeze(np.abs(tf.complex(B2A[:,0,:,:,0],B2A[:,0,:,:,1])))
             im_ech2 = np.squeeze(np.abs(tf.complex(B2A[:,1,:,:,0],B2A[:,1,:,:,1])))
-            if args.n_echoes >= 3:
+            if B2A.shape[1] >= 3:
                 im_ech3 = np.squeeze(np.abs(tf.complex(B2A[:,2,:,:,0],B2A[:,2,:,:,1])))
-            if args.n_echoes >= 4:
+            if B2A.shape[1] >= 4:
                 im_ech4 = np.squeeze(np.abs(tf.complex(B2A[:,3,:,:,0],B2A[:,3,:,:,1])))
-            if args.n_echoes >= 5:
+            if B2A.shape[1] >= 5:
                 im_ech5 = np.squeeze(np.abs(tf.complex(B2A[:,4,:,:,0],B2A[:,4,:,:,1])))
-            if args.n_echoes >= 6:
+            if B2A.shape[1] >= 6:
                 im_ech6 = np.squeeze(np.abs(tf.complex(B2A[:,5,:,:,0],B2A[:,5,:,:,1])))
             
             # Acquisitions in the first row
@@ -582,28 +582,28 @@ for ep in range(args.epochs):
                                   interpolation='none', vmin=0, vmax=1)
             axs[0,1].set_title('2nd Echo')
             axs[0,1].axis('off')
-            if args.n_echoes >= 3:
+            if B2A.shape[1] >= 3:
                 acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,2].set_title('3rd Echo')
                 axs[0,2].axis('off')
             else:
                 fig.delaxes(axs[0,2])
-            if args.n_echoes >= 4:
+            if B2A.shape[1] >= 4:
                 acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,3].set_title('4th Echo')
                 axs[0,3].axis('off')
             else:
                 fig.delaxes(axs[0,3])
-            if args.n_echoes >= 5:
+            if B2A.shape[1] >= 5:
                 acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,4].set_title('5th Echo')
                 axs[0,4].axis('off')
             else:
                 fig.delaxes(axs[0,4])
-            if args.n_echoes >= 6:
+            if B2A.shape[1] >= 6:
                 acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,5].set_title('6th Echo')
