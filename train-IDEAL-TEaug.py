@@ -138,7 +138,7 @@ if args.G_model == 'multi-decod':
     else:
         G_A2B = dl.PM_Generator(input_shape=(echoes,hgt,wdt,n_ch),
                                 te_input=args.te_input,
-                                te_shape=(args.n_echoes,),
+                                te_shape=(None,),
                                 filters=args.n_G_filters,
                                 R2_self_attention=args.D1_SelfAttention,
                                 FM_self_attention=args.D2_SelfAttention)
