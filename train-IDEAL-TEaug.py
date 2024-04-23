@@ -64,7 +64,12 @@ if args.DL_gen:
 # =                                    data                                    =
 # ==============================================================================
 
-ech_idx = args.n_echoes * 2
+if args.n_echoes > 0:
+    ech_idx = args.n_echoes * 2
+    echoes = args.n_echoes
+else:
+    ech_idx = 12
+    echoes = None
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -103,7 +108,6 @@ valY    = out_maps_1
 # Overall dataset statistics
 len_dataset,_,_,_,_ = np.shape(trainY)
 _,n_out,hgt,wdt,n_ch = np.shape(valY)
-echoes = args.n_echoes
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
@@ -517,10 +521,14 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        if args.field == 3.0:
-            te_var = wf.gen_TEvar(args.n_echoes, bs=B.shape[0], TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+        if args.n_echoes == 0:
+            ne_sel = np.random.randint(3,7)
         else:
-            te_var = wf.gen_TEvar(args.n_echoes, bs=B.shape[0])
+            ne_sel = 0
+        if args.field == 3.0:
+            te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+        else:
+            te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 
         G_loss_dict = train_step(B, te=te_var)
 
