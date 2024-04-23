@@ -470,7 +470,9 @@ def PM_Generator(
     elif len(input_shape) > 3 and te_input == True:
         x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[-3],x.shape[-2],x.shape[-1]]))(x)
         # Fully-connected network for processing the vector with echo-times
-        y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
+        y = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=-1))(te)
+        y = keras.layers.RNN(keras.layers.LSTMCell(6))(y)
+        y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(y)
         # Adaptive Instance Normalization for Style-Transfer
         x = AdaIN(x, y)
 
