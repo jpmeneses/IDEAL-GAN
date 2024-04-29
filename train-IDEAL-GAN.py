@@ -91,7 +91,7 @@ dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True, mag_and_phase=args.only_mag)
 
 dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_3, out_map s_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True, mag_and_phase=args.only_mag)
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True, mag_and_phase=args.only_mag)
 
 dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True, mag_and_phase=args.only_mag)
