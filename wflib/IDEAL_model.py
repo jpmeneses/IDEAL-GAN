@@ -263,7 +263,7 @@ def IDEAL_mag(out_maps, params):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
-    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,1]) * 3*np.pi
+    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,1]) * np.pi # * 3
     pha_rho_rav = tf.reshape(pha_rho, [n_batch, -1]) # (nb,nv)
     pha_rho_rav = tf.expand_dims(pha_rho_rav,1) # (nb,1,nv)
     exp_ph = tf.linalg.matmul(tf.ones([n_batch,ne,1],dtype=tf.complex64), pha_rho_rav) # (nb,ne,nv)
