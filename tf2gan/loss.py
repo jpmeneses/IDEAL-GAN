@@ -143,6 +143,6 @@ class AbsolutePhaseDisparity(tf.keras.losses.Loss):
         y_true = tf.complex(y_true[:,:1,:,:,:],0.0) * tf.math.exp(tf.complex(0.0,y_true[:,1:,:,:,:]))
         y_pred = tf.complex(y_pred[:,:1,:,:,:],0.0) * tf.math.exp(tf.complex(0.0,y_pred[:,1:,:,:,:]))
         y_APD_num = tf.abs(y_true)*tf.abs(tf.math.angle(y_true*tf.math.conj(y_pred)))
-        y_APD_num_sum = tf.reduce_sum(y_APD, axis=(2,3,4))
+        y_APD_num_sum = tf.reduce_sum(y_APD_num, axis=(2,3,4))
         y_APD_den_sum = tf.reduce_sum(tf.abs(y_true), axis=(2,3,4))
         return tf.math.divide_no_nan(y_APD_num_sum, y_APD_den_sum)
