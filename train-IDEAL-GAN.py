@@ -433,7 +433,7 @@ def sample(A, B):
         A2Z2B_WF_imag = A2Z2B_mag[:,:,:,:,:2] * tf.math.sin(A2Z2B_WF_pha*np.pi)
         A2Z2B_WF_imag = tf.transpose(A2Z2B_WF_imag, perm=[0,4,2,3,1])
         A2Z2B_WF = tf.concat([A2Z2B_WF_real,A2Z2B_WF_imag],axis=-1)
-        A2Z2B_PM = tf.concat([A2Z2B_pha[:,:,:,:,2:],A2Z2B_mag[:,:,:,:,2:]],axis=-1)
+        A2Z2B_PM = tf.concat([A2Z2B_pha[:,:,:,:,1:],A2Z2B_mag[:,:,:,:,2:]],axis=-1)
         A2B = tf.concat([A2Z2B_WF,A2Z2B_PM],axis=1)
     else:
         A2Z2B_w = dec_w(A2Z, training=False)
