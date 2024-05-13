@@ -85,16 +85,16 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, 12, MEBCRN=True, mag_and_phase=args.only_mag)
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, 12, MEBCRN=True)#, mag_and_phase=args.only_mag)
 
 dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True, mag_and_phase=args.only_mag)
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True)#, mag_and_phase=args.only_mag)
 
 dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True, mag_and_phase=args.only_mag)
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True)#, mag_and_phase=args.only_mag)
 
 dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True, mag_and_phase=args.only_mag)
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True)#, mag_and_phase=args.only_mag)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -212,11 +212,11 @@ D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch),
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
 
-if args.only_mag:
-    IDEAL_op = wf.IDEAL_mag_Layer()
-    APD_loss_fn = gan.AbsolutePhaseDisparity()
-else:
-    IDEAL_op = wf.IDEAL_Layer()
+# if args.only_mag:
+#     IDEAL_op = wf.IDEAL_mag_Layer()
+#     APD_loss_fn = gan.AbsolutePhaseDisparity()
+# else:
+IDEAL_op = wf.IDEAL_Layer()
 
 F_op = dl.FourierLayer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
@@ -272,10 +272,14 @@ def train_G(A, B):
         if args.only_mag:
             A2Z2B_mag = dec_mag(A2Z, training=True)
             A2Z2B_pha = dec_pha(A2Z, training=True)
-            if args.rem_R2:
-                A2Z2B_mag = tf.concat([A2Z2B_mag[:,:,:,:,:2],tf.zeros_like(A2Z2B_mag[:,:,:,:,2:])],axis=-1)
-            A2Z2B_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha],axis=-1)
-            A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
+            A2Z2B_WF_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha[:,:,:,:,:1]],axis=-1)
+            A2Z2B_WF_real = A2Z2B_mag[:,:,:,:,:2] * tf.math.cos(A2Z2B_WF_pha*np.pi) # (NB,1,H,W,NS)
+            A2Z2B_WF_real = tf.transpose(A2Z2B_WF_real, perm=[0,4,2,3,1]) # (NB,NS,H,W,1)
+            A2Z2B_WF_imag = A2Z2B_mag[:,:,:,:,:2] * tf.math.sin(A2Z2B_WF_pha*np.pi)
+            A2Z2B_WF_imag = tf.transpose(A2Z2B_WF_imag, perm=[0,4,2,3,1])
+            A2Z2B_WF = tf.concat([A2Z2B_WF_real,A2Z2B_WF_imag],axis=-1)
+            A2Z2B_PM = tf.concat([A2Z2B_pha[:,:,:,:,2:],A2Z2B_mag[:,:,:,:,2:]],axis=-1)
+            A2B = tf.concat([A2Z2B_WF,A2Z2B_PM],axis=1)
         else:
             A2Z2B_w = dec_w(A2Z, training=True)
             A2Z2B_f = dec_f(A2Z, training=True)
@@ -327,13 +331,13 @@ def train_G(A, B):
             A2B2A_cycle_loss += cycle_loss_fn(A, A2B2A)
             B2A2B_cycle_loss = tf.constant(0.0,dtype=tf.float32)
         else:
-            if args.only_mag:
-                B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
-                B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,2:], A2B[:,1:,:,:,2:]) * args.FM_loss_weight # PHASE
-                B2A2B_cycle_loss += APD_loss_fn(B[:,:,:,:,:2], A2B[:,:,:,:,:2]) * args.phi_0_loss_weight
-            else:
-                B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-                B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
+            # if args.only_mag:
+            #     B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
+            #     B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,1:], A2B[:,1:,:,:,1:]) * args.FM_loss_weight # PHASE
+            #     # B2A2B_cycle_loss += APD_loss_fn(B[:,:,:,:,:2], A2B[:,:,:,:,:2]) * args.phi_0_loss_weight
+            # else:
+            B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
+            B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
         A2B2A_f_cycle_loss = msle_loss(A_f, A2B2A_f)
         A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
 
@@ -423,10 +427,14 @@ def sample(A, B):
     if args.only_mag:
         A2Z2B_mag = dec_mag(A2Z, training=False)
         A2Z2B_pha = dec_pha(A2Z, training=False)
-        if args.rem_R2:
-            A2Z2B_mag = tf.concat([A2Z2B_mag[:,:,:,:,:2],tf.zeros_like(A2Z2B_mag[:,:,:,:,2:])],axis=-1)
-        A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
-        A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
+        A2Z2B_WF_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha[:,:,:,:,:1]],axis=-1)
+        A2Z2B_WF_real = A2Z2B_mag[:,:,:,:,:2] * tf.math.cos(A2Z2B_WF_pha*np.pi) # (NB,1,H,W,NS)
+        A2Z2B_WF_real = tf.transpose(A2Z2B_WF_real, perm=[0,4,2,3,1]) # (NB,NS,H,W,1)
+        A2Z2B_WF_imag = A2Z2B_mag[:,:,:,:,:2] * tf.math.sin(A2Z2B_WF_pha*np.pi)
+        A2Z2B_WF_imag = tf.transpose(A2Z2B_WF_imag, perm=[0,4,2,3,1])
+        A2Z2B_WF = tf.concat([A2Z2B_WF_real,A2Z2B_WF_imag],axis=-1)
+        A2Z2B_PM = tf.concat([A2Z2B_pha[:,:,:,:,2:],A2Z2B_mag[:,:,:,:,2:]],axis=-1)
+        A2B = tf.concat([A2Z2B_WF,A2Z2B_PM],axis=1)
     else:
         A2Z2B_w = dec_w(A2Z, training=False)
         A2Z2B_f = dec_f(A2Z, training=False)
@@ -475,12 +483,12 @@ def sample(A, B):
         val_A2B2A_loss += cycle_loss_fn(A, A2B2A)
         val_B2A2B_loss = tf.constant(0.0,dtype=tf.float32)
     else:
-        if args.only_mag:
-            val_B2A2B_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:])
-            val_B2A2B_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight
-        else:
-            val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
-            val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
+        # if args.only_mag:
+        #     val_B2A2B_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:])
+        #     val_B2A2B_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight
+        # else:
+        val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
+        val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_A2B2A_f_loss = msle_loss(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
@@ -632,20 +640,20 @@ for ep in range(args.epochs):
             axs[0,5].axis('off')
 
             # A2B maps in the second row
-            if args.only_mag:
-                w_m_aux = np.squeeze(A2B[:,0,:,:,0])
-                w_p_aux = np.squeeze(A2B[:,1,:,:,0])
-                f_m_aux = np.squeeze(A2B[:,0,:,:,1])
-                f_p_aux = np.squeeze(A2B[:,1,:,:,1])
-                r2_aux = np.squeeze(A2B[:,0,:,:,2])
-                field_aux = np.squeeze(A2B[:,1,:,:,2])
-            else:
-                w_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
-                w_p_aux = np.squeeze(np.arctan2(A2B[:,0,:,:,1],A2B[:,0,:,:,0]))/np.pi
-                f_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
-                f_p_aux = np.squeeze(np.arctan2(A2B[:,1,:,:,1],A2B[:,1,:,:,0]))/np.pi
-                r2_aux = np.squeeze(A2B[:,2,:,:,1])
-                field_aux = np.squeeze(A2B[:,2,:,:,0])
+            # if args.only_mag:
+            #     w_m_aux = np.squeeze(A2B[:,0,:,:,0])
+            #     w_p_aux = np.squeeze(A2B[:,1,:,:,0])
+            #     f_m_aux = np.squeeze(A2B[:,0,:,:,1])
+            #     f_p_aux = np.squeeze(A2B[:,1,:,:,1])
+            #     r2_aux = np.squeeze(A2B[:,0,:,:,2])
+            #     field_aux = np.squeeze(A2B[:,1,:,:,2])
+            # else:
+            w_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+            w_p_aux = np.squeeze(np.arctan2(A2B[:,0,:,:,1],A2B[:,0,:,:,0]))/np.pi
+            f_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
+            f_p_aux = np.squeeze(np.arctan2(A2B[:,1,:,:,1],A2B[:,1,:,:,0]))/np.pi
+            r2_aux = np.squeeze(A2B[:,2,:,:,1])
+            field_aux = np.squeeze(A2B[:,2,:,:,0])
             W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,0])
@@ -677,20 +685,20 @@ for ep in range(args.epochs):
             axs[1,5].axis('off')
 
             # Ground-truth in the third row
-            if args.only_mag:
-                wn_m_aux = np.squeeze(B[:,0,:,:,0])
-                wn_p_aux = np.squeeze(B[:,1,:,:,0])
-                fn_m_aux = np.squeeze(B[:,0,:,:,1])
-                fn_p_aux = np.squeeze(B[:,1,:,:,1])
-                r2n_aux = np.squeeze(B[:,0,:,:,2])
-                fieldn_aux = np.squeeze(B[:,1,:,:,2])
-            else:
-                wn_m_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
-                wn_p_aux = np.squeeze(np.arctan2(B[:,0,:,:,1],B[:,0,:,:,0]))/np.pi
-                fn_m_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
-                fn_p_aux = np.squeeze(np.arctan2(B[:,1,:,:,1],B[:,1,:,:,0]))/np.pi
-                r2n_aux = np.squeeze(B[:,2,:,:,1])
-                fieldn_aux = np.squeeze(B[:,2,:,:,0])
+            # if args.only_mag:
+            #     wn_m_aux = np.squeeze(B[:,0,:,:,0])
+            #     wn_p_aux = np.squeeze(B[:,1,:,:,0])
+            #     fn_m_aux = np.squeeze(B[:,0,:,:,1])
+            #     fn_p_aux = np.squeeze(B[:,1,:,:,1])
+            #     r2n_aux = np.squeeze(B[:,0,:,:,2])
+            #     fieldn_aux = np.squeeze(B[:,1,:,:,2])
+            # else:
+            wn_m_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+            wn_p_aux = np.squeeze(np.arctan2(B[:,0,:,:,1],B[:,0,:,:,0]))/np.pi
+            fn_m_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+            fn_p_aux = np.squeeze(np.arctan2(B[:,1,:,:,1],B[:,1,:,:,0]))/np.pi
+            r2n_aux = np.squeeze(B[:,2,:,:,1])
+            fieldn_aux = np.squeeze(B[:,2,:,:,0])
             W_unet = axs[2,0].imshow(wn_m_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_unet, ax=axs[2,0])
