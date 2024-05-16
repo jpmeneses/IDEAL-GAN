@@ -75,7 +75,7 @@ A_B_dataset_val.batch(1)
 if not(args.DL_gen):
     if args.DL_partial_real:
         dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-        trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=200,
+        trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=400,
                                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
     else:
         dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
