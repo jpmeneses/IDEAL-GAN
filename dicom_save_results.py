@@ -23,7 +23,7 @@ import pydicom._storage_sopclass_uids
 # ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
-py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani'])
+py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani','v33'])
 py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--is_GC',type=bool,default=False)
@@ -176,8 +176,9 @@ elif args.dataset == 'multiTE':
   testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
                                       acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=False)
 else:
-  testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
-                                      te_data=True,remove_zeros=True,MEBCRN=False)
+  testX, testY = data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
+                                te_data=False,remove_zeros=True,MEBCRN=False)
+  TEs = np.ones((testX.shape[0],1),dtype=np.float32)
 if args.dataset == 'multiTE':
   testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=False)
 
@@ -374,6 +375,9 @@ elif args.dataset == 'multiTE':
 elif args.dataset == '3ech':
   n_slices = delta_idxs
   ini_idx = 24
+else:
+  n_slices = [21]
+  ini_idx = 42
 cont = 0
 for idx in range(len(n_slices)):
   ini = cont
