@@ -73,20 +73,25 @@ A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
 A_B_dataset_val.batch(1)
 
 if not(args.DL_gen):
-    dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                        acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+    if args.DL_partial_real:
+        dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+        trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=200,
+                                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+    else:
+        dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+        acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-    dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
-                                        acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+        dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+        acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
+                                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-    dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
-                                        acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
+        dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+        acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
+                                            acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
 
-    trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
-    trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
+        trainX  = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
+        trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
 
     if args.G_model == 'MEBCRN':
         len_dataset,_,_,_,_ = np.shape(trainY)
