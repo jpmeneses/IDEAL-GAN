@@ -30,6 +30,11 @@ if not(hasattr(args,'data_size')):
     ds_args = py.args()
     args.__dict__.update(ds_args.__dict__)
 
+if not(hasattr(args,'unwrap')):
+    py.arg('--unwrap', type=bool, default=True)
+    ds_args = py.args()
+    args.__dict__.update(ds_args.__dict__)
+
 # ==============================================================================
 # =                                    data                                    =
 # ==============================================================================
@@ -39,7 +44,8 @@ r2_sc = 200.0
 
 dataset_dir = '../datasets/'
 dataset_hdf5_2 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, 12, MEBCRN=True, mag_and_phase=args.only_mag)
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, 12, MEBCRN=True,
+                            mag_and_phase=args.only_mag, unwrap=args.unwrap)
 
 len_dataset,ne,hgt,wdt,n_ch = valX.shape
 A_dataset_val = tf.data.Dataset.from_tensor_slices(valX)
@@ -49,13 +55,7 @@ A_dataset_val = A_dataset_val.batch(args.val_batch_size).shuffle(len_dataset)
 # =                                   models                                   =
 # ==============================================================================
 
-if args.div_decod:
-    if args.only_mag:
-        nd = 2
-    else:
-        nd = 3
-else:
-    nd = 1
+nd = 2
 if len(args.n_G_filt_list) == (args.n_downsamplings+1):
     nfe = filt_list
     nfd = [a//nd for a in filt_list]
@@ -72,56 +72,27 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 sd_out=not(args.VQ_encoder),
                 ls_mean_activ=None,
                 NL_self_attention=args.NL_SelfAttention)
-if args.only_mag:
-    dec_mag = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,3),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation='relu',
-                        output_initializer='he_normal',
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_pha = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,2),
-                        filters=nfd2,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation='tanh',
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    tl.Checkpoint(dict(enc=enc,dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.experiment_dir, 'checkpoints')).restore()
-    hgt_ls = dec_mag.input_shape[1]
-    wdt_ls = dec_mag.input_shape[2]
-else:
-    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        n_groups=args.n_groups_PM,
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.experiment_dir, 'checkpoints')).restore()
-    hgt_ls = dec_w.input_shape[1]
-    wdt_ls = dec_w.input_shape[2]
+dec_mag = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,3),
+                    filters=nfd,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='relu',
+                    output_initializer='he_normal',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_pha = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,2),
+                    filters=nfd2,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='tanh',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+
+tl.Checkpoint(dict(enc=enc,dec_mag=dec_mag,dec_pha=dec_pha), py.join(args.experiment_dir, 'checkpoints')).restore()
+hgt_ls = dec_mag.input_shape[1]
+wdt_ls = dec_mag.input_shape[2]
 
 z_std = tf.Variable(initial_value=1.0, trainable=False, dtype=tf.float32)
 
@@ -177,16 +148,10 @@ def sample(Z,denoise=False,Z_std=1.0,inference_timesteps=10,TE=None):
                 Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
     # Z2B2A Cycle
     Z = tf.math.multiply_no_nan(Z,Z_std)
-    if args.only_mag:
-        Z2B_mag = dec_mag(Z, training=True)
-        Z2B_pha = dec_pha(Z, training=True)
-        Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
-        Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
-    else:
-        Z2B_w = dec_w(Z, training=False)
-        Z2B_f = dec_f(Z, training=False)
-        Z2B_xi= dec_xi(Z, training=False)
-        Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
+    Z2B_mag = dec_mag(Z, training=True)
+    Z2B_pha = dec_pha(Z, training=True)
+    Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
+    Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
     # Reconstructed multi-echo images
     Z2B2A = IDEAL_op(Z2B)
 

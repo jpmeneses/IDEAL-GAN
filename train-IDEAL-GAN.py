@@ -24,13 +24,11 @@ py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--rand_ne', type=bool, default=False)
 py.arg('--rand_ph_offset', type=bool, default=False)
 py.arg('--only_mag', type=bool, default=False)
-py.arg('--no_GC', type=bool, default=False)
-py.arg('--rem_R2', type=bool, default=False)
+py.arg('--unwrap', type=bool, default=True)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--n_G_filt_list', default='')
 py.arg('--n_downsamplings', type=int, default=4)
 py.arg('--n_res_blocks', type=int, default=2)
-py.arg('--div_decod', type=bool, default=True)
 py.arg('--encoded_size', type=int, default=256)
 py.arg('--VQ_encoder', type=bool, default=False)
 py.arg('--VQ_num_embed', type=int, default=64)
@@ -49,11 +47,10 @@ py.arg('--beta_2', type=float, default=0.9)
 py.arg('--critic_train_steps', type=int, default=1)
 py.arg('--R1_reg_weight', type=float, default=0.2)
 py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE', 'MSLE'])
-py.arg('--A_loss', default='VGG', choices=['pix-wise', 'VGG', 'sinGAN'])
+py.arg('--A_loss', default='VGG', choices=['pix-wise', 'VGG'])
 py.arg('--A_loss_weight', type=float, default=0.01)
 py.arg('--B_loss_weight', type=float, default=0.1)
 py.arg('--FM_loss_weight', type=float, default=1.0)
-py.arg('--phi_0_loss_weight', type=float, default=1.0)
 py.arg('--ls_reg_weight', type=float, default=1e-7)
 py.arg('--cov_reg_weight', type=float, default=0.0)
 py.arg('--Fourier_reg_weight', type=float, default=0.0)
@@ -85,16 +82,20 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, 12, MEBCRN=True)#, mag_and_phase=args.only_mag)
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, 12, MEBCRN=True,
+                                    mag_and_phase=args.only_mag, unwrap=args.unwrap)
 
 dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True)#, mag_and_phase=args.only_mag)
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, 12, MEBCRN=True,
+                                    mag_and_phase=args.only_mag, unwrap=args.unwrap)
 
 dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True)#, mag_and_phase=args.only_mag)
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, 12, MEBCRN=True,
+                                    mag_and_phase=args.only_mag, unwrap=args.unwrap)
 
 dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True)#, mag_and_phase=args.only_mag)
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, 12, MEBCRN=True,
+                                    mag_and_phase=args.only_mag, unwrap=args.unwrap)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -108,10 +109,10 @@ valY    = out_maps_1
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
-# if args.only_mag:
-#     _,_,_,_,n_out = np.shape(trainY)
-# else:
-_,n_out,_,_,_ = np.shape(trainY)
+if args.only_mag:
+    _,_,_,_,n_out = np.shape(trainY)
+else:
+    _,n_out,_,_,_ = np.shape(trainY)
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',ne)
@@ -136,13 +137,8 @@ A_B_dataset_val.batch(1)
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
-if args.div_decod:
-    if args.only_mag:
-        nd = 2
-    else:
-        nd = 3
-else:
-    nd = 1
+# Num of decoders
+nd = 2
 if len(args.n_G_filt_list) == (args.n_downsamplings+1):
     nfe = filt_list
     nfd = [a//nd for a in filt_list]
@@ -161,50 +157,23 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 ls_reg_weight=args.ls_reg_weight,
                 NL_self_attention=args.NL_SelfAttention
                 )
-if args.only_mag:
-    dec_mag = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_out),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation='relu',
-                        output_initializer='he_normal',
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_pha = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_out-1),
-                        filters=nfd2,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation='tanh',
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-else:
-    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        n_groups=2,
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
+dec_mag = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_out),
+                    filters=nfd,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='relu',
+                    output_initializer='he_normal',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_pha = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_out-1),
+                    filters=nfd2,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='tanh',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
 
 D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch),
                 cGAN=args.cGAN,
@@ -212,11 +181,11 @@ D_A=dl.PatchGAN(input_shape=(None,hgt,wdt,n_ch),
                 dim=args.n_D_filters,
                 self_attention=(args.NL_SelfAttention))
 
-# if args.only_mag:
-#     IDEAL_op = wf.IDEAL_mag_Layer()
-#     APD_loss_fn = gan.AbsolutePhaseDisparity()
-# else:
-IDEAL_op = wf.IDEAL_Layer()
+if args.only_mag:
+    IDEAL_op = wf.IDEAL_mag_Layer()
+    APD_loss_fn = gan.AbsolutePhaseDisparity()
+else:
+    IDEAL_op = wf.IDEAL_Layer()
 
 F_op = dl.FourierLayer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
@@ -236,15 +205,6 @@ cosine_loss = tf.losses.CosineSimilarity()
 msle_loss = tf.losses.MeanSquaredLogarithmicError()
 if args.A_loss == 'VGG':
     metric_model = dl.perceptual_metric(input_shape=(None,hgt,wdt,n_ch))
-
-if args.A_loss == 'sinGAN':
-    # D_0 = dl.sGAN(input_shape=(None,None,n_ch))
-    D_1 = dl.sGAN(input_shape=(None,None,n_ch))
-    D_2 = dl.sGAN(input_shape=(None,None,n_ch))
-    D_3 = dl.sGAN(input_shape=(None,None,n_ch))
-    tl.Checkpoint(dict(D_1=D_1,D_2=D_2,D_3=D_3), py.join('output','sinGAN-WF','checkpoints')).restore()
-    D_list = [D_1, D_2, D_3]
-    batch_op = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 D_lr_scheduler = dl.LinearDecay(args.lr*args.D_lr_factor,
@@ -269,10 +229,13 @@ def train_G(A, B):
         else:
             vq_dict =  {'loss': tf.constant(0.0,dtype=tf.float32),
                         'perplexity': tf.constant(0.0,dtype=tf.float32)}
+        A2Z2B_mag = dec_mag(A2Z, training=True)
+        A2Z2B_pha = dec_pha(A2Z, training=True)
         if args.only_mag:
-            A2Z2B_mag = dec_mag(A2Z, training=True)
-            A2Z2B_pha = dec_pha(A2Z, training=True)
-            A2Z2B_WF_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha[:,:,:,:,:1]],axis=-1)
+            A2Z2B_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha],axis=-1) # (NB,1,H,W,1+NS)
+            A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
+        else:
+            A2Z2B_WF_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha[:,:,:,:,:1]],axis=-1) # (NB,1,H,W,NS)
             A2Z2B_WF_real = A2Z2B_mag[:,:,:,:,:2] * tf.math.cos(A2Z2B_WF_pha*np.pi) # (NB,1,H,W,NS)
             A2Z2B_WF_real = tf.transpose(A2Z2B_WF_real, perm=[0,4,2,3,1]) # (NB,NS,H,W,1)
             A2Z2B_WF_imag = A2Z2B_mag[:,:,:,:,:2] * tf.math.sin(A2Z2B_WF_pha*np.pi)
@@ -280,13 +243,6 @@ def train_G(A, B):
             A2Z2B_WF = tf.concat([A2Z2B_WF_real,A2Z2B_WF_imag],axis=-1)
             A2Z2B_PM = tf.concat([A2Z2B_pha[:,:,:,:,1:],A2Z2B_mag[:,:,:,:,2:]],axis=-1)
             A2B = tf.concat([A2Z2B_WF,A2Z2B_PM],axis=1)
-        else:
-            A2Z2B_w = dec_w(A2Z, training=True)
-            A2Z2B_f = dec_f(A2Z, training=True)
-            A2Z2B_xi= dec_xi(A2Z, training=True)
-            if args.rem_R2:
-                A2Z2B_xi = tf.concat([A2Z2B_xi[:,:,:,:,:1],tf.zeros_like(A2Z2B_xi[:,:,:,:,1:])],axis=-1)
-            A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
 
         A2B2A = IDEAL_op(A2B, ne=A.shape[1], training=False)
 
@@ -315,27 +271,13 @@ def train_G(A, B):
             A2B2A_cycle_loss = tf.constant(0.0,dtype=tf.float32)
             for l in range(len(A2Y)):
                 A2B2A_cycle_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
-        elif args.A_loss == 'sinGAN':
-            A2B2A_cycle_loss = 0.0
-            for D in D_list:
-                A_prep = batch_op(A, training=False)
-                A2Y = D(A_prep, training=False)
-                A2B2A_prep = batch_op(A2B2A, training=False)
-                A2B2A2Y = D(A2B2A_prep, training=False)
-                for l in range(1,len(A2Y)):
-                    A2B2A_cycle_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
-        if args.no_GC:
-            A2B2A_cycle_loss += cycle_loss_fn(A, A2B2A)
-            B2A2B_cycle_loss = tf.constant(0.0,dtype=tf.float32)
+        if args.only_mag:
+            B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
+            B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,1:], A2B[:,1:,:,:,1:]) * args.FM_loss_weight # PHASE
         else:
-            # if args.only_mag:
-            #     B2A2B_cycle_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:]) # MAG
-            #     B2A2B_cycle_loss += cycle_loss_fn(B[:,1:,:,:,1:], A2B[:,1:,:,:,1:]) * args.FM_loss_weight # PHASE
-            #     # B2A2B_cycle_loss += APD_loss_fn(B[:,:,:,:,:2], A2B[:,:,:,:,:2]) * args.phi_0_loss_weight
-            # else:
             B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
             B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
         A2B2A_f_cycle_loss = msle_loss(A_f, A2B2A_f)
@@ -350,12 +292,8 @@ def train_G(A, B):
         G_loss += activ_reg + A2B2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss'] * args.ls_reg_weight
         G_loss += A2Z_cov_loss * args.cov_reg_weight
 
-    if args.only_mag:
-        G_grad = t.gradient(G_loss, enc.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables))
-    else:
-        G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
+    G_grad = t.gradient(G_loss, enc.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables))
 
     return A2B2A,  {'A2B2A_g_loss': A2B2A_g_loss,
                     'A2B2A_cycle_loss': A2B2A_cycle_loss,
@@ -424,9 +362,12 @@ def sample(A, B):
     if args.VQ_encoder:
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
+    A2Z2B_mag = dec_mag(A2Z, training=False)
+    A2Z2B_pha = dec_pha(A2Z, training=False)
     if args.only_mag:
-        A2Z2B_mag = dec_mag(A2Z, training=False)
-        A2Z2B_pha = dec_pha(A2Z, training=False)
+        A2Z2B_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha],axis=-1) # (NB,1,H,W,1+NS)
+        A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
+    else:
         A2Z2B_WF_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha[:,:,:,:,:1]],axis=-1)
         A2Z2B_WF_real = A2Z2B_mag[:,:,:,:,:2] * tf.math.cos(A2Z2B_WF_pha*np.pi) # (NB,1,H,W,NS)
         A2Z2B_WF_real = tf.transpose(A2Z2B_WF_real, perm=[0,4,2,3,1]) # (NB,NS,H,W,1)
@@ -435,13 +376,6 @@ def sample(A, B):
         A2Z2B_WF = tf.concat([A2Z2B_WF_real,A2Z2B_WF_imag],axis=-1)
         A2Z2B_PM = tf.concat([A2Z2B_pha[:,:,:,:,1:],A2Z2B_mag[:,:,:,:,2:]],axis=-1)
         A2B = tf.concat([A2Z2B_WF,A2Z2B_PM],axis=1)
-    else:
-        A2Z2B_w = dec_w(A2Z, training=False)
-        A2Z2B_f = dec_f(A2Z, training=False)
-        A2Z2B_xi= dec_xi(A2Z, training=False)
-        if args.rem_R2:
-            A2Z2B_xi = tf.concat([A2Z2B_xi[:,:,:,:,:1],tf.zeros_like(A2Z2B_xi[:,:,:,:,1:])],axis=-1)
-        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
 
     A2B2A = IDEAL_op(A2B, training=False)
 
@@ -468,25 +402,12 @@ def sample(A, B):
         val_A2B2A_loss = tf.constant(0.0,dtype=tf.float32)
         for l in range(len(A2Y)):
             val_A2B2A_loss += cosine_loss(A2Y[l], A2B2A2Y[l])/len(A2Y)
-    elif args.A_loss == 'sinGAN':
-        val_A2B2A_loss = 0.0
-        for D in D_list:
-            A_prep = batch_op(A, training=False)
-            A2Y = D(A_prep, training=False)
-            A2B2A_prep = batch_op(A2B2A, training=False)
-            A2B2A2Y = D(A2B2A_prep, training=False)
-            for l in range(1,len(A2Y)):
-                val_A2B2A_loss += cycle_loss_fn(A2Y[l], A2B2A2Y[l])/(len(A2Y)*len(D_list))
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
-    if args.no_GC:
-        val_A2B2A_loss += cycle_loss_fn(A, A2B2A)
-        val_B2A2B_loss = tf.constant(0.0,dtype=tf.float32)
+    if args.only_mag:
+        val_B2A2B_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:])
+        val_B2A2B_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight
     else:
-        # if args.only_mag:
-        #     val_B2A2B_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:])
-        #     val_B2A2B_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight
-        # else:
         val_B2A2B_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:])
         val_B2A2B_loss += cycle_loss_fn(B[:,2:,:,:,:], A2B[:,2:,:,:,:]) * args.FM_loss_weight
     val_A2B2A_f_loss = msle_loss(A_f, A2B2A_f)
@@ -507,29 +428,16 @@ def validation_step(A, B):
 ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
-if args.only_mag:
-    checkpoint = tl.Checkpoint(dict(enc=enc,
-                                    dec_mag=dec_mag,
-                                    dec_pha=dec_pha,
-                                    D_A=D_A,
-                                    vq_op=vq_op,
-                                    G_optimizer=G_optimizer,
-                                    D_optimizer=D_optimizer,
-                                    ep_cnt=ep_cnt),
-                               py.join(output_dir, 'checkpoints'),
-                               max_to_keep=5)
-else:
-    checkpoint = tl.Checkpoint(dict(enc=enc,
-                                    dec_w=dec_w,
-                                    dec_f=dec_f,
-                                    dec_xi=dec_xi,
-                                    D_A=D_A,
-                                    vq_op=vq_op,
-                                    G_optimizer=G_optimizer,
-                                    D_optimizer=D_optimizer,
-                                    ep_cnt=ep_cnt),
-                               py.join(output_dir, 'checkpoints'),
-                               max_to_keep=5)
+checkpoint = tl.Checkpoint(dict(enc=enc,
+                                dec_mag=dec_mag,
+                                dec_pha=dec_pha,
+                                D_A=D_A,
+                                vq_op=vq_op,
+                                G_optimizer=G_optimizer,
+                                D_optimizer=D_optimizer,
+                                ep_cnt=ep_cnt),
+                           py.join(output_dir, 'checkpoints'),
+                           max_to_keep=5)
 try:  # restore checkpoint including the epoch counter
     checkpoint.restore().assert_existing_objects_matched()
 except Exception as e:
@@ -566,9 +474,10 @@ for ep in range(args.epochs):
                             A_mag*tf.math.sin(A_pha+pha_offset)],axis=-1)
             if args.only_mag:
                 B_pha = B[:,1:,:,:,1:2] + pha_offset/np.pi
-                B_pha = tf.where(B_pha < -np.pi, B_pha + 2*np.pi, B_pha)
-                B_pha = tf.where(B_pha > np.pi, B_pha - 2*np.pi, B_pha)
-                B_out_pha = tf.concat([B[:,1:,:,:,:1],B_pha,B[:,1:,:,:,2:]],axis=-1)
+                if not unwrap:
+                    B_pha = tf.where(B_pha < -np.pi, B_pha + 2*np.pi, B_pha)
+                    B_pha = tf.where(B_pha > np.pi, B_pha - 2*np.pi, B_pha)
+                    B_out_pha = tf.concat([B_pha,B_pha,B[:,1:,:,:,2:]],axis=-1)
                 B = tf.concat([B[:,:1,:,:,:],B_out_pha],axis=1)
             else:
                 B_w_mag = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:1,:,:,:]),axis=-1,keepdims=True))
@@ -640,20 +549,20 @@ for ep in range(args.epochs):
             axs[0,5].axis('off')
 
             # A2B maps in the second row
-            # if args.only_mag:
-            #     w_m_aux = np.squeeze(A2B[:,0,:,:,0])
-            #     w_p_aux = np.squeeze(A2B[:,1,:,:,0])
-            #     f_m_aux = np.squeeze(A2B[:,0,:,:,1])
-            #     f_p_aux = np.squeeze(A2B[:,1,:,:,1])
-            #     r2_aux = np.squeeze(A2B[:,0,:,:,2])
-            #     field_aux = np.squeeze(A2B[:,1,:,:,2])
-            # else:
-            w_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
-            w_p_aux = np.squeeze(np.arctan2(A2B[:,0,:,:,1],A2B[:,0,:,:,0]))/np.pi
-            f_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
-            f_p_aux = np.squeeze(np.arctan2(A2B[:,1,:,:,1],A2B[:,1,:,:,0]))/np.pi
-            r2_aux = np.squeeze(A2B[:,2,:,:,1])
-            field_aux = np.squeeze(A2B[:,2,:,:,0])
+            if args.only_mag:
+                w_m_aux = np.squeeze(A2B[:,0,:,:,0])
+                w_p_aux = np.squeeze(A2B[:,1,:,:,0])
+                f_m_aux = np.squeeze(A2B[:,0,:,:,1])
+                f_p_aux = np.squeeze(A2B[:,1,:,:,1])
+                r2_aux = np.squeeze(A2B[:,0,:,:,2])
+                field_aux = np.squeeze(A2B[:,1,:,:,2])
+            else:
+                w_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+                w_p_aux = np.squeeze(np.arctan2(A2B[:,0,:,:,1],A2B[:,0,:,:,0]))/np.pi
+                f_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
+                f_p_aux = np.squeeze(np.arctan2(A2B[:,1,:,:,1],A2B[:,1,:,:,0]))/np.pi
+                r2_aux = np.squeeze(A2B[:,2,:,:,1])
+                field_aux = np.squeeze(A2B[:,2,:,:,0])
             W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[1,0])
@@ -685,20 +594,20 @@ for ep in range(args.epochs):
             axs[1,5].axis('off')
 
             # Ground-truth in the third row
-            # if args.only_mag:
-            #     wn_m_aux = np.squeeze(B[:,0,:,:,0])
-            #     wn_p_aux = np.squeeze(B[:,1,:,:,0])
-            #     fn_m_aux = np.squeeze(B[:,0,:,:,1])
-            #     fn_p_aux = np.squeeze(B[:,1,:,:,1])
-            #     r2n_aux = np.squeeze(B[:,0,:,:,2])
-            #     fieldn_aux = np.squeeze(B[:,1,:,:,2])
-            # else:
-            wn_m_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
-            wn_p_aux = np.squeeze(np.arctan2(B[:,0,:,:,1],B[:,0,:,:,0]))/np.pi
-            fn_m_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
-            fn_p_aux = np.squeeze(np.arctan2(B[:,1,:,:,1],B[:,1,:,:,0]))/np.pi
-            r2n_aux = np.squeeze(B[:,2,:,:,1])
-            fieldn_aux = np.squeeze(B[:,2,:,:,0])
+            if args.only_mag:
+                wn_m_aux = np.squeeze(B[:,0,:,:,0])
+                wn_p_aux = np.squeeze(B[:,1,:,:,0])
+                fn_m_aux = np.squeeze(B[:,0,:,:,1])
+                fn_p_aux = np.squeeze(B[:,1,:,:,1])
+                r2n_aux = np.squeeze(B[:,0,:,:,2])
+                fieldn_aux = np.squeeze(B[:,1,:,:,2])
+            else:
+                wn_m_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+                wn_p_aux = np.squeeze(np.arctan2(B[:,0,:,:,1],B[:,0,:,:,0]))/np.pi
+                fn_m_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+                fn_p_aux = np.squeeze(np.arctan2(B[:,1,:,:,1],B[:,1,:,:,0]))/np.pi
+                r2n_aux = np.squeeze(B[:,2,:,:,1])
+                fieldn_aux = np.squeeze(B[:,2,:,:,0])
             W_unet = axs[2,0].imshow(wn_m_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_unet, ax=axs[2,0])

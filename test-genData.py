@@ -36,11 +36,6 @@ if not(hasattr(args,'data_size')):
 	ds_args = py.args()
 	args.__dict__.update(ds_args.__dict__)
 
-if not(hasattr(args,'div_decod')):
-    py.arg('--div_decod', type=bool, default=False)
-    dec_args = py.args()
-    args.__dict__.update(dec_args.__dict__)
-
 if hasattr(args,'n_G_filt_list'):
     if len(args.n_G_filt_list) > 0:
         filt_list = [int(a_i) for a_i in args.n_G_filt_list.split(',')]
@@ -62,13 +57,7 @@ n_out = 3
 # =                                   models                                   =
 # ==============================================================================
 
-if args.div_decod:
-    if args.only_mag:
-        nd = 2
-    else:
-        nd = 3
-else:
-    nd = 1
+nd = 2
 if len(args.n_G_filt_list) == (args.n_downsamplings+1):
     nfe = filt_list
     nfd = [a//nd for a in filt_list]
@@ -77,50 +66,22 @@ else:
     nfe = args.n_G_filters
     nfd = args.n_G_filters//nd
     nfd2= args.n_G_filters//(nd+1)
-if args.only_mag:
-    dec_mag = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_out),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation='relu',
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_pha = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_out-1),
-                        filters=nfd2,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation='tanh',
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-else:
-    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        n_groups=args.n_groups_PM,
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-
+dec_mag = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_out),
+                    filters=nfd,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='relu',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_pha = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_out-1),
+                    filters=nfd2,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='tanh',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
 
 if args.only_mag:
     IDEAL_op = wf.IDEAL_mag_Layer()
@@ -128,26 +89,17 @@ else:
     IDEAL_op = wf.IDEAL_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
 
-if args.only_mag:
-    tl.Checkpoint(dict(dec_mag=dec_mag, dec_pha=dec_pha, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
-else:
-    tl.Checkpoint(dict(dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(dec_mag=dec_mag, dec_pha=dec_pha, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 
 @tf.function
 def sample(Z,TE=None):
     if args.VQ_encoder:
         Z = vq_op.quantize(Z)
-    if args.only_mag:
-        Z2B_mag = dec_mag(Z, training=False)
-        Z2B_pha = dec_pha(Z, training=False)
-        Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
-        Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
-    else:
-        Z2B_w = dec_w(Z, training=False)
-        Z2B_f = dec_f(Z, training=False)
-        Z2B_xi= dec_xi(Z, training=False)
-        Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
+    Z2B_mag = dec_mag(Z, training=False)
+    Z2B_pha = dec_pha(Z, training=False)
+    Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
+    Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
     # Reconstructed multi-echo images
     Z2B2A = IDEAL_op(Z2B)
 
@@ -160,9 +112,6 @@ py.mkdir(save_dir)
 hls = hgt//(2**(args.n_downsamplings))
 wls = wdt//(2**(args.n_downsamplings))
 z_shape = (1,hls,wls,args.encoded_size)
-
-TE = wf.gen_TEvar(6,orig=False)
-# Z = tf.random.normal(z_shape,seed=1,dtype=tf.float32)
 
 for k in range(args.n_samples):
     if args.VQ_encoder:
@@ -251,8 +200,6 @@ for k in range(args.n_samples):
                                 interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
     fig.colorbar(field_ok, ax=axs[1,5])
     axs[1,5].axis('off')
-
-    fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE, axis=1))]), fontsize=16)
 
     # plt.show()
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)

@@ -44,8 +44,8 @@ if not(hasattr(args,'data_size')):
     ds_args = py.args()
     args.__dict__.update(ds_args.__dict__)
 
-if not(hasattr(args,'div_decod')):
-    py.arg('--div_decod', type=bool, default=False)
+if not(hasattr(args,'unwrap')):
+    py.arg('--unwrap', type=bool, default=True)
     dec_args = py.args()
     args.__dict__.update(dec_args.__dict__)
 
@@ -106,14 +106,14 @@ else:
 
 if args.dataset == 'JGalgani' or args.dataset == '3ech':
     valX, valY=data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=rnc,
-                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True,mag_and_phase=args.only_mag)
+                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True,mag_and_phase=args.only_mag,unwrap=args.unwrap)
     TEs = wf.gen_TEvar(args.n_echoes, bs=valX.shape[0], orig=True)
 elif args.dataset == 'multiTE':
     valX, valY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
-                                        acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=True,mag_and_phase=args.only_mag)
+                                        acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=True,mag_and_phase=args.only_mag,unwrap=args.unwrap)
 else:
     valX, valY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
-                                        te_data=True,remove_zeros=True,MEBCRN=True,mag_and_phase=args.only_mag)
+                                        te_data=True,remove_zeros=True,MEBCRN=True,mag_and_phase=args.only_mag,unwrap=args.unwrap)
 if args.dataset == 'multiTE':
     valX, valY, TEs = data.group_TEs(valX,valY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=True)
 
@@ -136,13 +136,7 @@ z_std = tf.Variable(initial_value=1.0, trainable=False, dtype=tf.float32)
 # =                                   models                                   =
 # ==============================================================================
 
-if args.div_decod:
-    if args.only_mag:
-        nd = 2
-    else:
-        nd = 3
-else:
-    nd = 1
+nd = 2
 if len(args.n_G_filt_list) == (args.n_downsamplings+1):
     nfe = filt_list
     nfd = [a//nd for a in filt_list]
@@ -159,58 +153,28 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 sd_out=not(args.VQ_encoder),
                 ls_mean_activ=None,
                 NL_self_attention=args.NL_SelfAttention)
-if args.only_mag:
-    dec_mag = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_out),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation='relu',
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_pha = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_out-1),
-                        filters=nfd2,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation='tanh',
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-else:
-    dec_w =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_f =  dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
-    dec_xi = dl.decoder(encoded_dims=args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        n_groups=args.n_groups_PM,
-                        filters=nfd,
-                        num_layers=args.n_downsamplings,
-                        num_res_blocks=args.n_res_blocks,
-                        output_activation=None,
-                        NL_self_attention=args.NL_SelfAttention
-                        )
+dec_mag = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_out),
+                    filters=nfd,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='relu',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_pha = dl.decoder(encoded_dims=args.encoded_size,
+                    output_shape=(hgt,wdt,n_out-1),
+                    filters=nfd2,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='tanh',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+
 if args.LDM:
     unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
     # Initiate unet
-    if args.only_mag:
-        hgt_ls = dec_mag.input_shape[1]
-        wdt_ls = dec_mag.input_shape[2]
-    else:
-        hgt_ls = dec_w.input_shape[1]
-        wdt_ls = dec_w.input_shape[2]
+    hgt_ls = dec_mag.input_shape[1]
+    wdt_ls = dec_mag.input_shape[2]
     test_images = tf.ones((1, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
     test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
     k = unet(test_images, test_timestamps)
@@ -236,10 +200,7 @@ else:
     IDEAL_op = wf.IDEAL_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
 
-if args.only_mag:
-    tl.Checkpoint(dict(enc=enc, dec_mag=dec_mag, dec_pha=dec_pha, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
-else:
-    tl.Checkpoint(dict(enc=enc, dec_w=dec_w, dec_f=dec_f, dec_xi=dec_xi, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(enc=enc, dec_mag=dec_mag, dec_pha=dec_pha, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 
 # @tf.function
@@ -264,16 +225,10 @@ def sample(A,Z_std,TE=None):
             A2Z = dm.ddpm(A2Z, pred_noise, t, alpha, alpha_bar, beta)
         A2Z = tf.math.multiply_no_nan(A2Z,Z_std)
     # Reconstruct to synthesize missing phase
-    if args.only_mag:
-        A2Z2B_mag = dec_mag(A2Z, training=False)
-        A2Z2B_pha = dec_pha(A2Z, training=False)
-        A2Z2B_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha],axis=-1)
-        A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
-    else:
-        A2Z2B_w = dec_w(A2Z, training=False)
-        A2Z2B_f = dec_f(A2Z, training=False)
-        A2Z2B_xi= dec_xi(A2Z, training=False)
-        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
+    A2Z2B_mag = dec_mag(A2Z, training=False)
+    A2Z2B_pha = dec_pha(A2Z, training=False)
+    A2Z2B_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha],axis=-1)
+    A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
     # Reconstructed multi-echo images
     A2B2A = IDEAL_op(A2B,te=TE)
 
