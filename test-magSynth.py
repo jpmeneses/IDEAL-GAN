@@ -267,7 +267,7 @@ def sample(A,Z_std,TE=None):
     if args.only_mag:
         A2Z2B_mag = dec_mag(A2Z, training=False)
         A2Z2B_pha = dec_pha(A2Z, training=False)
-        A2Z2B_pha = tf.concat([tf.zeros_like(A2Z2B_pha[:,:,:,:,:1]),A2Z2B_pha],axis=-1)
+        A2Z2B_pha = tf.concat([A2Z2B_pha[:,:,:,:,:1],A2Z2B_pha],axis=-1)
         A2B = tf.concat([A2Z2B_mag,A2Z2B_pha],axis=1)
     else:
         A2Z2B_w = dec_w(A2Z, training=False)
@@ -303,12 +303,6 @@ APD_loss_fn = gan.AbsolutePhaseDisparity()
 for A, TE, B in A_B_dataset_val:
     # Get only-magnitude latent space
     A2B, A2B2A = sample(A,z_std,TE)
-
-    # Save A2B2A cycle's SSIM 
-    for idx_a in range(A.shape[0]):
-        ms_ssim_scores.append(tf.image.ssim_multiscale(A[idx_a]+1.0, A2B2A[idx_b]+1.0, 2))
-        ssim_scores.append(tf.image.ssim(A[idx_a]+1.0, A2B2A[idx_b]+1.0, 2))
-        apd_scores.append(APD_loss_fn(B[:,:,:,:,:2], A2B[:,:,:,:,:2]))
 
     fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
@@ -364,6 +358,9 @@ for A, TE, B in A_B_dataset_val:
 
     # A2B maps in the second row
     if args.only_mag:
+        # Save APD loss
+        apd_scores.append(APD_loss_fn(B[:,:,:,:,:2], A2B[:,:,:,:,:2]))
+        
         w_m_aux = np.squeeze(A2B[:,0,:,:,0])
         w_p_aux = np.squeeze(A2B[:,1,:,:,0])
         f_m_aux = np.squeeze(A2B[:,0,:,:,1])
@@ -379,7 +376,18 @@ for A, TE, B in A_B_dataset_val:
         fieldn_aux = np.squeeze(B[:,1,:,:,2])
 
     else:
-        w_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
+        B_wf_mag = tf.abs(tf.complex(B[:,:2,:,:,:1],B[:,:2,:,:,1:]))
+        B_wf_phase = tf.math.atan2(B[:,:2,:,:,1:],B[:,:2,:,:,:1])
+        B_cplx = tf.concat([B_wf_mag,B_wf_phase], axis=-1)
+
+        Z2B_wf_mag = tf.abs(tf.complex(Z2B[:,:2,:,:,:1],Z2B[:,:2,:,:,1:]))
+        Z2B_wf_phase = tf.math.atan2(Z2B[:,:2,:,:,1:],Z2B[:,:2,:,:,:1])
+        Z2B_cplx = tf.concat([Z2B_wf_mag,Z2B_wf_phase], axis=-1)
+        
+        # Save APD loss
+        apd_scores.append(APD_loss_fn(B_cplx, Z2B_cplx))
+
+        w_m_aux = np.squeeze(np.abs(w_cplx))
         w_p_aux = np.squeeze(np.arctan2(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]))/np.pi
         f_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,1,:,:,0],Z2B[:,1,:,:,1])))
         f_p_aux = np.squeeze(np.arctan2(Z2B[:,1,:,:,1],Z2B[:,1,:,:,0]))/np.pi
@@ -453,6 +461,7 @@ for A, TE, B in A_B_dataset_val:
     fig.colorbar(field_gt, ax=axs[2,5])
     axs[2,5].axis('off')
 
+    fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE,axis=1))]), fontsize=16)
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
     tl.make_space_above(axs,topmargin=0.8)
     plt.savefig(sample_dir+'/sample'+str(k).zfill(3)+'.png',bbox_inches='tight',pad_inches=0)
@@ -516,12 +525,6 @@ for A, TE, B in A_B_dataset_val:
     plt.close(pha_fig)
 
     k+=1
-
-ms_ssim_scores = tf.concat(ms_ssim_scores,axis=0)
-print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ms_ssim_scores).numpy():.4f}")
-
-ssim_scores = tf.concat(ssim_scores,axis=0)
-print(f"SSIM Score: {tf.reduce_mean(ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ssim_scores).numpy():.4f}")
 
 apd_scores = tf.concat(apd_scores,axis=0)
 print(f"WF APD loss: {tf.reduce_mean(apd_scores).numpy():.4f} +- {tf.math.reduce_std(apd_scores).numpy():.4f}")

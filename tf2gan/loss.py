@@ -145,6 +145,7 @@ class AbsolutePhaseDisparity(tf.keras.losses.Loss):
         y_true_imag = y_true[:,:1,:,:,:] * tf.math.sin(y_true[:,1:,:,:,:]*np.pi)
         y_pred_real = y_pred[:,:1,:,:,:] * tf.math.cos(y_pred[:,1:,:,:,:]*np.pi)
         y_pred_imag = y_pred[:,:1,:,:,:] * tf.math.sin(y_pred[:,1:,:,:,:]*np.pi)
+        # Considering: (a + ib) * (c + id) = (ac - bd) + i(ad + bc)
         y_prod_conj_real = (y_true_real*y_pred_real + y_true_imag*y_pred_imag)
         y_prod_conj_imag = (-y_true_real*y_pred_imag + y_true_imag*y_pred_real)
         y_prod_conj_phase = tf.math.atan2(y_prod_conj_imag, y_prod_conj_real)
