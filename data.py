@@ -40,7 +40,7 @@ def unwrap_slices(x):
 
 def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_slice_list=None,
             remove_non_central=False,acqs_data=True,te_data=False,complex_data=False,
-            remove_zeros=True, MEBCRN=False, mag_and_phase=False):
+            remove_zeros=True, MEBCRN=False, mag_and_phase=False, unwrap=False):
     f = h5py.File(ds_dir + hdf5_file, 'r')
     if custom_list:
         if acqs_data:
@@ -86,20 +86,24 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
     r2_resc = 1.0 #(2/3)*(1/(2*np.pi))
     out_maps = out_maps[idxs_list,:,:,:]
     if MEBCRN:
-        if mag_and_phase:
+        if mag_and_phase: # SHAPE: [BS,2,H,W,Nmaps]
             out_w_mag = np.sqrt(np.sum(out_maps[:,:,:,:2]**2,axis=-1,keepdims=True))
             out_f_mag = np.sqrt(np.sum(out_maps[:,:,:,2:4]**2,axis=-1,keepdims=True))
-            out_w_pha = np.arctan2(out_maps[:,:,:,1],out_maps[:,:,:,0])
-            out_w_pha = unwrap_slices(out_w_pha)
-            out_f_pha = np.arctan2(out_maps[:,:,:,3],out_maps[:,:,:,2])
-            out_f_pha = unwrap_slices(out_f_pha)
-            # out_wf_pha = np.nan_to_num((out_w_mag*out_w_pha+out_f_mag*out_f_pha)/(out_w_mag+out_f_mag))
             out_mag = np.expand_dims(np.concatenate((out_w_mag,out_f_mag,out_maps[:,:,:,4:5]),axis=-1),axis=1)
-            # out_pha = np.expand_dims(np.concatenate((np.zeros_like(out_wf_pha),out_wf_pha/(3*np.pi),out_maps[:,:,:,5:]),axis=-1),axis=1)
-            out_pha = np.expand_dims(np.concatenate((out_w_pha/(3*np.pi),out_f_pha/(3*np.pi),out_maps[:,:,:,5:]),axis=-1),axis=1)
+            out_w_pha = np.where(out_w_mag>0,np.arctan2(out_maps[:,:,:,1:2],out_maps[:,:,:,0:1]),0.0)
+            out_f_pha = np.where(out_f_mag>0,np.arctan2(out_maps[:,:,:,3:4],out_maps[:,:,:,2:3]),0.0)
+            if unwrap:
+                out_w_pha = unwrap_slices(np.squeeze(out_w_pha,axis=-1))
+                out_f_pha = unwrap_slices(np.squeeze(out_f_pha,axis=-1))
+                out_wf_pha = np.nan_to_num((out_w_mag*out_w_pha+out_f_mag*out_f_pha)/(out_w_mag+out_f_mag))
+                out_pha = np.expand_dims(np.concatenate((out_wf_pha/(3*np.pi),out_wf_pha/(3*np.pi),out_maps[:,:,:,5:]),axis=-1),axis=1)
+            else:
+                out_w_pha = np.expand_dims(out_w_pha,axis=-1)
+                out_f_pha = np.expand_dims(out_f_pha,axis=-1)
+                out_pha = np.expand_dims(np.concatenate((out_w_pha/(3*np.pi),out_f_pha/(3*np.pi),out_maps[:,:,:,5:]),axis=-1),axis=1)
             out_maps = np.concatenate((out_mag,out_pha),axis=1)
             ns,_,hgt,wdt,_ = out_maps.shape
-        else:
+        else: # SHAPE: [BS,Nmaps,H,W,2]
             out_rho_w = np.expand_dims(out_maps[:,:,:,:2],axis=1)
             out_rho_f = np.expand_dims(out_maps[:,:,:,2:4],axis=1)
             out_xi = np.concatenate((out_maps[:,:,:,5:],out_maps[:,:,:,4:5]*r2_resc),axis=-1)
