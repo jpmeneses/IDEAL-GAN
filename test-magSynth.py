@@ -194,10 +194,7 @@ if args.LDM:
         alpha = np.clip(alpha_bar[1:] / alpha_bar[:-1], 0.0001, 0.9999)
         beta = 1.0 - alpha
 
-if args.only_mag:
-    IDEAL_op = wf.IDEAL_mag_Layer()
-else:
-    IDEAL_op = wf.IDEAL_Layer()
+IDEAL_op = wf.IDEAL_mag_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size,args.VQ_num_embed,args.VQ_commit_cost)
 
 tl.Checkpoint(dict(enc=enc, dec_mag=dec_mag, dec_pha=dec_pha, vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()

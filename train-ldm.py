@@ -128,10 +128,7 @@ dec_pha = dl.decoder(encoded_dims=args.encoded_size,
 # create our unet model
 unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
 
-if args.only_mag:
-    IDEAL_op = wf.IDEAL_mag_Layer()
-else:
-    IDEAL_op = wf.IDEAL_Layer()
+IDEAL_op = wf.IDEAL_mag_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
 
 tl.Checkpoint(dict(enc=enc,dec_mag=dec_mag,dec_pha=dec_pha,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()

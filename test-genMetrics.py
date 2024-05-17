@@ -121,10 +121,7 @@ if args.LDM:
 
 get_features = dl.get_features((ne,hgt,wdt,n_ch))
 
-if args.only_mag:
-    IDEAL_op = wf.IDEAL_mag_Layer()
-else:
-    IDEAL_op = wf.IDEAL_Layer()
+IDEAL_op = wf.IDEAL_mag_Layer()
 
 def encode(A):
 	A2Z = enc(A, training=True)
