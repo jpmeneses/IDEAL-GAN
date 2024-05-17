@@ -309,19 +309,22 @@ for A, TE, B in A_B_dataset_val:
     axs[0,5].axis('off')
 
     # A2B maps in the second row
+    w_m_aux = np.squeeze(A2B[:,0,:,:,0])
+    w_p_aux = np.squeeze(A2B[:,1,:,:,0])
+    f_m_aux = np.squeeze(A2B[:,0,:,:,1])
+    f_p_aux = np.squeeze(A2B[:,1,:,:,1])
+    r2_aux = np.squeeze(A2B[:,0,:,:,2])
+    field_aux = np.squeeze(A2B[:,1,:,:,2])
+
     if args.only_mag:
         # Save APD loss
         if args.unwrap:
             B_WF = tf.concat([B[:,:1,:,:,:2],3*B[:,1:,:,:,:2]],axis=1)
             A2B_WF = tf.concat([A2B[:,:1,:,:,:2],3*A2B[:,1:,:,:,:2]],axis=1)
+        else:
+            B_WF = B[:,:,:,:,:2]
+            A2B_WF = A2B[:,:,:,:,:2]
         apd_scores.append(APD_loss_fn(B_WF, A2B_WF))
-        
-        w_m_aux = np.squeeze(A2B[:,0,:,:,0])
-        w_p_aux = np.squeeze(A2B[:,1,:,:,0])
-        f_m_aux = np.squeeze(A2B[:,0,:,:,1])
-        f_p_aux = np.squeeze(A2B[:,1,:,:,1])
-        r2_aux = np.squeeze(A2B[:,0,:,:,2])
-        field_aux = np.squeeze(A2B[:,1,:,:,2])
 
         wn_m_aux = np.squeeze(B[:,0,:,:,0])
         wn_p_aux = np.squeeze(B[:,1,:,:,0])
@@ -337,21 +340,13 @@ for A, TE, B in A_B_dataset_val:
         B_wf_phase = tf.transpose(B_wf_phase, perm=[0,4,2,3,1])
         B_cplx = tf.concat([B_wf_mag,B_wf_phase], axis=1)
 
-        A2B_wf_mag = tf.abs(tf.complex(A2B[:,:2,:,:,:1],A2B[:,:2,:,:,1:]))
-        A2B_wf_mag = tf.transpose(A2B_wf_mag, perm=[0,4,2,3,1])
-        A2B_wf_phase = tf.math.atan2(A2B[:,:2,:,:,1:],A2B[:,:2,:,:,:1])
-        A2B_wf_phase = tf.transpose(A2B_wf_phase, perm=[0,4,2,3,1])
-        A2B_cplx = tf.concat([A2B_wf_mag,A2B_wf_phase], axis=1)
-        
+        if args.unwrap:
+            A2B_cplx = tf.concat([A2B[:,:1,:,:,:2],3*A2B[:,1:,:,:,:2]],axis=1)
+        else:
+            A2B_cplx = A2B[:,:,:,:,:2]
+
         # Save APD loss
         apd_scores.append(APD_loss_fn(B_cplx, A2B_cplx))
-
-        w_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
-        w_p_aux = np.squeeze(np.arctan2(A2B[:,0,:,:,1],A2B[:,0,:,:,0]))/np.pi
-        f_m_aux = np.squeeze(np.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
-        f_p_aux = np.squeeze(np.arctan2(A2B[:,1,:,:,1],A2B[:,1,:,:,0]))/np.pi
-        r2_aux = np.squeeze(A2B[:,2,:,:,1])
-        field_aux = np.squeeze(A2B[:,2,:,:,0])
 
         wn_m_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
         wn_p_aux = np.squeeze(np.arctan2(B[:,0,:,:,1],B[:,0,:,:,0]))/np.pi
