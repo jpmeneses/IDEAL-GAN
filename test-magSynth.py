@@ -19,10 +19,13 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir',default='output/WF-IDEAL')
+py.arg('--dataset', type=str, default='JGalgani', choices=['multiTE','3ech','JGalgani','phantom_1p5','phantom_3p0'])
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--remove_imag', type=bool, default=False)
 py.arg('--LDM', type=bool, default=False)
 py.arg('--infer_steps', type=int, default=10)
+py.arg('--TE1', type=float, default=0.0013)
+py.arg('--dTE', type=float, default=0.0021)
 py.arg('--n_samples', type=int, default=60)
 py.arg('--val_batch_size', type=int, default=1)
 test_args = py.args()
@@ -59,9 +62,58 @@ fm_sc = 300.0
 r2_sc = 200.0
 
 dataset_dir = '../datasets/'
-dataset_hdf5_2 = 'JGalgani_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_2, 2*args.n_echoes, end=args.n_samples,
-                            MEBCRN=True, mag_and_phase=args.only_mag)
+if args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
+    dataset_hdf5 = args.dataset + '_RF_192_128_complex_2D.hdf5'
+else:
+    dataset_hdf5 = args.dataset + '_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+
+if args.dataset == 'JGalgani':
+    num_slice_list = [0,21,20,24,24,21,24,21,21,24,21,21,22,27,23,22,20,24,21,21,22,20]
+    rnc = True
+elif args.dataset == 'multiTE':
+    ini_idxs = [0,84,204,300,396,484,580,680,776,848,932,1028, 1100,1142,1190,1232,1286,1334,1388,1460]
+    delta_idxs = [21,24,24,24,22,24,25,24,18,21,24,18, 21,24,21,18,16,18,24,21]
+    # First Patient
+    if args.TE1 == 0.0014 and args.dTE == 0.0022:
+        k_idxs = [(0,1),(2,3)]
+    elif args.TE1 == 0.0013 and args.dTE == 0.0023:
+        k_idxs = [(0,1),(3,4)]
+    else:
+        k_idxs = [(0,2)]
+    for k in k_idxs:
+        custom_list = [a for a in range(ini_idxs[0]+k[0]*delta_idxs[0],ini_idxs[0]+k[1]*delta_idxs[0])]
+    # Rest of the patients
+    for i in range(1,len(ini_idxs)):
+        if (i<=11) and args.TE1 == 0.0013 and args.dTE == 0.0022:
+            k_idxs = [(0,1),(2,3)]
+        elif (i<=11) and args.TE1 == 0.0014 and args.dTE == 0.0022:
+            k_idxs = [(0,1),(3,4)]
+        elif (i==1) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+            k_idxs = [(0,1),(4,5)]
+        elif (i==15 or i==16) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+            k_idxs = [(0,1),(2,3)]
+        elif (i>=17) and args.TE1 == 0.0013 and args.dTE == 0.0024:
+            k_idxs = [(0,1),(2,3)]
+        else:
+            k_idxs = [(0,2)]
+        for k in k_idxs:
+            custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
+else:
+    num_slice_list = None
+    rnc = False
+
+if args.dataset == 'JGalgani' or args.dataset == '3ech':
+    valX, valY=data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=rnc,
+                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True)
+    TEs = wf.gen_TEvar(args.n_echoes, bs=valX.shape[0], orig=True)
+elif args.dataset == 'multiTE':
+    valX, valY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
+                                        acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=True)
+else:
+    valX, valY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
+                                        te_data=True,remove_zeros=True,MEBCRN=True)
+if args.dataset == 'multiTE':
+    valX, valY, TEs = data.group_TEs(valX,valY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=True)
 
 len_dataset,ne,hgt,wdt,n_ch = valX.shape
 if args.only_mag:
@@ -73,7 +125,7 @@ print('Acquisition Dimensions:', hgt, wdt)
 print('Echoes:', ne)
 print('Output Maps:', n_out)
 
-A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
+A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,TEs,valY))
 A_B_dataset_val = A_B_dataset_val.batch(args.val_batch_size)
 
 z_std = tf.Variable(initial_value=1.0, trainable=False, dtype=tf.float32)
@@ -189,7 +241,7 @@ else:
 
 
 # @tf.function
-def sample(A,Z_std):
+def sample(A,Z_std,TE=None):
     # Turn complex-valued CSE-MR image into only-real
     if args.remove_imag:
         A_real = A[:,:,:,:,:1]
@@ -221,7 +273,7 @@ def sample(A,Z_std):
         A2Z2B_xi= dec_xi(A2Z, training=False)
         A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
     # Reconstructed multi-echo images
-    A2B2A = IDEAL_op(A2B)
+    A2B2A = IDEAL_op(A2B,te=TE)
 
     return A2B, A2B2A
 
@@ -241,16 +293,20 @@ py.mkdir(pha_dir)
 
 ms_ssim_scores = []
 ssim_scores = []
+apd_scores = []
+
+APD_loss_fn = gan.AbsolutePhaseDisparity()
 
 # main loop
-for A, B in A_B_dataset_val:
+for A, TE, B in A_B_dataset_val:
     # Get only-magnitude latent space
-    A2B, A2B2A = sample(A,z_std)
+    A2B, A2B2A = sample(A,z_std,TE)
 
     # Save A2B2A cycle's SSIM 
     for idx_a in range(A.shape[0]):
         ms_ssim_scores.append(tf.image.ssim_multiscale(A[idx_a]+1.0, A2B2A[idx_b]+1.0, 2))
         ssim_scores.append(tf.image.ssim(A[idx_a]+1.0, A2B2A[idx_b]+1.0, 2))
+        apd_scores.append(APD_loss_fn(B[:,:,:,:,:2], A2B[:,:,:,:,:2]))
 
     fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
@@ -464,3 +520,6 @@ print(f"MS-SSIM Score: {tf.reduce_mean(ms_ssim_scores).numpy():.4f} +- {tf.math.
 
 ssim_scores = tf.concat(ssim_scores,axis=0)
 print(f"SSIM Score: {tf.reduce_mean(ssim_scores).numpy():.4f} +- {tf.math.reduce_std(ssim_scores).numpy():.4f}")
+
+apd_scores = tf.concat(apd_scores,axis=0)
+print(f"WF APD loss: {tf.reduce_mean(apd_scores).numpy():.4f} +- {tf.math.reduce_std(apd_scores).numpy():.4f}")
