@@ -105,16 +105,16 @@ else:
 
 if args.dataset == 'JGalgani' or args.dataset == '3ech':
     valX, valY=data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=rnc,
-                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True)
+                                acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True,mag_and_phase=args.only_mag)
     TEs = wf.gen_TEvar(args.n_echoes, bs=valX.shape[0], orig=True)
 elif args.dataset == 'multiTE':
     valX, valY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
-                                        acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=True)
+                                        acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=True,mag_and_phase=args.only_mag)
 else:
     valX, valY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
-                                        te_data=True,remove_zeros=True,MEBCRN=True)
+                                        te_data=True,remove_zeros=True,MEBCRN=True,mag_and_phase=args.only_mag)
 if args.dataset == 'multiTE':
-    valX, valY, TEs = data.group_TEs(valX,valY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=True)
+    valX, valY, TEs = data.group_TEs(valX,valY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=True,mag_and_phase=args.only_mag)
 
 len_dataset,ne,hgt,wdt,n_ch = valX.shape
 if args.only_mag:
