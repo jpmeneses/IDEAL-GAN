@@ -60,6 +60,7 @@ if hasattr(args,'n_G_filt_list'):
 
 fm_sc = 300.0
 r2_sc = 200.0
+ech_idx = 2*args.n_echoes
 
 dataset_dir = '../datasets/'
 if args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
