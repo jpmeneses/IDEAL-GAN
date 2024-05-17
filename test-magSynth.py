@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from skimage.restoration import unwrap_phase
 
 import tf2lib as tl
+import tf2gan as gan
 import DLlib as dl
 import DMlib as dm
 import pylib as py
