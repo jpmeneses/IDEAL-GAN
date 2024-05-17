@@ -359,7 +359,9 @@ for A, TE, B in A_B_dataset_val:
     # A2B maps in the second row
     if args.only_mag:
         # Save APD loss
-        apd_scores.append(APD_loss_fn(B[:,:,:,:,:2], A2B[:,:,:,:,:2]))
+        A2B_WF = tf.concat([B[:,:1,:,:,:2],3*B[:,1:,:,:,:2]],axis=1)
+        A2B_WF = tf.concat([A2B[:,:1,:,:,:2],3*A2B[:,1:,:,:,:2]],axis=1)
+        apd_scores.append(APD_loss_fn(B_WF, A2B_WF))
         
         w_m_aux = np.squeeze(A2B[:,0,:,:,0])
         w_p_aux = np.squeeze(A2B[:,1,:,:,0])
