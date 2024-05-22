@@ -2,7 +2,6 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import tqdm
-from skimage.restoration import unwrap_phase
 
 import tf2lib as tl
 import DLlib as dl
@@ -269,7 +268,7 @@ for k in range(args.n_samples):
 
     # Show Q-maps 
     q_fig, q_axs = plt.subplots(figsize=(13,3), nrows=1, ncols=3)
-    Fp_unet = q_axs[0].imshow(f_p_aux*3, cmap='twilight', vmin=-3, vmax=3)
+    Fp_unet = q_axs[0].imshow(f_p_aux, cmap='twilight', vmin=-1, vmax=1)
     q_fig.colorbar(Fp_unet, ax=q_axs[0])
     q_axs[0].axis('off')
     r2_unet = q_axs[1].imshow(r2_aux*r2_sc, cmap='copper', vmin=0, vmax=r2_sc)
@@ -293,7 +292,7 @@ for k in range(args.n_samples):
 
     # Show all-echo unwrapped phase
     pha_fig, pha_ax = plt.subplots(figsize=(21,3))
-    im_pha = pha_ax.imshow(unwrap_phase(np.angle(all_echo))/np.pi, cmap='twilight', vmin=-4, vmax=4)
+    im_pha = pha_ax.imshow(np.angle(all_echo)/np.pi, cmap='twilight', vmin=-1, vmax=1)
     pha_fig.colorbar(im_pha, ax=pha_ax)
     pha_ax.axis('off')
     plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
