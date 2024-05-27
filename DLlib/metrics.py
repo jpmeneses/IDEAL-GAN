@@ -4,12 +4,13 @@ import tensorflow.keras as keras
 import tensorflow_probability as tfp
 
 vgg = keras.applications.vgg19.VGG19()
+inceptionNet = keras.applications.InceptionV3()
 
 def perceptual_metric(input_shape, layers=[2,5,8,13,18], multi_echo=True, only_mag=False):
     x = inputs = keras.Input(input_shape)
     if multi_echo:
         x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(x)
-    x = keras.layers.Lambda(lambda x: tf.image.resize(x,[224,224],method='lanczos5'))(x)
+    x = keras.layers.Lambda(lambda x: tf.image.resize(x,[224,224],method='lanczos5',antialias=True))(x)
     # x = keras.layers.ZeroPadding2D(padding=16)(x)
     if only_mag:
         x = keras.layers.Lambda(lambda x: tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)))(x)
@@ -33,7 +34,7 @@ def perceptual_metric(input_shape, layers=[2,5,8,13,18], multi_echo=True, only_m
 def get_features(input_shape, layers=[2,5,8,13,18]):
     inputs = keras.Input(input_shape)
     x = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(inputs)
-    x = keras.layers.Lambda(lambda x: tf.image.resize(x,[224,224],method='lanczos5'))(x)
+    x = keras.layers.Lambda(lambda x: tf.image.resize(x,[224,224],method='lanczos5',antialias=True))(x)
     x = keras.layers.Lambda(lambda x: tf.concat([x[...,:1]*0.5+0.5,
                                                 tf.math.sqrt(tf.reduce_sum(tf.math.square(x),axis=-1,keepdims=True)),
                                                 x[...,1:2]*0.5+0.5],axis=-1))(x)
@@ -41,10 +42,10 @@ def get_features(input_shape, layers=[2,5,8,13,18]):
 
     # Change order from 'RGB' to 'BGR'
     # Subtract mean used during training
-    x = keras.applications.vgg19.preprocess_input(x)
+    x = keras.applications.inception_v3.preprocess_input(x)
 
     # Get model outputs
-    features = vgg(x)
+    features = inceptionNet(x)
 
     return keras.Model(inputs=inputs, outputs=features)
 
