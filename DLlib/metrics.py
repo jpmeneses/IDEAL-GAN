@@ -2,6 +2,9 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow_probability as tfp
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 vgg = keras.applications.vgg19.VGG19()
 inceptionNet = keras.applications.InceptionV3()
