@@ -74,8 +74,35 @@ A_B_dataset_val.batch(1)
 
 if not(args.DL_gen):
     if args.DL_partial_real:
-        dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-        trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=200,
+        if args.TE1 == 0.0014 and args.dTE == 0.0022:
+            dataset_hdf5_1 = 'multiTE_' + str(args.data_size) + '_complex_2D.hdf5'
+            ini_idxs = [0,84,204,300,396,484,580,680,776,848]#,932,1028, 1100,1142,1190,1232,1286,1334,1388,1460]
+            delta_idxs = [21,24,24,24,22,24,25,24,18]#,21,24,18, 21,24,21,18,16,18,24,21]
+            k_idxs = [(0,1),(2,3)]
+            for k in k_idxs:
+                custom_list = [a for a in range(ini_idxs[0]+k[0]*delta_idxs[0],ini_idxs[0]+k[1]*delta_idxs[0])]
+            # Rest of the patients
+            for i in range(1,len(ini_idxs)):
+                if (i<=11) and args.TE1 == 0.0013 and args.dTE == 0.0022:
+                    k_idxs = [(0,1),(2,3)]
+                elif (i<=11) and args.TE1 == 0.0014 and args.dTE == 0.0022:
+                    k_idxs = [(0,1),(3,4)]
+                elif (i==1) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+                    k_idxs = [(0,1),(4,5)]
+                elif (i==15 or i==16) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+                    k_idxs = [(0,1),(2,3)]
+                elif (i>=17) and args.TE1 == 0.0013 and args.dTE == 0.0024:
+                    k_idxs = [(0,1),(2,3)]
+                else:
+                    k_idxs = [(0,2)]
+                for k in k_idxs:
+                    custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
+                trainX, trainY, TEs =data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
+                                                    acqs_data=True,te_data=True,remove_zeros=False,
+                                                    MEBCRN=(args.G_model=='MEBCRN'))
+        else:
+            dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+            trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=200,
                                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
     else:
         dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
