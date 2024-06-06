@@ -32,7 +32,10 @@ if not(hasattr(args,'field')):
 # Excel file for saving ROIs values
 workbook = xlsxwriter.Workbook(py.join(args.experiment_dir,args.map+'_phantom_ROIs.xlsx'))
 
-ech_idx = args.n_echoes * 2
+if args.n_echoes > 0:
+  ech_idx = args.n_echoes * 2
+else:
+  ech_idx = 12
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -68,14 +71,14 @@ A_B_dataset_test.batch(1)
 
 # model
 if args.ME_layer:
-  input_shape = (args.n_echoes,None,None,n_ch)
+  input_shape = (None,None,None,n_ch)
 else:
   input_shape = (None,None,ech_idx)
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
   if args.out_vars == 'WF-PM':
     G_A2B = dl.MDWF_Generator(input_shape=input_shape,
                               te_input=args.te_input,
-                              te_shape=(args.n_echoes,),
+                              te_shape=(None,),
                               filters=args.n_G_filters,
                               WF_self_attention=args.D1_SelfAttention,
                               R2_self_attention=args.D2_SelfAttention,
@@ -84,7 +87,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     G_A2B = dl.PM_Generator(input_shape=input_shape,
                             ME_layer=args.ME_layer,
                             te_input=args.te_input,
-                            te_shape=(args.n_echoes,),
+                            te_shape=(None,),
                             filters=args.n_G_filters,
                             R2_self_attention=args.D1_SelfAttention,
                             FM_self_attention=args.D2_SelfAttention)
@@ -97,7 +100,7 @@ elif args.G_model == 'U-Net':
                   n_out=n_out,
                   filters=args.n_G_filters,
                   te_input=args.te_input,
-                  te_shape=(args.n_echoes,),
+                  te_shape=(None,),
                   self_attention=args.D1_SelfAttention)
 elif args.G_model == 'MEBCRN':
   if args.out_vars == 'WFc':
@@ -106,7 +109,7 @@ elif args.G_model == 'MEBCRN':
   else:
     n_out = 2
     out_activ = 'sigmoid'
-  G_A2B = dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
+  G_A2B = dl.MEBCRN(input_shape=(None,hgt,wdt,2),
                     n_outputs=n_out,
                     output_activation=out_activ,
                     filters=args.n_G_filters,
@@ -128,8 +131,6 @@ def sample(A, B, TE=None):
   # Estimate A2B
   if args.out_vars == 'WF':
     if args.te_input:
-      if TE is None:
-        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
       A2B_WF = G_A2B([A,TE], training=True)
     else:
       A2B_WF = G_A2B(A, training=True)
@@ -147,8 +148,6 @@ def sample(A, B, TE=None):
     A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
   elif args.out_vars == 'PM':
     if args.te_input:
-      if TE is None:
-        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
       A2B_PM = G_A2B([A,TE], training=True)
     else:
       A2B_PM = G_A2B(A, training=True)
@@ -165,8 +164,6 @@ def sample(A, B, TE=None):
     A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
   elif args.out_vars == 'WF-PM':
     if args.te_input:
-      if TE is None:
-        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
       A2B_abs = G_A2B([A,TE], training=True)
     else:
       A2B_abs = G_A2B(A, training=True)
