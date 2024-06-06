@@ -65,7 +65,10 @@ ws_SSIM.write(0,4,'A2B FieldMap')
 # =                                    test                                    =
 # ==============================================================================
 
-ech_idx = args.n_echoes * 2
+if args.n_echoes > 0:
+    ech_idx = args.n_echoes * 2
+else:
+    ech_idx = 12
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -162,7 +165,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     else:
         G_A2B = dl.PM_Generator(input_shape=input_shape,
                                 te_input=args.te_input,
-                                te_shape=(args.n_echoes,),
+                                te_shape=(None,),
                                 ME_layer=args.ME_layer,
                                 filters=args.n_G_filters,
                                 R2_self_attention=args.D1_SelfAttention,
