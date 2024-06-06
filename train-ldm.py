@@ -196,7 +196,7 @@ def validation_step(Z, Z_std=1.0):
     Z = tf.math.multiply_no_nan(Z,Z_std)
     Z2B_mag = dec_mag(Z, training=False)
     Z2B_pha = dec_pha(Z, training=False)
-    Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
+    Z2B_pha = tf.concat([Z2B_pha[:,:,:,:,:1],Z2B_pha],axis=-1)
     Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
     Z2B2A = IDEAL_op(Z2B, training=False)
 
@@ -344,20 +344,13 @@ for ep in range(args.epochs_ldm):
         axs[0,5].axis('off')
 
         # A2B maps in the second row
-        if args.only_mag:
-            w_m_aux = np.squeeze(Z2B[:,0,:,:,0])
-            w_p_aux = np.squeeze(Z2B[:,1,:,:,0])
-            f_m_aux = np.squeeze(Z2B[:,0,:,:,1])
-            f_p_aux = np.squeeze(Z2B[:,1,:,:,1])
-            r2_aux = np.squeeze(Z2B[:,0,:,:,2])
-            field_aux = np.squeeze(Z2B[:,1,:,:,2])
-        else:
-            w_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
-            w_p_aux = np.squeeze(np.arctan2(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]))/np.pi
-            f_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,1,:,:,0],Z2B[:,1,:,:,1])))
-            f_p_aux = np.squeeze(np.arctan2(Z2B[:,1,:,:,1],Z2B[:,1,:,:,0]))/np.pi
-            r2_aux = np.squeeze(Z2B[:,2,:,:,1])
-            field_aux = np.squeeze(Z2B[:,2,:,:,0])
+        w_m_aux = np.squeeze(Z2B[:,0,:,:,0])
+        w_p_aux = np.squeeze(Z2B[:,1,:,:,0])
+        f_m_aux = np.squeeze(Z2B[:,0,:,:,1])
+        f_p_aux = np.squeeze(Z2B[:,1,:,:,1])
+        r2_aux = np.squeeze(Z2B[:,0,:,:,2])
+        field_aux = np.squeeze(Z2B[:,1,:,:,2])
+        
         W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(W_ok, ax=axs[1,0])
