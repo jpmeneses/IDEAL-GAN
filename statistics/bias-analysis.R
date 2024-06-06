@@ -1,5 +1,6 @@
 rm(list=ls(all=TRUE))
 
+library(tidyverse)
 library(readxl)
 library(lme4)
 
@@ -66,7 +67,7 @@ bias = c(meas-refs)*100,
 method = factor(c(meth_id), labels=c("2D-Net","U-Net","MDWF-Net",
 						"VET-Net","GraphCuts")),
 Site_Prot = factor(c(im_id),labels=c("S1-P1","S1-P2",
-		   "S2-P1","S2-P2","S3-P1","S3-P2","S6-P1","S6-P2"))
+		   "S2-P1","S2-P2","S3-P1","S3-P2","S4-P2","S6-P1","S6-P2"))
 )
 # factor(c(im_id),labels=c("S1-P1(V1)","S1-P2(V1)","S1-P1(V2)","S1-P2(V2)",
 # 		   "S2-P1","S2-P2","S3-P1","S3-P2","S4-P2","S6-P1","S6-P2"))
@@ -82,7 +83,7 @@ qqnorm(resid(mixed.lmer))
 qqline(resid(mixed.lmer))
 
 full.lmer <- lmer(bias ~ refs + (1|Site_Prot) + (1|method), data=pdff_Data, REML=FALSE)
-reduced.lmer <- lmer(bias ~ (1|method) + (1|Site_Prot), data=pdff_Data, REML=FALSE)
+reduced.lmer <- lmer(bias ~ refs + (1|Site_Prot), data=pdff_Data, REML=FALSE)
 
 anova(reduced.lmer, full.lmer)
 
