@@ -59,7 +59,10 @@ ws_ROI_2.write(0,0,'Ground-truth')
 ws_ROI_2.write(0,1,'Model res.')
 
 # data
-ech_idx = args.n_echoes * 2
+if args.n_echoes>0:
+  ech_idx = args.n_echoes * 2
+else:
+  ech_idx = 12
 
 dataset_dir = '../datasets/'
 dataset_hdf5 = args.dataset + '_GC_' + str(args.data_size) + '_complex_2D.hdf5'
@@ -129,7 +132,7 @@ A_B_dataset_test.batch(1)
 
 # model
 if args.ME_layer:
-  input_shape = (args.n_echoes,hgt,wdt,n_ch)
+  input_shape = (None,hgt,wdt,n_ch)
 else:
   input_shape = (hgt,wdt,ech_idx)
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
@@ -145,7 +148,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     G_A2B = dl.PM_Generator(input_shape=input_shape,
                             ME_layer=args.ME_layer,
                             te_input=args.te_input,
-                            te_shape=(args.n_echoes,),
+                            te_shape=(None,),
                             filters=args.n_G_filters,
                             R2_self_attention=args.D1_SelfAttention,
                             FM_self_attention=args.D2_SelfAttention)
