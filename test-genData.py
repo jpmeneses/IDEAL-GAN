@@ -117,21 +117,13 @@ for k in range(args.n_samples):
         Z = tf.random.normal(z_shape,seed=args.seed,dtype=tf.float32)
     Z2B, Z2B2A = sample(Z)
 
-    if args.only_mag:
-        w_m_aux = np.squeeze(Z2B[:,0,:,:,0])
-        w_p_aux = np.squeeze(Z2B[:,1,:,:,0])
-        f_m_aux = np.squeeze(Z2B[:,0,:,:,1])
-        f_p_aux = np.squeeze(Z2B[:,1,:,:,1])
-        r2_aux = np.squeeze(Z2B[:,0,:,:,2])
-        field_aux = np.squeeze(Z2B[:,1,:,:,2])
-    else:
-        w_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,0,:,:,0],Z2B[:,0,:,:,1])))
-        w_p_aux = np.squeeze(np.arctan2(Z2B[:,0,:,:,1],Z2B[:,0,:,:,0]))/np.pi
-        f_m_aux = np.squeeze(np.abs(tf.complex(Z2B[:,1,:,:,0],Z2B[:,1,:,:,1])))
-        f_p_aux = np.squeeze(np.arctan2(Z2B[:,1,:,:,1],Z2B[:,1,:,:,0]))/np.pi
-        r2_aux = np.squeeze(Z2B[:,2,:,:,1])
-        field_aux = np.squeeze(Z2B[:,2,:,:,0])
-
+    w_m_aux = np.squeeze(Z2B[:,0,:,:,0])
+    w_p_aux = np.squeeze(Z2B[:,1,:,:,0])
+    f_m_aux = np.squeeze(Z2B[:,0,:,:,1])
+    f_p_aux = np.squeeze(Z2B[:,1,:,:,1])
+    r2_aux = np.squeeze(Z2B[:,0,:,:,2])
+    field_aux = np.squeeze(Z2B[:,1,:,:,2])
+    
     im_ech1 = np.squeeze(np.abs(tf.complex(Z2B2A[:,0,:,:,0],Z2B2A[:,0,:,:,1])))
     im_ech2 = np.squeeze(np.abs(tf.complex(Z2B2A[:,1,:,:,0],Z2B2A[:,1,:,:,1])))
     im_ech3 = np.squeeze(np.abs(tf.complex(Z2B2A[:,2,:,:,0],Z2B2A[:,2,:,:,1])))
