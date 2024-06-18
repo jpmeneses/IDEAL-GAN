@@ -544,7 +544,7 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fal
 
 #@tf.function
 def acq_uncertainty(mean_maps, var_maps, te=None, rem_R2=False, only_mag=False):
-    n_batch,_,hgt,wdt,_ = acqs.shape
+    n_batch,_,hgt,wdt,_ = mean_maps.shape
 
     if te is None:
         te = gen_TEvar(6, bs=n_batch, orig=True) # (nb,ne,1)
