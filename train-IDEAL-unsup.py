@@ -20,8 +20,7 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
-py.arg('--n_echoes', type=int, default=6)
-py.arg('--G_model', default='U-Net', choices=['U-Net','MEBCRN'])
+py.arg('--rand_ne', type=bool, default=False)
 py.arg('--out_vars', default='FM', choices=['R2s','FM','PM'])
 py.arg('--UQ', type=bool, default=False)
 py.arg('--ME_layer', type=bool, default=True)
@@ -54,7 +53,6 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # =                                    data                                    =
 # ==============================================================================
 
-ech_idx = args.n_echoes * 2
 fm_sc = 300.0
 r2_sc = 200.0
 
@@ -63,23 +61,23 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'JGalgani_GC_384_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, end=100,
+acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, end=100,
                             acqs_data=True, te_data=False, MEBCRN=True)
 
 dataset_hdf5_2 = 'INTA_GC_384_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2,
                             acqs_data=True, te_data=False, MEBCRN=True)
 
 dataset_hdf5_3 = 'INTArest_GC_384_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
+acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3,
                             acqs_data=True, te_data=False, MEBCRN=True)
 
 dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
+acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4,
                             acqs_data=True, te_data=False, MEBCRN=True)
 
 dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
+acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5,
                             acqs_data=True, te_data=False, MEBCRN=True)
 
 ################################################################################
@@ -119,32 +117,21 @@ A_B_dataset_val.batch(1)
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
-if args.G_model == 'U-Net':
-    G_A2B = dl.UNet(input_shape=(ne,hgt,wdt,n_ch),
+G_A2B = dl.UNet(input_shape=(ne,hgt,wdt,n_ch),
+                bayesian=args.UQ,
+                ME_layer=args.ME_layer,
+                te_input=False,
+                filters=args.n_G_filters,
+                self_attention=args.D1_SelfAttention)
+if args.out_vars == 'R2s' or args.out_vars == 'PM':
+    G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
                     bayesian=args.UQ,
                     ME_layer=args.ME_layer,
                     te_input=False,
-                    te_shape=(args.n_echoes,),
                     filters=args.n_G_filters,
-                    self_attention=args.D1_SelfAttention)
-    if args.out_vars == 'R2s' or args.out_vars == 'PM':
-        G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
-                        bayesian=args.UQ,
-                        ME_layer=args.ME_layer,
-                        te_input=False,
-                        te_shape=(args.n_echoes,),
-                        filters=args.n_G_filters,
-                        output_activation='sigmoid',
-                        output_initializer='he_uniform',
-                        self_attention=args.D2_SelfAttention)
-elif args.G_model == 'MEBCRN':
-    G_A2B=dl.MEBCRN(input_shape=(hgt,wdt,d_ech),
-                    n_res_blocks=5,
-                    n_downsamplings=2,
-                    filters=args.n_G_filters,
-                    self_attention=args.D1_SelfAttention)
-else:
-    raise(NameError('Unrecognized Generator Architecture'))
+                    output_activation='sigmoid',
+                    output_initializer='he_uniform',
+                    self_attention=args.D2_SelfAttention)
 
 cycle_loss_fn = tf.losses.MeanSquaredError()
 uncertain_loss = gan.VarMeanSquaredError()
@@ -258,7 +245,7 @@ def train_G_R2(A, B):
         # Magnitude of water/fat images
         A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
-        A2B2A_abs = wf.IDEAL_mag(A2B_WF_abs, A2B_PM, ne=args.n_echoes)
+        A2B2A_abs = wf.IDEAL_mag(A2B_WF_abs, A2B_PM, ne=A.shape[1])
         
         # Variance map mask and attach to recon-A
         if args.UQ:
@@ -465,7 +452,8 @@ for ep in range(args.epochs):
         # ==============================================================================
         p = np.random.rand()
         if p <= args.data_aug_p:
-            A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,args.n_echoes*n_ch])
+            aux_ne = A.shape[1]
+            A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,aux_ne*n_ch])
             B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
 
             # Random 90 deg rotations
@@ -480,14 +468,17 @@ for ep in range(args.epochs):
             A = tf.image.random_flip_up_down(A)
             B = tf.image.random_flip_up_down(B)
 
-            A = tf.transpose(tf.reshape(A,[A.shape[0],hgt,wdt,args.n_echoes,n_ch]),[0,3,1,2,4])
+            A = tf.transpose(tf.reshape(A,[A.shape[0],hgt,wdt,aux_ne,n_ch]),[0,3,1,2,4])
             B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
         # ==============================================================================
 
         # ==============================================================================
         # =                                RANDOM TEs                                  =
         # ==============================================================================
-        
+        if args.rand_ne:
+            ne_sel = np.random.randint(3,7)
+            A = A[:,:ne_sel,:,:,:]
+
         G_loss_dict, G_R2_loss_dict = train_step(A, B)
 
         if args.out_vars == 'R2s':
@@ -507,6 +498,7 @@ for ep in range(args.epochs):
             A, B = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
+            A = A[:,:ne_sel,:,:,:]
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=False))
             A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A, B)
 
@@ -521,13 +513,13 @@ for ep in range(args.epochs):
                 # Magnitude of recon MR images at each echo
                 im_ech1 = np.squeeze(A_abs[:,0,:,:])
                 im_ech2 = np.squeeze(A_abs[:,1,:,:])
-                if args.n_echoes >= 3:
+                if A.shape[1] >= 3:
                     im_ech3 = np.squeeze(A_abs[:,2,:,:])
-                if args.n_echoes >= 4:
+                if A.shape[1] >= 4:
                     im_ech4 = np.squeeze(A_abs[:,3,:,:])
-                if args.n_echoes >= 5:
+                if A.shape[1] >= 5:
                     im_ech5 = np.squeeze(A_abs[:,4,:,:])
-                if args.n_echoes >= 6:
+                if A.shape[1] >= 6:
                     im_ech6 = np.squeeze(A_abs[:,5,:,:])
                 
                 # Acquisitions in the first row
@@ -539,28 +531,28 @@ for ep in range(args.epochs):
                                       interpolation='none', vmin=0, vmax=1)
                 axs[0,1].set_title('2nd Echo')
                 axs[0,1].axis('off')
-                if args.n_echoes >= 3:
+                if A.shape[1] >= 3:
                     acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
                                           interpolation='none', vmin=0, vmax=1)
                     axs[0,2].set_title('3rd Echo')
                     axs[0,2].axis('off')
                 else:
                     fig.delaxes(axs[0,2])
-                if args.n_echoes >= 4:
+                if A.shape[1] >= 4:
                     acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
                                           interpolation='none', vmin=0, vmax=1)
                     axs[0,3].set_title('4th Echo')
                     axs[0,3].axis('off')
                 else:
                     fig.delaxes(axs[0,3])
-                if args.n_echoes >= 5:
+                if A.shape[1] >= 5:
                     acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
                                           interpolation='none', vmin=0, vmax=1)
                     axs[0,4].set_title('5th Echo')
                     axs[0,4].axis('off')
                 else:
                     fig.delaxes(axs[0,4])
-                if args.n_echoes >= 6:
+                if A.shape[1] >= 6:
                     acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
                                           interpolation='none', vmin=0, vmax=1)
                     axs[0,5].set_title('6th Echo')
