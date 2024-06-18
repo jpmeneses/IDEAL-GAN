@@ -309,7 +309,7 @@ def UNet(
             # Based on: https://en.wikipedia.org/wiki/Rice_distribution#Related_distributions
             x_prob = tfp.layers.DistributionLambda(
                         lambda t: tfp.distributions.Poisson(
-                            rate=tf.math.divide_no_nan(tf.square(t[...,:n_out]),2*tf.math.sqrt(t[...,n_out:]))),
+                            rate=tf.math.divide_no_nan(tf.square(t[...,:n_out]),2*tf.square(t[...,n_out:]))),
                         )(x_prob)
             out_prob = tfp.layers.DistributionLambda(
                         lambda t: tfp.distributions.Chi2(
