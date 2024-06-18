@@ -312,10 +312,10 @@ def sample(A, B):
     if args.out_vars == 'FM':
         if args.UQ:
             A2B_FM, _, A2B_FM_var = G_A2B(A, training=False)
-            A2B_R2_var = tf.zeros_like(A2B_FM_var)
+            A2B_R2_nu = tf.zeros_like(A2B_FM_var)
+            A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
         else:
             A2B_FM = G_A2B(A, training=False)
-            A2B_FM_var = None
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         # Build A2B_PM array with zero-valued R2*
@@ -329,20 +329,17 @@ def sample(A, B):
 
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-        # Compute R2s maps using only-mag images
-        if args.UQ:
-            A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
-        else:
-            A2B_R2 = G_A2R2(A_abs, training=True)
-        A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
-
         # Compute FM from complex-valued images
         if args.UQ:
             A2B_FM, A2B_FM_var = G_A2B(A, training=False)
+            A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=False)
         else:
             A2B_FM = G_A2B(A, training=False)
-            A2B_FM_var = None
+            A2B_R2 = G_A2R2(A_abs, training=True)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
+
+        # Compute R2s maps using only-mag images
+        A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
         # Magnitude of water/fat images
@@ -359,6 +356,8 @@ def sample(A, B):
         A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
         A2B2A_var = wf.acq_uncertainty(A2B_PM, A2B_PM_var, ne=A.shape[1])
         A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
+    else:
+        A2B_PM_var = None
 
     ########### Splitted R2s and FM Losses ############
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
