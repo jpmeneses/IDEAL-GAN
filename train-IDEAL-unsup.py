@@ -117,14 +117,14 @@ A_B_dataset_val.batch(1)
 
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
-G_A2B = dl.UNet(input_shape=(ne,hgt,wdt,n_ch),
+G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                 bayesian=args.UQ,
                 ME_layer=args.ME_layer,
                 te_input=False,
                 filters=args.n_G_filters,
                 self_attention=args.D1_SelfAttention)
 if args.out_vars == 'R2s' or args.out_vars == 'PM':
-    G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
+    G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
                     bayesian=args.UQ,
                     ME_layer=args.ME_layer,
                     te_input=False,
