@@ -582,6 +582,7 @@ def acq_uncertainty(mean_maps, var_maps, te=None, rem_R2=False, only_mag=False):
         r2s_var -= r2s_var_aux*tf.math.special.bessel_i1e(-r2s_var_aux/2)
         r2s_var *= tf.math.exp(r2s_var_aux/2) # Laguerre polynomial 
         r2s_var *= -(np.pi*r2s_sigma_rav**2)/2 # (nb,1,nv)
+        r2s_var += 2*r2s_sigma_rav**2 + r2s_nu_rav**2
         Wp_var += tf.linalg.matmul(-(te_real)**2, r2s_var)
 
     # Matrix operations (variance)
