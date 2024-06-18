@@ -185,6 +185,10 @@ def train_G(A, B):
             A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
             A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
             A2B2A_var = wf.acq_uncertainty(A2B, A2B_PM_var, rem_R2=(args.out_vars=='PM'))
+            if A2B2A.shape[1] < 6:
+                A_aux = tf.zeros_like(A2B2A)
+                A = tf.concat([A,A_aux[:,(6-A2B2A.shape),:,:,:]],axis=1)
+                A2B2A = tf.concat([A2B2A,A_aux[:,(6-A2B2A.shape),:,:,:]],axis=1)
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
@@ -254,6 +258,10 @@ def train_G_R2(A, B):
             A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
             A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
             A2B2A_var = wf.acq_uncertainty(A2B, A2B_PM_var, rem_R2=(args.out_vars=='PM'))
+            if A2B2A_abs.shape[1] < 6:
+                A_aux = tf.zeros_like(A2B2A_abs)
+                A_abs = tf.concat([A_abs,A_aux[:,(6-A2B2A_abs.shape),:,:,:]],axis=1)
+                A2B2A_abs = tf.concat([A2B2A_abs,A_aux[:,(6-A2B2A_abs.shape),:,:,:]],axis=1)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
@@ -358,6 +366,10 @@ def sample(A, B):
         A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
         A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
         A2B2A_var = wf.acq_uncertainty(A2B_PM, A2B_PM_var)
+        if A2B2A.shape[1] < 6:
+            A_aux = tf.zeros_like(A2B2A)
+            A = tf.concat([A,A_aux[:,(6-A2B2A.shape),:,:,:]],axis=1)
+            A2B2A = tf.concat([A2B2A,A_aux[:,(6-A2B2A.shape),:,:,:]],axis=1)
         A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
     ########### Splitted R2s and FM Losses ############
