@@ -570,12 +570,12 @@ def acq_uncertainty(mean_maps, var_maps, te=None, rem_R2=False, only_mag=False):
     r2s_sigma = var_maps[...,2] * (r2_sc**2) #CHECK
     phi_unc = var_maps[...,0] * (fm_sc**2)
 
-    r2s_nu_rav = tf.expand_dims(tf.reshape(tf.complex(r2s_nu,0.0),[n_batch,-1]),1) # (nb,1,nv)
-    r2s_sigma_rav = tf.expand_dims(tf.reshape(tf.complex(r2s_sigma,0.0),[n_batch,-1]),1) # (nb,1,nv)
-    phi_unc_rav = tf.expand_dims(tf.reshape(tf.complex(phi_unc,0.0),[n_batch,-1]),1) # (nb,1,nv)
+    r2s_nu_rav = tf.expand_dims(tf.reshape(r2s_nu,[n_batch,-1]),1) # (nb,1,nv)
+    r2s_sigma_rav = tf.expand_dims(tf.reshape(r2s_sigma,[n_batch,-1]),1) # (nb,1,nv)
+    phi_unc_rav = tf.expand_dims(tf.reshape(phi_unc,[n_batch,-1]),1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wp_var = tf.linalg.matmul(-(2*np.pi * te_real)**2, phi_unc_rav) # (nb,ne,nv)
+    Wp_var = tf.linalg.matmul(-(2*np.pi * te)**2, phi_unc_rav) # (nb,ne,nv)
     if not(rem_R2):
         r2s_var_aux = tf.math.divide_no_nan(-r2s_nu_rav**2, 2*r2s_sigma_rav**2)# (nb,1,nv)
         r2s_var = (1-r2s_var_aux)*tf.math.special.bessel_i0e(-r2s_var_aux/2)
@@ -586,11 +586,10 @@ def acq_uncertainty(mean_maps, var_maps, te=None, rem_R2=False, only_mag=False):
 
     # Matrix operations (variance)
     Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
-    Smtx = Wp * Mp * tf.math.conj(Mp) # (nb,ne,nv)
+    Smtx = Wp_var * tf.abs(Mp * tf.math.conj(Mp)) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
-    S_var = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
-    res_S_var = tf.expand_dims(tf.abs(S_var), -1)
+    res_S_var = tf.expand_dims(tf.reshape(Smtx,[n_batch,ne,hgt,wdt]), -1)
     if not(only_mag):
         res_S_var = tf.concat([res_S_var,res_S_var], axis=-1) # Same variance for real/imag
 
