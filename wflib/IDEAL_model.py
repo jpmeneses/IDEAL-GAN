@@ -543,78 +543,55 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fal
 
 
 #@tf.function
-def acq_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=False):
-    if MEBCRN:
-        n_batch,ne,hgt,wdt,_ = acqs.shape
-    else:
-        n_batch,hgt,wdt,d_ech = acqs.shape
-        ne = d_ech//2
+def acq_uncertainty(mean_maps, var_maps, te=None, rem_R2=False, only_mag=False):
+    n_batch,_,hgt,wdt,_ = acqs.shape
 
     if te is None:
-        te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
+        te = gen_TEvar(6, bs=n_batch, orig=True) # (nb,ne,1)
+
+    ne = te.shape[1]
+    te_real = tf.complex(te,0.0)
 
     M, M_pinv = gen_M(te)
     MM = tf.linalg.matmul(M,M_pinv)
 
-    # te_complex = tf.expand_dims(tf.complex(0.0,te),-1)
-    te_real = tf.complex(te,0.0)
-
-    # Generate complex signal
-    if MEBCRN:
-        real_S = acqs[...,:1]
-        imag_S = acqs[...,1:]
-    else:
-        real_S = acqs[...,0::2]
-        imag_S = acqs[...,1::2]
-    
-    S = tf.complex(real_S,imag_S)
+    # Generate complex water/fat signals
+    real_rho = mean_maps[:,:2,:,:,0]
+    imag_rho = mean_maps[:,:2,:,:,1]
+    rho = tf.complex(real_rho, imag_rho) * rho_sc # (nb,ns,hgt,wdt)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
-    if MEBCRN:
-        Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # (nb,ne,nv)
-    else:
-        Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # (nb,ne,nv)
+    rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
-    r2s = mean_maps[...,1] * r2_sc
-    phi = mean_maps[...,0] * fm_sc
-    r2s_unc = var_maps[...,1] * (r2_sc**2)
+    r2s = mean_maps[:,2,:,:,1] * r2_sc
+    phi = mean_maps[:,2,:,:,0] * fm_sc
+    r2s_nu = var_maps[...,1] * (r2_sc**2)
+    r2s_sigma = var_maps[...,2] * (r2_sc**2) #CHECK
     phi_unc = var_maps[...,0] * (fm_sc**2)
 
-    r2s_rav = tf.reshape(tf.complex(r2s,0.0),[n_batch,-1])
-    r2s_rav = tf.expand_dims(r2s_rav,1) # (nb,1,nv)
-    r2s_unc_rav = tf.reshape(tf.complex(r2s_unc,0.0),[n_batch,-1])
-    r2s_unc_rav = tf.expand_dims(r2s_unc_rav,1) # (nb,1,nv)
-    phi_unc_rav = tf.reshape(tf.complex(phi_unc,0.0),[n_batch,-1])
-    phi_unc_rav = tf.expand_dims(phi_unc_rav,1) # (nb,1,nv)
+    r2s_nu_rav = tf.expand_dims(tf.reshape(tf.complex(r2s_nu,0.0),[n_batch,-1]),1) # (nb,1,nv)
+    r2s_sigma_rav = tf.expand_dims(tf.reshape(tf.complex(r2s_sigma,0.0),[n_batch,-1]),1) # (nb,1,nv)
+    phi_unc_rav = tf.expand_dims(tf.reshape(tf.complex(phi_unc,0.0),[n_batch,-1]),1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wm_var = tf.linalg.matmul((2*np.pi * te_real)**2, phi_unc_rav) # (nb,ne,nv)
+    Wp_var = tf.linalg.matmul(-(2*np.pi * te_real)**2, phi_unc_rav) # (nb,ne,nv)
     if not(rem_R2):
-        r2s_var_aux = tf.linalg.matmul(te_real**2, r2s_unc_rav) # (nb,ne,nv)
-        Wm_unc_r2s = tf.math.exp(tf.linalg.matmul(2*te_real, r2s_rav) + r2s_var_aux) # (nb,ne,nv)
-        Wm_var_r2s = tf.math.exp(r2s_var_aux)
-        Wm_var *= (1 - Wm_var_r2s) * Wm_unc_r2s
+        r2s_var_aux = tf.math.divide_no_nan(-r2s_nu_rav**2, 2*r2s_sigma_rav**2)# (nb,1,nv)
+        r2s_var = (1-r2s_var_aux)*tf.math.special.bessel_i0e(-r2s_var_aux/2)
+        r2s_var -= r2s_var_aux*tf.math.special.bessel_i1e(-r2s_var_aux/2)
+        r2s_var *= tf.math.exp(r2s_var_aux/2) # Laguerre polynomial 
+        r2s_var *= -(np.pi*r2s_sigma_rav**2)/2 # (nb,1,nv)
+        Wp_var += tf.linalg.matmul(-(te_real)**2, r2s_var)
 
     # Matrix operations (variance)
-    WmZS = 2 * tf.square(Wm_var) # * (Smtx * tf.math.conj(Smtx))
-    # WpMMWmZS = Wm_var * tf.linalg.matmul(MM * tf.math.conj(MM), WmZS)
+    Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
+    Smtx = Wp * Mp * tf.math.conj(Mp) # (nb,ne,nv)
 
-    # Extract corresponding Water/Fat signals
-    # Reshape to original images dimensions
-    if MEBCRN:
-        S_var = tf.reshape(WmZS, [n_batch,ne,hgt,wdt,1])
-        # res_S_var = tf.concat([tf.math.real(S_var), tf.math.imag(S_var)],axis=-1)
-        res_S_var = tf.concat([tf.abs(S_var), tf.abs(S_var)],axis=-1)
-    else:
-        S_var = tf.reshape(tf.transpose(WpMMWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ne])
-        Re_S_var = tf.math.real(S_var)
-        Im_S_var = tf.math.imag(S_var)
-        zero_fill = tf.zeros_like(Re_S_var)
-        re_stack_var = tf.stack([Re_S_var,zero_fill],4)
-        re_aux_var = tf.reshape(re_stack_var,[n_batch,hgt,wdt,2*ne])
-        im_stack_var = tf.stack([zero_fill,Im_S_var],4)
-        im_aux_var = tf.reshape(im_stack_var,[n_batch,hgt,wdt,2*ne])
-        res_S_var = re_aux_var + im_aux_var
+    # Reshape to original acquisition dimensions
+    S_var = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
+    res_S_var = tf.expand_dims(tf.abs(S_var), -1)
+    if not(only_mag):
+        res_S_var = tf.concat([res_S_var,res_S_var], axis=-1) # Same variance for real/imag
 
     return res_S_var
