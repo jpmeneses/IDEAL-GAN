@@ -543,14 +543,11 @@ def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=Fal
 
 
 #@tf.function
-def acq_uncertainty(mean_maps, var_maps, te=None, rem_R2=False, only_mag=False):
+def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=False):
     n_batch,_,hgt,wdt,_ = mean_maps.shape
 
     if te is None:
-        te = gen_TEvar(6, bs=n_batch, orig=True) # (nb,ne,1)
-
-    ne = te.shape[1]
-    te_real = tf.complex(te,0.0)
+        te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
 
     M, M_pinv = gen_M(te)
     MM = tf.linalg.matmul(M,M_pinv)
