@@ -217,7 +217,7 @@ def sample(A, B, TE=None):
   elif args.out_vars == 'PM':
     if args.te_input:
       if TE is None:
-        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
+        TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True) # (nb,ne,1)
       A2B_PM = G_A2B([A,TE], training=True)
     else:
       A2B_PM = G_A2B(A, training=True)
