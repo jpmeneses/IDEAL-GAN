@@ -561,8 +561,8 @@ def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=F
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
-    r2s = mean_maps[:,2,:,:,1] * r2_sc
-    phi = mean_maps[:,2,:,:,0] * fm_sc
+    # r2s = mean_maps[:,2,:,:,1] * r2_sc
+    # phi = mean_maps[:,2,:,:,0] * fm_sc
     r2s_nu = var_maps[...,1] * (r2_sc**2)
     r2s_sigma = var_maps[...,2] * (r2_sc**2) #CHECK
     phi_unc = var_maps[...,0] * (fm_sc**2)
@@ -572,9 +572,9 @@ def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=F
     phi_unc_rav = tf.expand_dims(tf.reshape(phi_unc,[n_batch,-1]),1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wp_var = tf.linalg.matmul(-(2*np.pi * te)**2, phi_unc_rav) # (nb,ne,nv)
+    Wp_var = tf.linalg.matmul((2*np.pi * te)**2, phi_unc_rav) # (nb,ne,nv) NEG
     if not(rem_R2):
-        r2s_var_aux = tf.math.divide_no_nan(-r2s_nu_rav**2, 2*r2s_sigma_rav**2)# (nb,1,nv)
+        r2s_var_aux = tf.math.divide_no_nan(r2s_nu_rav**2, 2*r2s_sigma_rav**2)# (nb,1,nv) NEG
         r2s_var = (1-r2s_var_aux)*tf.math.special.bessel_i0e(-r2s_var_aux/2)
         r2s_var -= r2s_var_aux*tf.math.special.bessel_i1e(-r2s_var_aux/2)
         r2s_var *= tf.math.exp(r2s_var_aux/2) # Laguerre polynomial 
