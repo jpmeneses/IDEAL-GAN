@@ -584,7 +584,7 @@ def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=F
 
     # Matrix operations (variance)
     Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
-    Smtx = Wp_var * tf.abs(Mp * tf.math.conj(Mp)) # (nb,ne,nv)
+    Smtx = Wp_var * tf.abs(Mp * tf.math.conj(Mp)) / (rho_sc**2) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
     res_S_var = tf.expand_dims(tf.reshape(Smtx,[n_batch,ne,hgt,wdt]), -1)
