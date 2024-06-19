@@ -475,6 +475,8 @@ for ep in range(args.epochs):
         if args.rand_ne:
             ne_sel = np.random.randint(3,7)
             A = A[:,:ne_sel,:,:,:]
+        else:
+            ne_sel = A.shape[1]
 
         G_loss_dict, G_R2_loss_dict = train_step(A, B)
 
