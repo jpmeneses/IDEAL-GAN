@@ -553,8 +553,8 @@ def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=F
     MM = tf.linalg.matmul(M,M_pinv)
 
     # Generate complex water/fat signals
-    real_rho = mean_maps[:,:2,:,:,0]
-    imag_rho = mean_maps[:,:2,:,:,1]
+    real_rho = tf.ones_like(mean_maps[:,:2,:,:,0]) * 0.5
+    imag_rho = tf.zeros_like(mean_maps[:,:2,:,:,1])
     rho = tf.complex(real_rho, imag_rho) * rho_sc # (nb,ns,hgt,wdt)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
@@ -583,8 +583,8 @@ def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=F
         Wp_var += tf.linalg.matmul(-(te)**2, r2s_var)
 
     # Matrix operations (variance)
-    # Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
-    Smtx = Wp_var / (rho_sc**2) #* tf.abs(Mp * tf.math.conj(Mp)) # (nb,ne,nv)
+    Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
+    Smtx = Wp_var / (rho_sc**2) * tf.abs(Mp * tf.math.conj(Mp)) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
     res_S_var = tf.expand_dims(tf.reshape(Smtx,[n_batch,ne,hgt,wdt]), -1)
