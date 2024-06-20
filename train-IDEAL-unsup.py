@@ -234,7 +234,7 @@ def train_G_R2(A, B):
 
         # Compute FM using complex-valued images and pre-trained model
         if args.UQ:
-            A2B_FM, A2B_FM_var = G_A2B(A, training=False) # Mean FM
+            A2B_FM, _, A2B_FM_var = G_A2B(A, training=False) # Mean FM
         else:
             A2B_FM = G_A2B(A, training=False)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -329,7 +329,7 @@ def sample(A, B):
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
         # Compute FM from complex-valued images
         if args.UQ:
-            A2B_FM, A2B_FM_var = G_A2B(A, training=False)
+            A2B_FM, _, A2B_FM_var = G_A2B(A, training=False)
             A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=False)
         else:
             A2B_FM = G_A2B(A, training=False)
