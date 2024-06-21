@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl
 
-python train-IDEAL-unsup.py --dataset Unsup-108 --rand_ne False --UQ True --epochs 60 --FM_TV_weight 1e-6
+python train-IDEAL-unsup.py --dataset Unsup-108 --rand_ne False --UQ True --epochs 30 --FM_TV_weight 1e-6
