@@ -315,10 +315,13 @@ def UNet(
                         lambda t: tfp.distributions.Chi2(
                             df=2*t+2),
                         )(x_prob)
+            out_prob = keras.layers.Lambda(lambda z: tf.math.sqrt(z))(out_prob)
+            out_prob = keras.layers.Multiply()([out_prob, out_var])
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
         if bayesian:
             out_prob = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_prob)
+            out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
 
     if te_input and bayesian:
         return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_var])
