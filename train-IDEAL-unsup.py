@@ -221,10 +221,9 @@ def train_G(A, B):
 
 @tf.function
 def train_G_R2(A, B):
+    A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-
         # Compute R2s map from only-mag images
         if args.UQ:
             A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
