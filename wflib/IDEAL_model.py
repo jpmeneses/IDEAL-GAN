@@ -78,8 +78,7 @@ def acq_to_acq(acqs, param_maps, te=None):
 
     te_complex = tf.complex(0.0,te) # (nb,ne,1)
 
-    M, M_pinv = gen_M(te) # M shape: (ne,ns)
-    M_pinv = tf.squeeze(M_pinv,axis=0)
+    M, M_pinv = gen_M(te) # M shape: (nb,ne,ns)
 
     # Generate complex signal
     S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
