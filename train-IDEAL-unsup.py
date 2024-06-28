@@ -137,7 +137,7 @@ uncertain_loss = gan.VarMeanSquaredError()
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 if not(args.out_vars == 'FM'):
-    G_R2_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler*0.5, beta_1=args.beta_1, beta_2=args.beta_2)
+    G_R2_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
 # ==============================================================================
 # =                                 train step                                 =
