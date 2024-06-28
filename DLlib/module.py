@@ -289,7 +289,11 @@ def UNet(
         # Update counter
         cont += 1
 
-    output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
+    if output_activation=='relu':
+        output = keras.layers.Conv2D(n_out, (1, 1), activation=None, kernel_initializer=output_initializer)(x)
+        output = keras.layers.ReLU(threshold=1e-6)
+    else:
+        output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
     # if output_activation == 'sigmoid':
     #     output = tf.keras.layers.Lambda(lambda x: x*(2/3)*(1/(2*np.pi)))(output)
     if bayesian:
