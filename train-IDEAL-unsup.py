@@ -572,12 +572,6 @@ for ep in range(args.epochs):
                 fig.colorbar(F_ok, ax=axs[1,1])
                 axs[1,1].axis('off')
 
-                r2_aux = np.squeeze(A2B[:,2,:,:,1])
-                r2_ok = axs[1,2].imshow(r2_aux*r2_sc, cmap='copper',
-                                        interpolation='none', vmin=0, vmax=r2_sc)
-                fig.colorbar(r2_ok, ax=axs[1,2])
-                axs[1,2].axis('off')
-
                 field_aux = np.squeeze(A2B[:,2,:,:,0])
                 field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                             interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
@@ -585,7 +579,8 @@ for ep in range(args.epochs):
                 axs[1,4].axis('off')
                 
                 if args.UQ:
-                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,1])*(r2_sc**2)
+                    r2_aux = np.squeeze(A2B_var[:,0,:,:,1])
+                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,2])*(r2_sc**2)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
                                             interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
@@ -597,8 +592,13 @@ for ep in range(args.epochs):
                     fig.colorbar(FM_var_ok, ax=axs[1,5])
                     axs[1,5].axis('off')
                 else:
+                    r2_aux = np.squeeze(A2B[:,2,:,:,1])
                     fig.delaxes(axs[1,3])
                     fig.delaxes(axs[1,5])
+                r2_ok = axs[1,2].imshow(r2_aux*r2_sc, cmap='copper',
+                                        interpolation='none', vmin=0, vmax=r2_sc)
+                fig.colorbar(r2_ok, ax=axs[1,2])
+                axs[1,2].axis('off')
 
                 # Ground-truth in the third row
                 wn_aux = np.squeeze(tf.math.sqrt(tf.reduce_sum(tf.square(B[:,0,:,:,:]),axis=-1,keepdims=False)))
