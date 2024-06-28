@@ -148,7 +148,7 @@ def train_G(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         if args.UQ:
-            A2B_FM, _, A2B_FM_var = G_A2B(A, training=True) # Randomly sampled FM
+            A2B_FM, _, A2B_FM_sigma = G_A2B(A, training=True) # Randomly sampled FM
         else:
             A2B_FM = G_A2B(A, training=True)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -166,8 +166,8 @@ def train_G(A, B):
         else:
             A2B_R2 = tf.zeros_like(A2B_FM)
             if args.UQ:
-                A2B_R2_nu = tf.zeros_like(A2B_FM_var)
-                A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
+                A2B_R2_nu = tf.zeros_like(A2B_FM_sigma)
+                A2B_R2_sigma = tf.zeros_like(A2B_FM_sigma)
 
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
@@ -176,12 +176,12 @@ def train_G(A, B):
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
 
-        # Variance map mask and attach to recon-A
+        # Stddev map mask and attach to recon-A
         if args.UQ:
-            A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
+            A2B_FM_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_sigma,0.0)
             A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
             A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
-            A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
+            A2B_PM_var = tf.concat([A2B_FM_sigma,A2B_R2_nu,A2B_R2_sigma], axis=-1)
             A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=(args.out_vars=='FM'))
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
@@ -580,13 +580,13 @@ for ep in range(args.epochs):
                 
                 if args.UQ:
                     r2_aux = np.squeeze(A2B_var[:,0,:,:,1])
-                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,2])*(r2_sc**2)
+                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,2])*(r2_sc)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
                                             interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
                     axs[1,3].axis('off')
 
-                    FM_var_aux = np.squeeze(A2B_var[:,0,:,:,0])*(fm_sc**2)
+                    FM_var_aux = np.squeeze(A2B_var[:,0,:,:,0])*(fm_sc)
                     FM_var_ok= axs[1,5].imshow(FM_var_aux, cmap='gnuplot2',
                                             interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(FM_var_ok, ax=axs[1,5])
