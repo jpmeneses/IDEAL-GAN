@@ -238,10 +238,7 @@ def train_G_R2(A, B):
         else:
             A2B_FM = G_A2B(A, training=False)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
-        if args.UQ_R2s:
-            A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
-        else:
-            A2B_PM = tf.concat([A2B_FM,A2B_R2_nu], axis=-1)
+        A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
         # Magnitude of water/fat images
         A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
