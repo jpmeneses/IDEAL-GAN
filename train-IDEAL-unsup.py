@@ -228,11 +228,10 @@ def train_G_R2(A, B):
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
         if args.UQ:
-            A2B_R2_aux, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
-            A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,tf.math.sqrt(A2B_R2_aux)*A2B_R2_sigma,0.0)
+            A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
         else:
             A2B_R2 = G_A2R2(A_abs, training=True)
-            A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
+        A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
         # Compute FM using complex-valued images and pre-trained model
         if args.UQ:
@@ -585,7 +584,7 @@ for ep in range(args.epochs):
                     r2_aux = np.squeeze(A2B_var[:,0,:,:,1])
                     R2_var_aux = np.squeeze(A2B_var[:,0,:,:,2])*(r2_sc)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
-                                            interpolation='none', vmin=0, vmax=4)
+                                            interpolation='none', vmin=0, vmax=10)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
                     axs[1,3].axis('off')
                     R2_samp_aux = np.squeeze(A2B[:,2,:,:,1])*r2_sc
