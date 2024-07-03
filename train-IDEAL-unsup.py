@@ -227,10 +227,11 @@ def train_G_R2(A, B):
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
         if args.UQ:
-            A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
+            A2B_R2_aux, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
+            A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,tf.math.sqrt(A2B_R2_aux*A2B_R2_sigma),0.0)
         else:
             A2B_R2 = G_A2R2(A_abs, training=True)
-        A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
+            A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
         # Compute FM using complex-valued images and pre-trained model
         if args.UQ:

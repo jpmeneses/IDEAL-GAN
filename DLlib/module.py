@@ -294,16 +294,11 @@ def UNet(
         output = keras.layers.ReLU(threshold=1e-6)
     else:
         output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
-    # if output_activation == 'sigmoid':
-    #     output = tf.keras.layers.Lambda(lambda x: x*(2/3)*(1/(2*np.pi)))(output)
     if bayesian:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         # Compute standard deviation (sigma; NOT sigma^2)
         out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
         x_prob = keras.layers.concatenate([output,out_var])
-        # if output_activation == 'sigmoid':
-        #     out_var = tf.keras.layers.Lambda(lambda x: x*0.001)(out_var)
-        x_prob = tf.concat([output,out_var],axis=-1)
         if output_activation == 'tanh':
             out_prob = tfp.layers.DistributionLambda(
                         lambda t: tfp.distributions.Normal(
@@ -311,17 +306,12 @@ def UNet(
                             scale=t[...,n_out:]),
                         )(x_prob)
         else:
-            # Based on: https://en.wikipedia.org/wiki/Rice_distribution#Related_distributions
-            x_prob = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.Poisson(
-                            rate=tf.math.divide_no_nan(tf.square(t[...,:n_out]),2*tf.square(t[...,n_out:]))),
-                        )(x_prob)
+            # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
             out_prob = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.Chi2(
-                            df=2*t+2),
-                        )(x_prob)
-            out_prob = keras.layers.Lambda(lambda z: tf.math.sqrt(z))(out_prob)
-            out_prob = keras.layers.Multiply()([out_prob, out_var])
+                        lambda t: tfp.distributions.NoncentralChi2(
+                            df=1,
+                            noncentrality=tf.square(tf.math.divide_no_nan(t[...,:n_out],t[...,n_out:]))),
+                        )(x_prob) # Random variable: R2s**2/r2s_var
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
         if bayesian:
