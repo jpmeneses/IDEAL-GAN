@@ -566,13 +566,14 @@ def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=F
     r2s_sigma = var_maps[...,2] * (r2_sc) #CHECK
     phi_sigma = var_maps[...,0] * (fm_sc)
 
+    r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_mu,[n_batch,-1]),1) # (nb,1,nv)
     r2s_sigma_rav = tf.expand_dims(tf.reshape(r2s_sigma,[n_batch,-1]),1) # (nb,1,nv)
     phi_sigma_rav = tf.expand_dims(tf.reshape(phi_sigma,[n_batch,-1]),1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
     Wp_var = tf.linalg.matmul((2*np.pi * te)**2, phi_sigma_rav**2) # (nb,ne,nv) NEG
     if not(rem_R2):
-        r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu))
+        r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu_rav))
         Wp_var += tf.linalg.matmul(te**2, r2s_sigma_rav**2) # (nb,ne,nv) NEG
 
     # Matrix operations (variance)
