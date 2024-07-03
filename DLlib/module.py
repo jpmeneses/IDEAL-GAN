@@ -295,7 +295,7 @@ def UNet(
         # Compute standard deviation (sigma; NOT sigma^2)
         out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
         if output_activation != 'tanh':
-            out_var = keras.layers.Lambda(lambda z: 0.05*z)(out_var)
+            out_var = keras.layers.Lambda(lambda z: 0.02*z)(out_var)
         x_prob = keras.layers.concatenate([output,out_var])
         if output_activation == 'tanh':
             out_prob = tfp.layers.DistributionLambda(
