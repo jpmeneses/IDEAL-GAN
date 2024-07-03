@@ -134,6 +134,7 @@ if args.out_vars == 'R2s' or args.out_vars == 'PM':
 
 cycle_loss_fn = tf.losses.MeanSquaredError()
 uncertain_loss = gan.VarMeanSquaredError()
+uncertain_loss_R2 = gan.VarMeanSquaredErrorR2()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
@@ -259,7 +260,7 @@ def train_G_R2(A, B):
         ############ Cycle-Consistency Losses #############
         # CHECK
         if args.UQ:
-            A2B2A_cycle_loss = uncertain_loss(A_abs, A2B2A_sampled_var)
+            A2B2A_cycle_loss = uncertain_loss_R2(A_abs, A2B2A_sampled_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
 
