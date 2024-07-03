@@ -128,7 +128,7 @@ if args.out_vars == 'R2s' or args.out_vars == 'PM':
                     bayesian=args.UQ,
                     ME_layer=args.ME_layer,
                     filters=args.n_G_filters,
-                    output_activation='sigmoid',
+                    output_activation='relu',
                     output_initializer='he_uniform',
                     self_attention=args.D2_SelfAttention)
 
