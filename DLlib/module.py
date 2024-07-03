@@ -307,10 +307,13 @@ def UNet(
                         )(x_prob)
         else:
             # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
+            x_prob = tfp.layers.DistributionLambda(
+                        lambda t: tfp.distributions.Poisson(
+                            rate=tf.math.divide_no_nan(tf.square(t[...,:n_out]),2*tf.square(t[...,n_out:]))),
+                        )(x_prob)
             out_prob = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.NoncentralChi2(
-                            df=1,
-                            noncentrality=tf.square(tf.math.divide_no_nan(t[...,:n_out],t[...,n_out:]))),
+                        lambda t: tfp.distributions.Chi2(
+                            df=2*t+2),
                         )(x_prob) # Random variable: R2s**2/r2s_var
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
