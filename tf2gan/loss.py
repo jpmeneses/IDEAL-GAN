@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
+import tensorflow_probability as tfp
 from tensorflow.keras.losses import Loss
 
 def get_gan_losses_fn():
