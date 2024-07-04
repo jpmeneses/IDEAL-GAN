@@ -144,11 +144,15 @@ class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
         idx = y_pred.shape[-1]//2
         var_map = y_pred[...,idx:]
         y_pred = y_pred[...,:idx]
-        # std_map = tf.math.sqrt(var_map)
-        loglik = tf.math.special.bessel_i0e(tf.math.divide_no_nan(y_true*y_pred,var_map))
-        loglik *= tf.math.exp(tf.math.divide_no_nan(-(tf.square(y_true)+tf.square(y_pred)),2*var_map))
-        loglik *= tf.math.divide_no_nan(y_true,var_map)
-        return tf.reduce_mean(-tf.math.log(loglik))
+        # Based on ISMRM 2024 abstract No 1766: Non-central chi likelihood loss for 
+        # quantitative MRI from parallel acquisitions with self-supervised deep learning
+        loglik = tf.where(y_true>0.0,tf.math.log(y_true),0.0)
+        loglik -= tf.where(var_map>0.0,tf.math.log(var_map),0.0)
+        loglik -= tf.math.divide_no_nan(-(tf.square(y_true)+tf.square(y_pred)),2*var_map)
+        aux_log = tfp.math.bessel_ive(0,tf.math.divide_no_nan(y_true*y_pred,var_map))
+        loglik += tf.where(aux_log>0.0,tf.math.log(aux_log),0.0)
+        loglik += tf.math.divide_no_nan(y_true*y_pred,var_map)
+        return tf.reduce_mean(-loglik)
 
 
 class AbsolutePhaseDisparity(tf.keras.losses.Loss):
