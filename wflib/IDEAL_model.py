@@ -70,7 +70,7 @@ def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False):
         return M
 
 
-def acq_to_acq(acqs, param_maps, te=None):
+def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
@@ -89,21 +89,28 @@ def acq_to_acq(acqs, param_maps, te=None):
 
     r2s = param_maps[:,0,:,:,1] * r2_sc
     phi = param_maps[:,0,:,:,0] * fm_sc
-    # r2s = tf.nn.relu(r2s)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1]) # shape: (nb,nv)
     xi_rav = tf.expand_dims(xi_rav,1) # shape: (nb,1,nv)
+    if only_mag:
+        r2s_rav = tf.reshape(r2s,[n_batch,-1]) # shape: (nb,nv)
+        r2s_rav = tf.expand_dims(r2s,1) # shape: (nb,1,nv)
 
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
+    if only_mag:
+        Wp = tf.math.exp(tf.linalg.matmul(-te, r2s_rav))
 
     # Matrix operations
     WmS = Wm * Smtx # shape = (nb,ne,nv)
     MWmS = tf.linalg.matmul(M_pinv,WmS) # shape = (nb,ns,nv)
     MMWmS = tf.linalg.matmul(M,MWmS) # shape = (nb,ne,nv)
-    Smtx_hat = Wp * MMWmS # shape = (nb,ne,nv)
+    if only_mag:
+        Smtx_hat = Wp_r2s * tf.abs(MMWmS) # shape = (nb,ne,nv)
+    else:
+        Smtx_hat = Wp * MMWmS # shape = (nb,ne,nv)
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
@@ -114,9 +121,10 @@ def acq_to_acq(acqs, param_maps, te=None):
 
     # Reshape to original acquisition dimensions
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
-    Re_gt = tf.math.real(res_gt)
-    Im_gt = tf.math.imag(res_gt)
-    res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+    if not(only_mag):
+        Re_gt = tf.math.real(res_gt)
+        Im_gt = tf.math.imag(res_gt)
+        res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
     return (res_rho,res_gt)
 
 
