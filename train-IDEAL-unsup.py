@@ -507,7 +507,7 @@ for ep in range(args.epochs):
                 tl.summary(val_FM_dict, step=opt_aux, name='G_losses')
                 tl.summary(val_R2_dict, step=opt_aux, name='G_R2_losses')
 
-            if (opt_aux.numpy() % (n_div*100) == 0) or (opt_aux.numpy() < 100):
+            if (opt_aux.numpy() % (n_div*10) == 0) or (opt_aux.numpy() < 100):
                 fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
                 # Magnitude of recon MR images at each echo
