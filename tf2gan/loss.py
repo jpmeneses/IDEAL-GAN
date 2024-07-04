@@ -145,12 +145,10 @@ class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
         var_map = y_pred[...,idx:]
         y_pred = y_pred[...,:idx]
         # std_map = tf.math.sqrt(var_map)
-        err_map_1 = tf.math.divide_no_nan(y_true,var_map)
-        err_map_1 = tf.where(err_map_1>0.0, tf.math.log(err_map_1), 0.0)
-        err_map_2 = tf.math.divide_no_nan(tf.square(y_true)+tf.square(y_pred),2*var_map)
-        err_aux = tf.math.special.bessel_i0e(tf.math.divide_no_nan(y_true*y_pred,2*var_map))
-        err_map_3 = tf.where(err_aux>0.0,tf.math.log(err_aux),0.0)
-        return tf.reduce_mean(err_map_2 - err_map_1 - err_map_3)
+        loglik = tf.math.special.bessel_i0e(tf.math.divide_no_nan(y_true*y_pred,var_map))
+        loglik *= tf.math.exp(tf.math.divide_no_nan(-(tf.square(y_true)+tf.square(y_pred)),2*var_map))
+        loglik *= tf.math.divide_no_nan(y_true,var_map)
+        return tf.reduce_mean(-tf.math.log(loglik))
 
 
 class AbsolutePhaseDisparity(tf.keras.losses.Loss):
