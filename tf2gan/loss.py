@@ -150,7 +150,7 @@ class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
         loglik = tf.where(y_true>0.0,tf.math.log(y_true),0.0)
         loglik -= tf.where(var_map>0.0,tf.math.log(var_map),0.0)
         loglik -= tf.math.divide_no_nan(-(tf.square(y_true)+tf.square(y_pred)),2*var_map)
-        aux_log = tfp.math.bessel_ive(0,tf.math.divide_no_nan(y_true*y_pred,var_map))
+        aux_log = tfp.math.bessel_ive(0.0,tf.math.divide_no_nan(y_true*y_pred,var_map))
         loglik += tf.where(aux_log>0.0,tf.math.log(aux_log),0.0)
         loglik += tf.math.divide_no_nan(y_true*y_pred,var_map)
         return tf.reduce_mean(-loglik)
