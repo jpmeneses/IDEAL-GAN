@@ -310,7 +310,7 @@ def UNet(
                             loc=t[...,:n_out],
                             scale=t[...,n_out:],
                             low=0.0,
-                            high=1.0),
+                            high=1e4),
                         )(x_prob) # Random variable: R2s**2/r2s_var
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
