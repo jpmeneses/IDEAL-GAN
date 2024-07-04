@@ -99,18 +99,18 @@ def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
         r2s_rav = tf.expand_dims(r2s_rav,1) # shape: (nb,1,nv)
 
     Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
-    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
     if only_mag:
         Wp = tf.math.exp(tf.linalg.matmul(-te, r2s_rav))
+    else:
+        Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
 
     # Matrix operations
     WmS = Wm * Smtx # shape = (nb,ne,nv)
     MWmS = tf.linalg.matmul(M_pinv,WmS) # shape = (nb,ns,nv)
     MMWmS = tf.linalg.matmul(M,MWmS) # shape = (nb,ne,nv)
     if only_mag:
-        Smtx_hat = Wp_r2s * tf.abs(MMWmS) # shape = (nb,ne,nv)
-    else:
-        Smtx_hat = Wp * MMWmS # shape = (nb,ne,nv)
+        MMWmS = tf.abs(MMWmS) # shape = (nb,ne,nv)
+    Smtx_hat = Wp * MMWmS # shape = (nb,ne,nv)
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
