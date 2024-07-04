@@ -389,11 +389,11 @@ def sample(A, B):
                     'R2_loss': R2_loss,
                     'FM_loss': FM_loss}
 
-    return A2B, A2B_PM_var, val_FM_dict, val_R2_dict
+    return A2B, A2B_PM_var, A2B2A_var, val_FM_dict, val_R2_dict
 
 def validation_step(A, B):
-    A2B, A2B_var, val_FM_dict, val_R2_dict = sample(A, B)
-    return A2B, A2B_var, val_FM_dict, val_R2_dict
+    A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = sample(A, B)
+    return A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict
 
 
 # ==============================================================================
@@ -500,7 +500,7 @@ for ep in range(args.epochs):
             B = tf.expand_dims(B,axis=0)
             A = A[:,:ne_sel,:,:,:]
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=False))
-            A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A, B)
+            A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
@@ -596,6 +596,11 @@ for ep in range(args.epochs):
                                             interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(FM_var_ok, ax=axs[1,5])
                     axs[1,5].axis('off')
+                    ech1_var_aux = np.squeeze(A2B2A_var[:,0,:,:,0])
+                    ech1_var_ok= axs[2,5].imshow(ech1_var_aux, cmap='gnuplot2',
+                                            interpolation='none', vmin=0, vmax=0.2)
+                    fig.colorbar(ech1_var_ok, ax=axs[2,5])
+                    axs[2,5].axis('off')
                 else:
                     r2_aux = np.squeeze(A2B[:,2,:,:,1])
                     fig.delaxes(axs[1,3])
@@ -630,7 +635,6 @@ for ep in range(args.epochs):
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
                 fig.colorbar(field_unet, ax=axs[2,4])
                 axs[2,4].axis('off')
-                fig.delaxes(axs[2,5])
 
                 if args.out_vars == 'R2s':
                     fig.suptitle('A2B Error: '+str(val_R2_dict['WF_loss']), fontsize=16)
