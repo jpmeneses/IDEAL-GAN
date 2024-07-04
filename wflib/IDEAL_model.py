@@ -574,7 +574,8 @@ def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=F
     Wp_var = tf.linalg.matmul((2*np.pi * te)**2, phi_sigma_rav**2) # (nb,ne,nv) NEG
     if not(rem_R2):
         r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu_rav))
-        Wp_var += tf.linalg.matmul(te**2, r2s_sigma_rav**2) # (nb,ne,nv) NEG
+        r2s_var_aux *= tf.linalg.matmul(te**2, r2s_sigma_rav**2)
+        Wp_var += r2s_var_aux # (nb,ne,nv) NEG
 
     # Matrix operations (variance)
     Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
