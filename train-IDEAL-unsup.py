@@ -125,7 +125,7 @@ G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                 self_attention=args.D1_SelfAttention)
 if args.out_vars == 'R2s' or args.out_vars == 'PM':
     G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
-                    bayesian=args.UQ,
+                    bayesian=args.UQ_R2s,
                     ME_layer=args.ME_layer,
                     filters=args.n_G_filters,
                     output_activation='sigmoid',
@@ -158,7 +158,7 @@ def train_G(A, B):
         if args.out_vars == 'PM':
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
             # Compute R2s map from only-mag images
-            if args.UQ:
+            if args.UQ_R2s:
                 A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=(args.out_vars=='PM')) # Randomly sampled R2s
             else:
                 A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
@@ -227,7 +227,7 @@ def train_G_R2(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
-        if args.UQ:
+        if args.UQ_R2s:
             A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
         else:
             A2B_R2 = G_A2R2(A_abs, training=True)
@@ -331,9 +331,11 @@ def sample(A, B):
         # Compute FM from complex-valued images
         if args.UQ:
             A2B_FM, _, A2B_FM_var = G_A2B(A, training=False)
-            A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=False)
         else:
             A2B_FM = G_A2B(A, training=False)
+        if args.UQ_R2s:
+            A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=False)
+        else:
             A2B_R2 = G_A2R2(A_abs, training=True)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
