@@ -249,8 +249,12 @@ def train_G_R2(A, B):
         # Variance map mask and attach to recon-A
         if args.UQ:
             A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-            A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
-            A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
+            if args.UQ_R2s:
+                A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
+                A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
+            else:
+                A2B_R2_nu = tf.zeros_like(A2B_FM_var)
+                A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
             A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
             A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
@@ -352,10 +356,14 @@ def sample(A, B):
     # Variance map mask and attach to recon-A
     if args.UQ:
         A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-        A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
-        A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
+        if args.UQ_R2s:
+            A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
+            A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
+        else:
+            A2B_R2_nu = tf.zeros_like(A2B_FM_var)
+            A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
         A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
-        A2B2A_var = wf.acq_uncertainty(A2B, A2B_PM_var, ne=A.shape[1])
+        A2B2A_var = wf.acq_uncertainty(A2B, A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s))
         A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
     else:
         A2B_PM_var = None
