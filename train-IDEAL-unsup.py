@@ -149,22 +149,24 @@ if not(args.out_vars == 'FM'):
 def train_G(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
+        A2B_FM = G_A2B(A, training=True)
         if args.UQ:
-            A2B_FM, _, A2B_FM_sigma = G_A2B(A, training=True) # Randomly sampled FM
+            A2B_FM_sigma = A2B_FM.stddev()
         else:
-            A2B_FM = G_A2B(A, training=True)
+            A2B_FM_sigma = tf.zeros_like(A2B_FM)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         if args.out_vars == 'PM':
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
             # Compute R2s map from only-mag images
+            A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
             if args.UQ_R2s:
-                A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=(args.out_vars=='PM')) # Randomly sampled R2s
+                A2B_R2_nu = A2B_R2.mean()
+                A2B_R2_sigma = A2B_R2.stddev()
             else:
-                A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
-                # A2B_R2_var = None
+                A2B_R2_nu = tf.zeros_like(A2B_FM_sigma)
+                A2B_R2_sigma = tf.zeros_like(A2B_FM_sigma)
             A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
-
         else:
             A2B_R2 = tf.zeros_like(A2B_FM)
             if args.UQ:
@@ -227,17 +229,21 @@ def train_G_R2(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
+        A2B_R2 = G_A2R2(A_abs, training=True)
         if args.UQ_R2s:
-            A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
+            A2B_R2_nu = A2B_R2.mean()
+            A2B_R2_sigma = A2B_R2.stddev() 
         else:
-            A2B_R2 = G_A2R2(A_abs, training=True)
+            A2B_R2_nu = tf.zeros_like(A2B_R2)
+            A2B_R2_sigma = tf.zeros_like(A2B_R2)
         A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
         # Compute FM using complex-valued images and pre-trained model
+        A2B_FM = G_A2B(A, training=False)
         if args.UQ:
-            A2B_FM, _, A2B_FM_var = G_A2B(A, training=False) # Mean FM
+            A2B_FM_var = A2B_FM.stddev()
         else:
-            A2B_FM = G_A2B(A, training=False)
+            A2B_FM_var = tf.zeros_like(A2B_FM)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
@@ -252,9 +258,6 @@ def train_G_R2(A, B):
             if args.UQ_R2s:
                 A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
                 A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
-            else:
-                A2B_R2_nu = tf.zeros_like(A2B_FM_var)
-                A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
             A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
             A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
@@ -313,12 +316,12 @@ def train_step(A, B):
 @tf.function
 def sample(A, B):
     if args.out_vars == 'FM':
+        A2B_FM = G_A2B(A, training=False)
         if args.UQ:
-            A2B_FM, _, A2B_FM_var = G_A2B(A, training=False)
+            A2B_FM_var = A2B_FM.stddev()
             A2B_R2_nu = tf.zeros_like(A2B_FM_var)
             A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
-        else:
-            A2B_FM = G_A2B(A, training=False)
+            
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         # Build A2B_PM array with zero-valued R2*
@@ -333,17 +336,15 @@ def sample(A, B):
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
         # Compute FM from complex-valued images
+        A2B_FM = G_A2B(A, training=False)
         if args.UQ:
-            A2B_FM, _, A2B_FM_var = G_A2B(A, training=False)
-        else:
-            A2B_FM = G_A2B(A, training=False)
+            A2B_FM_var = A2B_FM.stddev()
+        A2B_R2 = G_A2R2(A_abs, training=True)
         if args.UQ_R2s:
-            A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=False)
-        else:
-            A2B_R2 = G_A2R2(A_abs, training=True)
+            A2B_R2_nu = A2B_R2.mean()
+            A2B_R2_sigma = A2B_R2.stddev()
+        
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
-
-        # Compute R2s maps using only-mag images
         A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
@@ -365,6 +366,7 @@ def sample(A, B):
         A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
         A2B2A_var = wf.acq_uncertainty(A2B, A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s))
         A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
+        A2B2A_abs_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
     else:
         A2B_PM_var = None
 
@@ -379,8 +381,7 @@ def sample(A, B):
             val_A2B2A_R2_loss = 0
             val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
         else:
-            # val_A2B2A_R2_loss = uncertain_loss(A_abs, A2B2A_abs_sampled_var)
-            val_A2B2A_R2_loss = 0
+            val_A2B2A_R2_loss = uncertain_loss_R2(A_abs, A2B2A_abs_sampled_var)
             val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
     else:
         if args.out_vars == 'FM':

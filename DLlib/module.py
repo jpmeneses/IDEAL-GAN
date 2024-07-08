@@ -290,40 +290,33 @@ def UNet(
         cont += 1
 
     output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
+    if ME_layer:
+        output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
     if bayesian:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         # Compute standard deviation (sigma; NOT sigma^2)
         out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
-        # if output_activation != 'tanh':
-        #     out_var = keras.layers.Lambda(lambda z: 0.02*z)(out_var)
+        if ME_layer:
+            out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
         x_prob = keras.layers.concatenate([output,out_var])
         if output_activation == 'tanh':
-            out_prob = tfp.layers.DistributionLambda(
+            output = tfp.layers.DistributionLambda(
                         lambda t: tfp.distributions.Normal(
                             loc=t[...,:n_out],
                             scale=t[...,n_out:]),
                         )(x_prob)
         else:
             # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
-            out_prob = tfp.layers.DistributionLambda(
+            output = tfp.layers.DistributionLambda(
                         lambda t: tfp.distributions.TruncatedNormal(
                             loc=t[...,:n_out],
                             scale=t[...,n_out:],
                             low=0.0,
                             high=1e4),
                         )(x_prob) # Random variable: R2s**2/r2s_var
-    if ME_layer:
-        output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
-        if bayesian:
-            out_prob = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_prob)
-            out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
 
-    if te_input and bayesian:
-        return keras.Model(inputs=[inputs1,inputs2], outputs=[out_prob,output,out_var])
-    elif te_input:
+    if te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)
-    elif bayesian:
-        return keras.Model(inputs=inputs1, outputs=[out_prob,output,out_var])
     else:
         return keras.Model(inputs=inputs1, outputs=output)
 
