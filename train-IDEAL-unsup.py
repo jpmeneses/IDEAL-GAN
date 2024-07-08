@@ -320,6 +320,7 @@ def sample(A, B):
         A2B_FM_prob = G_A2B(A, training=False)
         if args.UQ:
             A2B_FM_var = A2B_FM_prob.components_distribution.stddev()[...,:1]
+            A2B_FM_means = A2B_FM_prob.components_distribution.mean()
             A2B_R2_nu = tf.zeros_like(A2B_FM_var)
             A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
         A2B_FM = tf.keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=-1))(A2B_FM_prob)
@@ -401,11 +402,11 @@ def sample(A, B):
                     'R2_loss': R2_loss,
                     'FM_loss': FM_loss}
 
-    return A2B, A2B_PM_var, A2B2A_var, A2B_FM_prob, val_FM_dict, val_R2_dict
+    return A2B, A2B_PM_var, A2B2A_var, A2B_FM_means, val_FM_dict, val_R2_dict
 
 def validation_step(A, B):
-    A2B, A2B_var, A2B2A_var, A2B_FM_prob, val_FM_dict, val_R2_dict = sample(A, B)
-    return A2B, A2B_var, A2B2A_var, A2B_FM_prob, val_FM_dict, val_R2_dict
+    A2B, A2B_var, A2B2A_var, A2B_FM_means, val_FM_dict, val_R2_dict = sample(A, B)
+    return A2B, A2B_var, A2B2A_var, A2B_FM_means, val_FM_dict, val_R2_dict
 
 
 # ==============================================================================
@@ -512,7 +513,7 @@ for ep in range(args.epochs):
             B = tf.expand_dims(B,axis=0)
             A = A[:,:ne_sel,:,:,:]
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=False))
-            A2B, A2B_var, A2B2A_var, A2B_FM_prob, val_FM_dict, val_R2_dict = validation_step(A, B)
+            A2B, A2B_var, A2B2A_var, A2B_FM_means, val_FM_dict, val_R2_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
@@ -586,7 +587,7 @@ for ep in range(args.epochs):
                 axs[1,1].axis('off')
                 
                 if args.UQ:
-                    field_aux = np.squeeze(A2B_FM_prob.components_distribution.mean())[...,0]
+                    field_aux = A2B_FM_means[...,0]
                     r2_aux = np.squeeze(A2B_var[:,0,:,:,1])
                     R2_var_aux = np.squeeze(A2B_var[:,0,:,:,2])*(r2_sc)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
@@ -603,7 +604,7 @@ for ep in range(args.epochs):
                                             interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(FM_var_ok, ax=axs[2,5])
                     axs[2,5].axis('off')
-                    field2_aux = np.squeeze(A2B_FM_prob.components_distribution.mean())[...,1]
+                    field2_aux = A2B_FM_means[...,1]
                     field2_ok= axs[1,5].imshow(field2_aux, cmap='twilight',
                                             interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
                     fig.colorbar(field2_ok, ax=axs[1,5])
