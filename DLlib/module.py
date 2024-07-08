@@ -304,7 +304,7 @@ def UNet(
             out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
         x_prob = keras.layers.concatenate([output,out_var])
         if output_activation == 'tanh':
-            out_cat = keras.layers.Conv2D(k_out*n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(output)
+            out_cat = keras.layers.Conv2D(k_out*n_out, (1,1), activation='softmax', kernel_initializer='he_normal')(output)
             x_prob = keras.layers.concatenate([x_prob,out_cat])
             output = tfp.layers.DistributionLambda(
                         lambda t: tfp.distributions.MixtureSameFamily(
