@@ -289,7 +289,11 @@ def UNet(
         # Update counter
         cont += 1
 
-    output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
+    if bayesian and output_activation=='tanh':
+        k_out = 2
+    else:
+        k_out = 1
+    output = keras.layers.Conv2D(k_out*n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
     if bayesian:
@@ -300,10 +304,15 @@ def UNet(
             out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
         x_prob = keras.layers.concatenate([output,out_var])
         if output_activation == 'tanh':
+            out_cat = keras.layers.Conv2D(k_out*n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(output)
+            x_prob = keras.layers.concatenate([x_prob,out_cat])
             output = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.Normal(
-                            loc=t[...,:n_out],
-                            scale=t[...,n_out:]),
+                        lambda t: tfp.distributions.MixtureSameFamily(
+                            mixture_distribution=tfp.distributions.Categorical(
+                                probs=t[...,(k_out*n_out+1):]), #EDIT
+                            components_distribution=tfp.distributions.Laplace(
+                                loc=t[...,:k_out*n_out],
+                                scale=t[...,k_out*n_out:(k_out*n_out+1)])),
                         )(x_prob)
         else:
             # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
