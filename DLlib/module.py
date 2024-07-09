@@ -259,7 +259,7 @@ def UNet(
 
         filters = filters * 2  # double the number of filters with each layer
 
-    x_ls = x = _conv2d_block(
+    x = _conv2d_block(
         inputs=x,
         filters=filters,
         dropout=dropout,
@@ -304,33 +304,11 @@ def UNet(
             out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
         x_prob = keras.layers.concatenate([output,out_var])
         if output_activation == 'tanh':
-            output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=-2))(output)
-            out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=-2))(out_var)
-            x_ls = keras.layers.Conv2D(1, (1,1), activation='relu', kernel_initializer='he_normal')(x_ls)
-            x_ls = keras.layers.Flatten()(x_ls)
-            out_cat = keras.layers.Dense(2, activation='softmax')(x_ls)
-            mean_1 = keras.layers.Lambda(lambda z: z[...,:n_out])(output)
-            mean_1 = keras.layers.Flatten()(mean_1)
-            mean_2 = keras.layers.Lambda(lambda z: z[...,n_out:])(output)
-            mean_2 = keras.layers.Flatten()(mean_2)
-            var_1  = keras.layers.Lambda(lambda z: z[...,:n_out])(out_var)
-            var_1 = keras.layers.Flatten()(var_1)
-            var_2  = keras.layers.Lambda(lambda z: z[...,n_out:])(out_var)
-            var_2 = keras.layers.Flatten()(var_2)
-            x_prob = keras.layers.concatenate([out_cat,mean_1,var_1,mean_2,var_2])
-            output = tfp.layers.MixtureSameFamily(
-                        num_components=2,
-                        component_layer=tfp.layers.IndependentNormal(output.shape[1:-1]
-                            )
+            output = tfp.layers.DistributionLambda(
+                        lambda t: tfp.distributions.Laplace(
+                            loc=t[...,:n_out],
+                            scale=t[...,n_out:])
                         )(x_prob)
-            # output = tfp.layers.DistributionLambda(
-            #             lambda t: tfp.distributions.MixtureSameFamily(
-            #                 mixture_distribution=tfp.distributions.Categorical(
-            #                     probs=t[...,(k_out*n_out+1):]), #EDIT
-            #                 components_distribution=tfp.distributions.Laplace(
-            #                     loc=t[...,:k_out*n_out],
-            #                     scale=t[...,k_out*n_out:(k_out*n_out+1)])),
-            #             )(x_prob)
         else:
             # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
             output = tfp.layers.DistributionLambda(
