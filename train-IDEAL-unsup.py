@@ -149,9 +149,9 @@ if not(args.out_vars == 'FM'):
 def train_G(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        A2B_FM_prob = G_A2B(A, training=True)
+        A2B_FM = G_A2B(A, training=True)
         if args.UQ:
-            A2B_FM_sigma = A2B_FM_prob.stddev()
+            A2B_FM_sigma = A2B_FM.stddev()
         else:
             A2B_FM_sigma = tf.zeros_like(A2B_FM)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
@@ -316,15 +316,14 @@ def train_step(A, B):
 @tf.function
 def sample(A, B):
     if args.out_vars == 'FM':
-        A2B_FM_prob = G_A2B(A, training=False)
+        A2B_FM = G_A2B(A, training=False)
         if args.UQ:
-            A2B_FM_var = A2B_FM_prob.stddev()
-            A2B_FM_means = A2B_FM_prob.components_distribution.mean()
+            A2B_FM_var = A2B_FM.stddev()
+            A2B_FM_means = A2B_FM.components_distribution.mean()
             A2B_R2_nu = tf.zeros_like(A2B_FM_var)
             A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
         else:
             A2B_FM_means = None
-        A2B_FM = tf.keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=-1))(A2B_FM_prob)
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         # Build A2B_PM array with zero-valued R2*
