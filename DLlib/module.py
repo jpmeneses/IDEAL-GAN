@@ -289,17 +289,13 @@ def UNet(
         # Update counter
         cont += 1
 
-    if bayesian and output_activation=='tanh':
-        k_out = 2
-    else:
-        k_out = 1
-    output = keras.layers.Conv2D(k_out*n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
+    output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
     if bayesian:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         # Compute standard deviation (sigma; NOT sigma^2)
-        out_var = keras.layers.Conv2D(k_out,n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
+        out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
         if ME_layer:
             out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
         x_prob = keras.layers.concatenate([output,out_var])
