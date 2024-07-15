@@ -294,22 +294,24 @@ def train_G_R2(A, B):
 
 
 def train_step(A, B):
-    if args.out_vars == 'R2s':
-        G_loss_dict  = {'A2B2A_cycle_loss': tf.constant(0.0),
-                        'WF_loss': tf.constant(0.0),
-                        'R2_loss': tf.constant(0.0),
-                        'FM_loss': tf.constant(0.0),
-                        'TV_FM': tf.constant(0.0),
-                        'L1_FM': tf.constant(0.0)}
+    if args.out_vars != 'FM':
+        if args.out_vars == 'R2s':
+            G_loss_dict  = {'A2B2A_cycle_loss': tf.constant(0.0),
+                            'WF_loss': tf.constant(0.0),
+                            'R2_loss': tf.constant(0.0),
+                            'FM_loss': tf.constant(0.0),
+                            'TV_FM': tf.constant(0.0),
+                            'L1_FM': tf.constant(0.0)}
         G_R2_loss_dict = train_G_R2(A, B)
-    else:
+    if args.out_vars != 'R2s':
         G_loss_dict = train_G(A, B)
-        G_R2_loss_dict={'A2B2A_cycle_loss': tf.constant(0.0),
-                        'WF_loss': tf.constant(0.0),
-                        'R2_loss': tf.constant(0.0),
-                        'FM_loss': tf.constant(0.0),
-                        'TV_R2': tf.constant(0.0),
-                        'L1_R2': tf.constant(0.0)}
+        if args.out_vars == 'FM':
+            G_R2_loss_dict={'A2B2A_cycle_loss': tf.constant(0.0),
+                            'WF_loss': tf.constant(0.0),
+                            'R2_loss': tf.constant(0.0),
+                            'FM_loss': tf.constant(0.0),
+                            'TV_R2': tf.constant(0.0),
+                            'L1_R2': tf.constant(0.0)}
     return G_loss_dict, G_R2_loss_dict
 
 
