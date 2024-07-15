@@ -301,7 +301,7 @@ def UNet(
         x_prob = keras.layers.concatenate([output,out_var])
         if output_activation == 'tanh':
             output = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.Laplace(
+                        lambda t: tfp.distributions.Normal(
                             loc=t[...,:n_out],
                             scale=t[...,n_out:])
                         )(x_prob)
