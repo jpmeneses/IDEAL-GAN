@@ -159,7 +159,7 @@ def train_G(A, B):
         if args.out_vars == 'PM':
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
             # Compute R2s map from only-mag images
-            A2B_R2 = G_A2R2(A_abs, training=(args.out_vars=='PM'))
+            A2B_R2 = G_A2R2(A_abs, training=False)
             if args.UQ_R2s:
                 A2B_R2_nu = A2B_R2.mean()
                 A2B_R2_sigma = A2B_R2.stddev()
