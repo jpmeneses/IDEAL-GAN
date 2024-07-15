@@ -208,12 +208,8 @@ def train_G(A, B):
         
         G_loss = A2B2A_cycle_loss + reg_term
         
-    if args.out_vars == 'FM':
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
-    else:
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables + G_A2R2.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables + G_A2R2.trainable_variables))
+    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
     
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
             'WF_loss': WF_abs_loss,
