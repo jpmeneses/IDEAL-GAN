@@ -336,7 +336,7 @@ def sample(A, B):
         A2B_FM = G_A2B(A, training=False)
         if args.UQ:
             A2B_FM_var = A2B_FM.stddev()
-        A2B_R2 = G_A2R2(A_abs, training=True)
+        A2B_R2 = G_A2R2(A_abs, training=False)
         if args.UQ_R2s:
             A2B_R2_nu = A2B_R2.mean()
             A2B_R2_sigma = A2B_R2.stddev()
@@ -502,7 +502,7 @@ for ep in range(args.epochs):
                         step=opt_aux, name='G learning rate')
 
         # sample
-        if (opt_aux.numpy() % n_div == 0) or (opt_aux.numpy() < 200):
+        if (opt_aux.numpy() % n_div == 0) or (opt_aux.numpy() < 200//args.batch_size):
             A, B = next(val_iter)
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
