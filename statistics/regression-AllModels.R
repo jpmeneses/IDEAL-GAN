@@ -1,3 +1,5 @@
+rm(list=ls(all=TRUE))
+
 library(readxl)
 library(pwr)
 library(tidyverse)
@@ -9,98 +11,121 @@ library(emmeans)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-#setwd("C:/Users/jpmen/Documents/PDFF-models/Radiology models/3ech_tests")
-setwd("C:/Users/jpmen/Desktop/JuanPablo/UC/PhD/ISMRM/2022/Abstract")
+map = "R2s"
+if (map == "PDFF")
+{
+  models = c("/Sup-200/","/Sup-202/","/Sup-204/","/TEaug-300/")
+  k_resc = 100.0
+} else
+{
+  models = c("/Sup-200/","/Sup-204/","/TEaug-300/")
+  k_resc = 1.0
+}
+epoch = "100"
 
-#gfg_data=read_excel('All_R2s_ROIs.xlsx',sheet="Mean")
-gfg_data=read_excel('PDFF_ROIs.xlsx',sheet="RHL")
+for (k in c(1:length(models)))
+{
+dir = paste("C:/Users/jpmen/Documents/IDEAL-GAN/output",models[k],"Ep-",epoch,sep="")
+setwd(dir)
 
-refs <- c(t(gfg_data[,1]))*100 # 3ech: R2s -> del c(-9,-22)
-otcy <- c(t(gfg_data[,2]))*100
-mdwf <- c(t(gfg_data[,4]))*100
-unet <- c(t(gfg_data[,3]))*100
-
-n_data = length(refs)
+TEs_suffix = c('13_21','13_22','13_23','13_24','14_21','14_22')
+for (i in c(1:length(TEs_suffix)))
+{
+  filename = paste(c(map,'_ROIs_',TEs_suffix[i],'.xlsx'),collapse="")
+  ROI_sheets = excel_sheets(filename)
+  for (j in c(1:length(ROI_sheets)))
+  {
+    roi_data=read_excel(filename,sheet=ROI_sheets[j])
+    len_ij = length(t(roi_data[,2]))
+    if (i==1 & j==1)
+    {
+	if (k==1)
+	{
+		refs = c(t(roi_data[,1]))
+		meas = c(t(roi_data[,2]))
+		sample_id = c(1:len_ij)
+		roi_id = rep(c(j),length(t(roi_data[,1])))
+		meth_id = rep(c(k),length(t(roi_data[,1])))
+		TEs = rep(c(TEs_suffix[i]),len_ij)
+	} else
+	{
+		refs = c(t(roi_data[,1]))
+		meas = c(meas,t(roi_data[,2]))
+		sample_id = append(sample_id,c(1:len_ij))
+		roi_id = append(roi_id,rep(c(j),length(t(roi_data[,1]))))
+		meth_id = append(meth_id,rep(c(k),length(t(roi_data[,1]))))
+		TEs = append(TEs,rep(c(TEs_suffix[i]),len_ij))
+	}
+    } else
+    {
+      refs = c(refs,t(roi_data[,1]))
+      meas = c(meas,t(roi_data[,2]))
+	sample_id = c(sample_id,c(1:len_ij)+(j-1)*len_ij)
+	roi_id = append(roi_id,rep(c(j),length(t(roi_data[,1]))))
+	meth_id = append(meth_id,rep(c(k),length(t(roi_data[,1]))))
+      TEs = c(TEs,rep(c(TEs_suffix[i]),len_ij))
+    }
+  }
+}
+}
+n_data = length(meas) 
 
 # Create a data frame
 pdff_Data <- data.frame(
-Method = factor(rep(c(0,1,2), each=n_data), labels=c("OT-CycleGAN","MDWF-Net","U-Net")),
-mean = c(otcy,mdwf,unet),
-refs = rep(c(refs),3)
+refs = c(refs)*k_resc,
+meas = c(meas)*k_resc,
+sample_id = factor(sample_id,
+			 labels=c(paste0(LETTERS[1:len_ij],sep='-',1),
+				    paste0(LETTERS[1:len_ij],sep='-',2))
+			 ),
+id = factor(sample_id, labels=rep(LETTERS[1:len_ij],2)),
+roi = factor(roi_id, labels=c("RHL","LHL")),
+Method = factor(c(meth_id), labels=c("VET-Net (No TE)","MDWF-Net","VET-Net")),
+TEs = factor(TEs)
 )
 
-# Dataset summary stats
-pdff_Data %>%
-  group_by(Method) %>%
-  get_summary_stats(mean, type="common")
- 
+# Remove zero-values and separate by ROIs
+pdff_RHL = subset(pdff_Data, meas > 0.0 & roi == 'RHL')
+pdff_LHL = subset(pdff_Data, meas > 0.0 & roi == 'LHL')
+
+# Calculate mean of all TEs
+pdff_RHL_bySubj <- pdff_RHL %>%
+  group_by(Method, id, .add=TRUE) %>%
+  summarise(mean = mean(meas),
+		mean_ref = mean(refs))
+# print(pdff_RHL_bySubj, n=60)
+
+pdff_LHL_bySubj <- pdff_LHL %>%
+  group_by(Method, id, .add=TRUE) %>%
+  summarise(mean = mean(meas),
+		mean_ref = mean(refs))
+# print(pdff_LHL_bySubj, n=60)
+
 ############################################################################
 ########################### REGRESSION LINES ###############################
 ############################################################################
 q = ggscatter(
-  pdff_Data, x="refs", y="mean",
-  color="Method", xlab="Reference PDFF [%]",
-  ylab="Measured R2* [%]", add="reg.line",
+  pdff_RHL_bySubj, x="mean_ref", y="mean",
+  color="Method", xlab="Mean Ref. R2* [1/s]",
+  ylab="Mean Measured R2* [1/s]", add="reg.line",
   )+
+  xlim(0.0,150.0) +
+  ylim(0.0,150.0) +
   stat_regline_equation(
     aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"), color=Method)
     )
-ggsave(plot=q, width=4, height=4, dpi=300, filename="LS-corr.png")
+fn = paste(map,"LR-RHL.png",sep="-")
+ggsave(plot=q, width=5, height=5, dpi=400, filename=fn)
 
-############################################################################
-######################### BLAND ALTMAN PLOTS ###############################
-############################################################################
-# Averages and differences
-pdff_Data$avg <- (pdff_Data$mean + pdff_Data$refs)/2
-pdff_Data$df <- (pdff_Data$mean - pdff_Data$refs)
-
-# create OT-CycleGAN Bland-Altman
-otcy_Data <- pdff_Data %>% filter(Method == "OT-CycleGAN")
-mean_diff = mean(otcy_Data$df)
-lower <- mean_diff - 1.96*sd(otcy_Data$df)
-upper <- mean_diff + 1.96*sd(otcy_Data$df)
-r=ggplot(otcy_Data, aes(x = avg, y = df)) +
-  geom_point(size=1) +
-  geom_hline(yintercept = mean_diff) +
-  geom_hline(yintercept = lower, color = "red", linetype="dashed") +
-  geom_hline(yintercept = upper, color = "red", linetype="dashed") +
-  ylab("Bias PDFF [%]") +
-  xlab("Mean PDFF [%]") +
-  xlim(0,0.45) +
-  ylim(-0.05,0.05)
-r
-ggsave(plot=r, width=2, height=2, dpi=300, filename="OTcGAN-BlandAltman.png")
-
-# create MDWF-Net Bland-Altman
-mdwf_Data <- pdff_Data %>% filter(Method == "MDWF-Net")
-mean_diff = mean(mdwf_Data$df)
-lower <- mean_diff - 1.96*sd(mdwf_Data$df)
-upper <- mean_diff + 1.96*sd(mdwf_Data$df)
-r=ggplot(mdwf_Data, aes(x = avg, y = df)) +
-  geom_point(size=1) +
-  geom_hline(yintercept = mean_diff) +
-  geom_hline(yintercept = lower, color = "red", linetype="dashed") +
-  geom_hline(yintercept = upper, color = "red", linetype="dashed") +
-  ylab("Bias PDFF [%]") +
-  xlab("Mean PDFF [%]") +
-  xlim(0,0.45) +
-  ylim(-0.05,0.05)
-r
-ggsave(plot=r, width=2, height=2, dpi=300, filename="MDWF-BlandAltman.png")
-
-# create U-Net Bland-Altman
-unet_Data <- pdff_Data %>% filter(Method == "U-Net")
-mean_diff = mean(unet_Data$df)
-lower <- mean_diff - 1.96*sd(unet_Data$df)
-upper <- mean_diff + 1.96*sd(unet_Data$df)
-s=ggplot(unet_Data, aes(x = avg, y = df)) +
-  geom_point(size=1) +
-  geom_hline(yintercept = mean_diff) +
-  geom_hline(yintercept = lower, color = "red", linetype="dashed") +
-  geom_hline(yintercept = upper, color = "red", linetype="dashed") +
-  ylab("Bias PDFF [%]") +
-  xlab("Mean PDFF [%]") +
-  xlim(0,0.45) +
-  ylim(-0.05,0.05)
-s
-ggsave(plot=s, width=2, height=2, dpi=300, filename="UNet-BlandAltman.png")
+q2 = ggscatter(
+  pdff_LHL_bySubj, x="mean_ref", y="mean",
+  color="Method", xlab="Mean Ref. R2* [1/s]",
+  ylab="Mean Measured R2* [1/s]", add="reg.line",
+  )+
+  xlim(0.0,150.0) +
+  ylim(0.0,150.0) +
+  stat_regline_equation(
+    aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"), color=Method)
+    )
+fn2 = paste(map,"LR-LHL.png",sep="-")
+ggsave(plot=q2, width=5, height=5, dpi=400, filename=fn2)
