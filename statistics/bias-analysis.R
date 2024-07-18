@@ -62,6 +62,7 @@ n_data = length(refs)
 # Create a data frame
 pdff_Data <- data.frame(
 refs = c(refs)*100,
+meas = c(meas)*100,
 bias = c(meas-refs)*100,
 method = factor(c(meth_id), labels=c("2D-Net","U-Net","MDWF-Net",
 						"VET-Net","GraphCuts")),
@@ -77,9 +78,12 @@ boxplot(bias ~ method, data = pdff_Data)
 # pdff_Data <- subset(pdff_Data, method!="MDWF-Net")
 
 ## LINEAR MIXED MODEL
+# Singularity is relatively easy to detect because it leads to:
+# 1) random-effect variance estimates of (nearly) zero, or
+# 2) estimates of correlations that are (almost) exactly -1 or 1.
 mixed.lmer <- lmer(bias ~ refs + (1|Site_Prot) + (1|method), data=pdff_Data)
 summary(mixed.lmer)
-# plot(mixed.lmer)
+ # plot(mixed.lmer)
 
 full.lmer <- lmer(bias ~ refs + (1|Site_Prot) + (1|method), data=pdff_Data, REML=FALSE)
 reduced.lmer <- lmer(bias ~ refs + (1|Site_Prot), data=pdff_Data, REML=FALSE)
@@ -94,7 +98,7 @@ pdff_group <- pdff_Data %>%
 print(pdff_group, n=55)
 
 ## BLAND-ALTMAN BY METHOD
-sel_meth = "MDWF-Net"
+sel_meth = "GraphCuts"
 pdff_meth = subset(pdff_Data, method==sel_meth)
 pdff_meth <- within(pdff_meth, meas <- bias+refs)
 meth.lmer <- lmer(meas ~ refs + (1|Site_Prot), data=pdff_meth)
@@ -114,4 +118,4 @@ q2= ggplot(pdff_meth, aes(refs, bias)) +
   ylab("Difference") +
   xlab("Ground-Truth")
 fn2 = paste(map,sel_meth,"Bias-BlandAltman.png",sep="-")
-ggsave(plot=q2, width=5, height=3, dpi=400, filename=fn2)
+#ggsave(plot=q2, width=5, height=3, dpi=400, filename=fn2)

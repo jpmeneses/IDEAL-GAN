@@ -10,8 +10,16 @@ library(car)
 ########################## DATA ARRANGEMENT ################################
 ############################################################################
 
-models = c("/Sup-200/","/Sup-202/","/Sup-204/","/TEaug-300/")
 map = "PDFF"
+if (map == "PDFF")
+{
+  models = c("/Sup-200/","/Sup-202/","/Sup-204/","/TEaug-300/")
+  k_resc = 100.0
+} else
+{
+  models = c("/Sup-200/","/Sup-204/","/TEaug-300/")
+  k_resc = 1.0
+}
 epoch = "100"
 
 for (k in c(1:length(models)))
@@ -75,14 +83,14 @@ n_data = length(meas)
 
 # Create a data frame
 pdff_Data <- data.frame(
-meas = c(meas)*100,
+meas = c(meas)*k_resc,
 sample_id = factor(sample_id,
 			 labels=c(paste0(LETTERS[1:len_ij],sep='-',1),
 				    paste0(LETTERS[1:len_ij],sep='-',2))
 			 ),
 id = factor(sample_id, labels=rep(LETTERS[1:len_ij],2)),
 roi = factor(roi_id, labels=c("RHL","LHL")),
-method = factor(c(meth_id), labels=c("2D-Net","U-Net","MDWF-Net",
+method = factor(c(meth_id), labels=c("VET-Net (No TE)","U-Net","MDWF-Net",
 						"VET-Net","GraphCuts")),
 TEs = factor(TEs)
 )
@@ -99,7 +107,7 @@ pdff_RHL_RDCs <- pdff_RHL %>%
   summarise(RDC = 1.96*sd(meas),
 		mmeas = mean(meas),
 		n = factor(n()))
-# print(pdff_RHL_RDCs, n=80)
+# print(pdff_RHL_RDCs, n=100)
 
 pdff_RHL_RDC_byMeth <- pdff_RHL_RDCs %>%
   group_by(method) %>%
@@ -114,17 +122,17 @@ leveneTest(RDC ~ method, data = pdff_RHL_RDCs, center = "median")
 # Non-parametric test
 kruskal.test(RDC ~ method, data = pdff_RHL_RDCs)
 
-sel_meth = "GraphCuts"
-pdff_RHL_meth = subset(pdff_RHL_RDCs, method == sel_meth)
-if (map=="PDFF") {yl=8.5} else {yl=40.0}
-q1 = ggplot(pdff_RHL_meth, aes(mmeas, RDC)) +
-       geom_point(colour="red")+
+sel_meth = "all"
+# pdff_RHL_meth = subset(pdff_RHL_RDCs, method == sel_meth)
+if (map=="PDFF") {yl=8.5} else {yl=30.0}
+q1 = ggplot(pdff_RHL_RDCs, aes(mmeas, RDC)) +
+       geom_point(aes(color=method))+
        theme(text = element_text(size = 14)) +
 	 ylim(0.0,yl) +
 	 ylab("Mean RDC") +
 	 xlab("Mean PDFF") 
 fn1 = paste(map,sel_meth,"RDC-LR-RHL.png",sep="-")
-ggsave(plot=q1, width=4, height=3, dpi=400, filename=fn1)
+#ggsave(plot=q1, width=5, height=3, dpi=400, filename=fn1)
 
 ############################################################################
 ############################## LHL ANALYSIS ################################
@@ -134,7 +142,7 @@ pdff_LHL_RDCs <- pdff_LHL %>%
   summarise(RDC = 1.96*sd(meas),
 		mmeas = mean(meas),
 		n = factor(n()))
-# print(pdff_LHL_RDCs, n=80)
+# print(pdff_LHL_RDCs, n=100)
 
 pdff_LHL_RDC_byMeth <- pdff_LHL_RDCs %>%
   group_by(method) %>%
@@ -152,12 +160,11 @@ kruskal.test(RDC ~ method, data = pdff_LHL_RDCs)
 pairwise.wilcox.test(x=pdff_LHL_RDCs$RDC, g=pdff_LHL_RDCs$method, p.adjust.method = "holm")
 
 # Mean PDFF v/s Mean RDC plot
-pdff_LHL_meth = subset(pdff_LHL_RDCs, method == sel_meth)
-q2 = ggplot(pdff_LHL_meth, aes(mmeas, RDC)) +
-       geom_point(colour="blue")+
+q2 = ggplot(pdff_LHL_RDCs, aes(mmeas, RDC)) +
+       geom_point(aes(color=method))+
        theme(text = element_text(size = 14)) +
 	 ylim(0.0,yl) +
 	 ylab("Mean RDC") +
 	 xlab("Mean PDFF")
 fn2 = paste(map,sel_meth,"RDC-LR-LHL.png",sep="-")
-ggsave(plot=q2, width=4, height=3, dpi=400, filename=fn2)
+#ggsave(plot=q2, width=5, height=3, dpi=400, filename=fn2)

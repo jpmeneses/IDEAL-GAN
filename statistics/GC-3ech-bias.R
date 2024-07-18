@@ -39,15 +39,15 @@ n_data = length(meas)
 
 # Create a data frame
 pdff_Data <- data.frame(
-refs = c(refs),
-meas = c(meas),
-bias = c(meas - refs),
-mean = c((meas + refs)/2),
+refs = c(refs)*100,
+meas = c(meas)*100,
+bias = c(meas - refs)*100,
+mean = c((meas + refs)/2)*100,
 roi = factor(c(rep(c("RHL"),len_ij),rep(c("LHL"),len_ij)))
 )
 
 # Remove zero-values
-pdff_Data = subset(pdff_Data, meas > 0.0)
+pdff_Data = subset(pdff_Data, meas > 0.0 & roi == "RHL")
 
 # Dataset summary stats
 pdff_Data %>%
@@ -62,8 +62,8 @@ q2 = ggplot(pdff_Data, aes(refs, meas)) +
       geom_smooth(method="lm",fullrange=TRUE) +
 	labs(x='Reference', y='Measurement') +
 	theme(text = element_text(size = 12)) +
-	xlim(0.0,0.4) +
-	ylim(0.0,0.4) +
+	xlim(0.0,40.0) +
+	ylim(0.0,40.0) +
   stat_regline_equation(
     aes(label = paste(..eq.label.., ..rr.label.., sep="~~~~"))
     )
@@ -77,8 +77,8 @@ mean_diff <- mean(pdff_Data$bias)
 lower <- mean_diff - 1.96*sd(pdff_Data$bias)
 upper <- mean_diff + 1.96*sd(pdff_Data$bias)
 if (map=="PDFF"){
-  yl = 0.20
-  xl = 0.35
+  yl = 20
+  xl = 35
 } else {
   yl = 35.0
   xl = 115.0
