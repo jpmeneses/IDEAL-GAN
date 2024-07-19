@@ -467,86 +467,87 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
     return res_rho
 
 
-@tf.function
-def PDFF_uncertainty(acqs, mean_maps, var_maps, te=None, MEBCRN=True, rem_R2=False):
-    if MEBCRN:
-        n_batch,ne,hgt,wdt,_ = acqs.shape
-    else:
-        n_batch,hgt,wdt,d_ech = acqs.shape
-        ne = d_ech//2
-
+#@tf.function
+def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
+    n_batch,ne,hgt,wdt,_ = acqs.shape
+    
     if te is None:
         te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
 
-    M, M_pinv = gen_M(te)
+    M, P0, M_pinv = gen_M(te, get_P0=True)
+    MTM =  tf.linalg.matmul(tf.transpose(M, perm=[0,2,1], conjugate=True),M) # (nb,ns,ns)
+    # MTM_wf = tf.expand_dims(tf.linalg.diag_part(MTM_inv),axis=-1)
 
     te_complex = tf.complex(0.0,te)
     te_real = tf.complex(te,0.0)
 
     # Generate complex signal
-    if MEBCRN:
-        real_S = acqs[...,:1]
-        imag_S = acqs[...,1:]
-    else:
-        real_S = acqs[...,0::2]
-        imag_S = acqs[...,1::2]
+    real_S = acqs[...,:1]
+    imag_S = acqs[...,1:]
     
     S = tf.complex(real_S,imag_S)
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
-    if MEBCRN:
-        Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # (nb,ne,nv)
-    else:
-        Smtx = tf.transpose(tf.reshape(S, [n_batch, num_voxel, ne]), perm=[0,2,1]) # (nb,ne,nv)
+    Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # (nb,ne,nv)
 
-    r2s = mean_maps[...,1] * r2_sc
-    phi = mean_maps[...,0] * fm_sc
-    r2s_unc = var_maps[...,1] * (r2_sc**2)
-    phi_unc = var_maps[...,0] * (fm_sc**2)
+    phi_samp = phi_tfp.sample() * fm_sc
+    phi_mean = phi_tfp.mean() * fm_sc
+    phi_var = phi_tfp.variance() * (fm_sc**2)
 
-    r2s_rav = tf.reshape(tf.complex(r2s,0.0),[n_batch,-1])
-    r2s_rav = tf.expand_dims(r2s_rav,1) # (nb,1,nv)
-    r2s_unc_rav = tf.reshape(tf.complex(r2s_unc,0.0),[n_batch,-1])
-    r2s_unc_rav = tf.expand_dims(r2s_unc_rav,1) # (nb,1,nv)
+    r2s_samp = r2s_tfp.sample() * r2_sc
+    r2s_mean = r2s_tfp.mean() * r2_sc
+    r2s_var = r2s_tfp.variance() * (r2_sc**2)
 
-    phi_rav = tf.reshape(tf.complex(phi,0.0),[n_batch,-1])
-    phi_rav = tf.expand_dims(phi_rav,1) # (nb,1,nv)
-    phi_unc_rav = tf.reshape(tf.complex(phi_unc,0.0),[n_batch,-1])
-    phi_unc_rav = tf.expand_dims(phi_unc_rav,1) # (nb,1,nv)
+    # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
+    xi = tf.complex(phi_mean,r2s_mean/(2*np.pi))
+    xi_rav = tf.reshape(xi,[n_batch,-1])
+    xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
+
+    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
+
+    r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_mean,[n_batch,-1]),1) # (nb,1,nv)
+    r2s_sigma_rav = tf.expand_dims(tf.reshape(r2s_var,[n_batch,-1]),1) # (nb,1,nv)
+    phi_sigma_rav = tf.expand_dims(tf.reshape(phi_var,[n_batch,-1]),1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wm_var_phi = tf.math.exp(tf.linalg.matmul(-(2*np.pi * te_real)**2, phi_unc_rav)) # (nb,ne,nv)
-    Wm_var = (1 - Wm_var_phi)
+    Wm_var = 1 - tf.math.exp(tf.linalg.matmul(-(2*np.pi * te)**2, phi_sigma_rav)) # (nb,ne,nv) NEG
     if not(rem_R2):
-        r2s_var_aux = tf.linalg.matmul(te_real**2, r2s_unc_rav) # (nb,ne,nv)
-        Wm_unc_r2s = tf.math.exp(tf.linalg.matmul(2*te_real, r2s_rav) + r2s_var_aux) # (nb,ne,nv)
-        Wm_var_r2s = tf.math.exp(r2s_var_aux)
-        Wm_var *= (1 - Wm_var_r2s) * Wm_unc_r2s
+        r2s_var_aux = tf.math.exp(tf.linalg.matmul(te, r2s_mu_rav))
+        r2s_var_aux *= tf.linalg.matmul(te**2, r2s_sigma_rav)
+        Wm_var += r2s_var_aux # (nb,ne,nv) NEG
 
     # Matrix operations (variance)
-    WmZS = Wm_var * (Smtx * tf.math.conj(Smtx))
-    MWmZS = tf.linalg.matmul(M_pinv * tf.math.conj(M_pinv),WmZS)
+    WpP0Wm = Wp * tf.linalg.matmul(P0, Wm) # (nb,ne,nv)
+    s_var = tf.reduce_mean(tf.abs(tf.math.conj(WpP0Wm) * WpP0Wm),axis=1,keepdims=True) # (nb,1,nv)
+    y_Sigma = Wm_var * s_var 
+    y_Sigma += Wm_var * tf.reduce_sum(tf.abs(tf.math.conj(Smtx) * Smtx),axis=1,keepdims=True)
+    y_Sigma += tf.abs(tf.math.conj(Wm) * Wm) * s_var
+    y_Sigma_inv = tf.math.divide_no_nan(tf.ones_like(y_Sigma),y_Sigma) # (nb,ne,nv)
+    y_Sigma_inv = tf.linalg.diag(tf.transpose(y_Sigma_inv,perm=[2,0,1])) # (nv,nb,ne,ne)
+    SigM = tf.linalg.matmul(tf.complex(y_Sigma_inv,0.0),M) # (nv,nb,ne,ns)
+    MTSigM = tf.linalg.matmul(tf.transpose(M, perm=[0,2,1], conjugate=True),SigM) # (nv,nb,ns,ns)
+    rho_cov = tf.linalg.inv(MTSigM)
+    rho_var = tf.transpose(tf.linalg.diag_part(rho_cov),perm=[1,2,0]) # (nb,ns,nv)
+
+    xi_samp = tf.complex(phi_samp,r2s_samp/(2*np.pi))
+    xi_samp_rav = tf.reshape(xi_samp,[n_batch,-1])
+    xi_samp_rav = tf.expand_dims(xi_samp_rav,1) # (nb,1,nv)
+    Wm_samp = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_samp_rav)) # shape = (nb,ne,nv)
+    y_samp = tf.transpose(Wm_samp * Smtx, perm=[2,0,1]) # shape = (nv,nb,ne)
+    SigY = tf.linalg.matmul(tf.complex(y_Sigma_inv,0.0),tf.expand_dims(y_samp,axis=-1)) # shape = (nv,nb,ne,1)
+    MTSigY = tf.linalg.matmul(tf.transpose(M, perm=[0,2,1], conjugate=True),SigY) # shape = (nv,nb,ns,1)
+    rho_hat = tf.linalg.matmul(rho_cov,MTSigY) # shape = (nv,nb,ns,1)
+    rho_hat = tf.reshape(tf.transpose(rho_hat,perm=[1,2,0,3]), [n_batch,ns,hgt,wdt,1]) / rho_sc
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
-    if MEBCRN:
-        rho_var = tf.reshape(MWmZS,[n_batch,ns,hgt,wdt,1]) / rho_sc
-        Re_rho_var = tf.math.real(rho_var)
-        Im_rho_var = tf.math.imag(rho_var)
-        res_rho_var = tf.concat([Re_rho_var,Im_rho_var],axis=-1)
-    else:
-        rho_var = tf.reshape(tf.transpose(MWmZS, perm=[0,2,1]),[n_batch,hgt,wdt,ns]) / rho_sc
-        Re_rho_var = tf.math.real(rho_var)
-        Im_rho_var = tf.math.imag(rho_var)
-        zero_fill = tf.zeros_like(Re_rho_var)
-        re_stack_var = tf.stack([Re_rho_var,zero_fill],4)
-        re_aux_var = tf.reshape(re_stack_var,[n_batch,hgt,wdt,2*ns])
-        im_stack_var = tf.stack([zero_fill,Im_rho_var],4)
-        im_aux_var = tf.reshape(im_stack_var,[n_batch,hgt,wdt,2*ns])
-        res_rho_var = re_aux_var + im_aux_var
-
-    return res_rho_var
+    Re_rho = tf.math.real(rho_hat)
+    Im_rho = tf.math.imag(rho_hat)
+    res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
+    res_rho_var = tf.reshape(tf.abs(rho_var),[n_batch,ns,hgt,wdt,1]) / (rho_sc**2)
+    return res_rho, res_rho_var
 
 
 #@tf.function
@@ -579,7 +580,7 @@ def acq_uncertainty(mean_maps, var_maps, ne=6, te=None, rem_R2=False, only_mag=F
     phi_sigma_rav = tf.expand_dims(tf.reshape(phi_sigma,[n_batch,-1]),1) # (nb,1,nv)
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wp_var = tf.linalg.matmul((2*np.pi * te)**2, phi_sigma_rav**2) # (nb,ne,nv) NEG
+    Wp_var = 1 - tf.math.exp(tf.linalg.matmul(-(2*np.pi * te)**2, phi_sigma_rav**2)) # (nb,ne,nv) NEG
     if not(rem_R2):
         r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu_rav))
         r2s_var_aux *= tf.linalg.matmul(te**2, r2s_sigma_rav**2)
