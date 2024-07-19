@@ -24,6 +24,7 @@ py.arg('--rand_ne', type=bool, default=False)
 py.arg('--out_vars', default='FM', choices=['R2s','FM','PM'])
 py.arg('--UQ', type=bool, default=False)
 py.arg('--UQ_R2s', type=bool, default=False)
+py.arg('--UQ_calib', type=bool, default=False)
 py.arg('--ME_layer', type=bool, default=True)
 py.arg('--k_fold', type=int, default=1)
 py.arg('--n_G_filters', type=int, default=32)
@@ -89,11 +90,17 @@ trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
 trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
 k_divs = [0,832,1694,2547,3409,len(trainX)]
 
-valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
-valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
-
-trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
-trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+if args.UQ_calib:
+    calib_divs = [404,1236,2100,2952,3814]
+    valX = trainX[calib_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+    valY = trainY[calib_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+    trainX = trainX[k_divs[args.k_fold-1]:calib_divs[args.k_fold-1],:,:,:,:]
+    trainY = trainY[k_divs[args.k_fold-1]:calib_divs[args.k_fold-1],:,:,:,:]
+else:
+    valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+    valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+    trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+    trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
@@ -131,6 +138,9 @@ if args.out_vars == 'R2s' or args.out_vars == 'PM':
                     output_activation='sigmoid',
                     output_initializer='he_uniform',
                     self_attention=args.D2_SelfAttention)
+    G_calib = tf.keras.Sequential()
+    G_calib.add(tf.keras.layers.Conv2D(1,1,use_bias=False,kernel_initializer='ones'))
+    G_calib.build((None, 1, hgt, wdt, 1))
 
 cycle_loss_fn = tf.losses.MeanSquaredError()
 uncertain_loss = gan.VarMeanSquaredError()
@@ -225,7 +235,7 @@ def train_G_R2(A, B):
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
-        A2B_R2 = G_A2R2(A_abs, training=True)
+        A2B_R2 = G_A2R2(A_abs, training=not(args.UQ_calib))
         if args.UQ_R2s:
             A2B_R2_nu = A2B_R2.mean()
             A2B_R2_sigma = A2B_R2.stddev() 
@@ -254,6 +264,8 @@ def train_G_R2(A, B):
             if args.UQ_R2s:
                 A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
                 A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
+                if args.UQ_calib:
+                    A2B_R2_sigma = G_calib(A2B_R2_sigma, training=True)
             A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
             A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
@@ -278,8 +290,12 @@ def train_G_R2(A, B):
         
         G_loss = A2B2A_cycle_loss + reg_term
         
-    G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
-    G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
+    if args.UQ_calib:
+        G_grad = t.gradient(G_loss, G_calib.trainable_variables)
+        G_R2_optimizer.apply_gradients(zip(G_grad, G_calib.trainable_variables))
+    else:
+        G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
+        G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
             'WF_loss': WF_abs_loss,
@@ -355,6 +371,8 @@ def sample(A, B):
         if args.UQ_R2s:
             A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
             A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
+            if args.UQ_calib:
+                A2B_R2_sigma = G_calib(A2B_R2_sigma, training=False)
         else:
             A2B_R2_nu = tf.zeros_like(A2B_FM_var)
             A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
@@ -418,13 +436,14 @@ checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
 if not(args.out_vars == 'FM'):
     checkpoint_2=tl.Checkpoint(dict(G_A2B=G_A2B,
                                     G_A2R2=G_A2R2,
+                                    G_calib=G_calib,
                                     G_optimizer=G_optimizer,
                                     G_R2_optimizer=G_R2_optimizer,
                                     ep_cnt=ep_cnt),
                                py.join(output_dir, 'checkpoints'),
                                max_to_keep=5)
 try:  # restore checkpoint including the epoch counter
-    if args.out_vars == 'PM' or (args.out_vars=='R2s' and args.UQ_R2s):
+    if args.out_vars == 'PM' or (args.out_vars=='R2s' and args.UQ_calib):
         checkpoint_2.restore().assert_existing_objects_matched()
     else:
         checkpoint.restore().assert_existing_objects_matched()
