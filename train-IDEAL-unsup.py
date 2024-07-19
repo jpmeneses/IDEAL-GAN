@@ -150,6 +150,7 @@ G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_s
 G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 if not(args.out_vars == 'FM'):
     G_R2_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+    G_calib_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
 # ==============================================================================
 # =                                 train step                                 =
@@ -292,7 +293,7 @@ def train_G_R2(A, B):
         
     if args.UQ_calib:
         G_grad = t.gradient(G_loss, G_calib.trainable_variables)
-        G_R2_optimizer.apply_gradients(zip(G_grad, G_calib.trainable_variables))
+        G_calib_optimizer.apply_gradients(zip(G_grad, G_calib.trainable_variables))
     else:
         G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
         G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
@@ -506,7 +507,9 @@ for ep in range(args.epochs):
 
         G_loss_dict, G_R2_loss_dict = train_step(A, B)
 
-        if args.out_vars == 'R2s':
+        if args.UQ_calib:
+            opt_aux = G_calib_optimizer.iterations
+        elif args.out_vars == 'R2s':
             opt_aux = G_R2_optimizer.iterations
         else:
             opt_aux = G_optimizer.iterations
@@ -615,7 +618,7 @@ for ep in range(args.epochs):
                                             interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(FM_var_ok, ax=axs[1,5])
                     axs[1,5].axis('off')
-                    ech1_var_aux = np.squeeze(A2B2A_var[:,0,:,:,0])
+                    ech1_var_aux = np.squeeze(A2B2A_var[:,-1,:,:,0])
                     ech1_var_ok= axs[2,5].imshow(ech1_var_aux, cmap='gnuplot2',
                                             interpolation='none', vmin=0, vmax=0.005)
                     fig.colorbar(ech1_var_ok, ax=axs[2,5])
