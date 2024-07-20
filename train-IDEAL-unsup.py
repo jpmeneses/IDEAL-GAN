@@ -237,11 +237,12 @@ def train_G_R2(A, B):
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
         A2B_R2 = G_A2R2(A_abs, training=not(args.UQ_calib))
-        if args.UQ_calib:
-            A2B_R2_sigma = G_calib(A2B_R2.stddev(),training=True)
-        elif args.UQ_R2s:
+        if args.UQ_R2s:
             A2B_R2_nu = A2B_R2.mean()
-            A2B_R2_sigma = A2B_R2.stddev() 
+            if args.UQ_calib:
+                A2B_R2_sigma = G_calib(A2B_R2.stddev(),training=True)
+            else:
+                A2B_R2_sigma = A2B_R2.stddev() 
         else:
             A2B_R2_nu = tf.zeros_like(A2B_R2)
             A2B_R2_sigma = tf.zeros_like(A2B_R2)
