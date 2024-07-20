@@ -150,7 +150,7 @@ G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_s
 G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 if not(args.out_vars == 'FM'):
     G_R2_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
-    G_calib_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+    G_calib_optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr)
 
 # ==============================================================================
 # =                                 train step                                 =
@@ -237,7 +237,9 @@ def train_G_R2(A, B):
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
         A2B_R2 = G_A2R2(A_abs, training=not(args.UQ_calib))
-        if args.UQ_R2s:
+        if args.UQ_calib:
+            A2B_R2_sigma = G_calib(A2B_R2.stddev(),training=True)
+        elif args.UQ_R2s:
             A2B_R2_nu = A2B_R2.mean()
             A2B_R2_sigma = A2B_R2.stddev() 
         else:
@@ -265,8 +267,6 @@ def train_G_R2(A, B):
             if args.UQ_R2s:
                 A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
                 A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
-                if args.UQ_calib:
-                    A2B_R2_sigma = G_calib(A2B_R2_sigma, training=True)
             A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
             A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
@@ -354,7 +354,10 @@ def sample(A, B):
         A2B_R2 = G_A2R2(A_abs, training=False)
         if args.UQ_R2s:
             A2B_R2_nu = A2B_R2.mean()
-            A2B_R2_sigma = A2B_R2.stddev()
+            if args.UQ_calib:
+                A2B_R2_sigma = G_calib(A2B_R2.stddev(), training=False)
+            else:
+                A2B_R2_sigma = A2B_R2.stddev()
         
         A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
         A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
@@ -372,8 +375,6 @@ def sample(A, B):
         if args.UQ_R2s:
             A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
             A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
-            if args.UQ_calib:
-                A2B_R2_sigma = G_calib(A2B_R2_sigma, training=False)
         else:
             A2B_R2_nu = tf.zeros_like(A2B_FM_var)
             A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
