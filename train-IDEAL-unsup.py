@@ -139,7 +139,7 @@ if args.out_vars == 'R2s' or args.out_vars == 'PM':
                     output_initializer='he_uniform',
                     self_attention=args.D2_SelfAttention)
     G_calib = tf.keras.Sequential()
-    G_calib.add(tf.keras.layers.Conv2D(1,1,use_bias=False,kernel_constraint=tf.keras.constraints.NonNeg()))
+    G_calib.add(tf.keras.layers.Conv2D(1,1,use_bias=False,kernel_initializer='ones',kernel_constraint=tf.keras.constraints.NonNeg()))
     G_calib.build((None, 1, hgt, wdt, 1))
 
 cycle_loss_fn = tf.losses.MeanSquaredError()
