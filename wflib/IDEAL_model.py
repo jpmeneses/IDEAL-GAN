@@ -491,16 +491,13 @@ def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # (nb,ne,nv)
 
-    phi_samp = phi_tfp.sample() * fm_sc
     phi_mean = phi_tfp.mean() * fm_sc
     phi_var = phi_tfp.variance() * (fm_sc**2)
 
     if rem_R2:
-        r2s_samp = tf.zeros_like(phi_samp)
         r2s_mean = tf.zeros_like(phi_mean)
         r2s_var = tf.zeros_like(phi_var)
     else:
-        r2s_samp = r2s_tfp.sample() * r2_sc
         r2s_mean = r2s_tfp.mean() * r2_sc
         r2s_var = r2s_tfp.variance() * (r2_sc**2)
 
@@ -536,11 +533,7 @@ def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
     rho_cov = tf.linalg.inv(MTSigM)
     rho_var = tf.transpose(tf.linalg.diag_part(rho_cov),perm=[1,2,0]) # (nb,ns,nv)
 
-    xi_samp = tf.complex(phi_samp,r2s_samp/(2*np.pi))
-    xi_samp_rav = tf.reshape(xi_samp,[n_batch,-1])
-    xi_samp_rav = tf.expand_dims(xi_samp_rav,1) # (nb,1,nv)
-    Wm_samp = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_samp_rav)) # shape = (nb,ne,nv)
-    y_samp = tf.transpose(Wm_samp * Smtx, perm=[2,0,1]) # shape = (nv,nb,ne)
+    y_samp = tf.transpose(Wm * Smtx, perm=[2,0,1]) # shape = (nv,nb,ne)
     SigY = tf.linalg.matmul(tf.complex(y_Sigma_inv,0.0),tf.expand_dims(y_samp,axis=-1)) # shape = (nv,nb,ne,1)
     MTSigY = tf.linalg.matmul(tf.transpose(M, perm=[0,2,1], conjugate=True),SigY) # shape = (nv,nb,ns,1)
     rho_hat = tf.linalg.matmul(rho_cov,MTSigY) # shape = (nv,nb,ns,1)
