@@ -309,7 +309,7 @@ def sample(A, B, TE=None):
             A2B_FM_var = A2B_FM.stddev()
         else:
             A2B_FM_var = tf.zeros_like(A2B_FM)
-        A2B_PM = tf.concat([A2B_R2.mean(),A2B_FM.mean()], axis=-1)
+        A2B_PM = tf.concat([A2B_FM.mean(),A2B_R2.mean()], axis=-1)
 
         # Variance map mask
         if args.UQ:
@@ -430,12 +430,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
             fig.delaxes(axs[2,0]) # No PDFF variance map
 
             W_uq = axs[2,1].matshow(W_var, cmap='gnuplot2',
-                                    norm=LogNorm(vmin=1e-6,vmax=1e-2))
+                                    norm=LogNorm(vmin=1e-2,vmax=1e0))
             fig.colorbar(W_uq, ax=axs[2,1])
             axs[2,1].axis('off')
 
             F_uq = axs[2,2].matshow(F_var, cmap='gnuplot2',
-                                    norm=LogNorm(vmin=1e-6,vmax=1e-2))
+                                    norm=LogNorm(vmin=1e-2,vmax=1e0))
             fig.colorbar(F_uq, ax=axs[2,2])
             axs[2,2].axis('off')
 
@@ -443,12 +443,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
                 fig.delaxes(axs[2,3]) # No R2s variance map
             else:
                 r2s_uq=axs[2,3].matshow(r2s_var, cmap='gnuplot',
-                                        norm=LogNorm(vmin=.1,vmax=10))
+                                        norm=LogNorm(vmin=1e0,vmax=1e3))
                 fig.colorbar(r2s_uq, ax=axs[2,3])
                 axs[2,3].axis('off')
 
             field_uq = axs[2,4].matshow(field_var, cmap='gnuplot2',
-                                        norm=LogNorm(vmin=.1,vmax=100))
+                                        norm=LogNorm(vmin=1e-2,vmax=1e1))
             fig.colorbar(field_uq, ax=axs[2,4])
             axs[2,4].axis('off')
         else:
