@@ -33,6 +33,10 @@ if not(hasattr(args,'UQ')):
     UQ_args = py.args()
     args.__dict__.update(UQ_args.__dict__)
 
+if not(hasattr(args,'n_echoes')):
+    py.arg('--n_echoes', type=int, default=6)
+    NE_args = py.args()
+    args.__dict__.update(NE_args.__dict__)
 
 # ==============================================================================
 # =                                   excel                                    =
