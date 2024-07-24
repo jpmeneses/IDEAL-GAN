@@ -14,7 +14,7 @@ import data
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../../OneDrive - Universidad Católica de Chile/Documents/datasets/'
+dataset_dir = '../datasets/'
 dataset_hdf5 = 'JGalgani_GC_384_complex_2D.hdf5'
 acqs, out_maps = data.load_hdf5(dataset_dir, dataset_hdf5, 12, end=87, MEBCRN=True)
 acqs = acqs[:,:,::8,::8,:]
@@ -27,6 +27,7 @@ out_maps = out_maps[:,:,::8,::8,:]
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(acqs)
 _,n_out,_,_,_ = np.shape(out_maps)
+r2_sc = 200.0
 fm_sc = 300.0
 
 print('Dataset size:', len_dataset)
@@ -37,45 +38,22 @@ bs = 4
 A_B_dataset = tf.data.Dataset.from_tensor_slices((acqs,out_maps))
 A_B_dataset = A_B_dataset.batch(bs).shuffle(len_dataset)
 
-enc= dl.encoder(input_shape=(6,hgt,wdt,n_ch),
-                encoded_dims=64,
+G_A2B = dl.UNet(input_shape=(None,None,None,n_ch),
+                bayesian=True,
+                ME_layer=True,
+                filters=36,
+                self_attention=True)
+G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
+                bayesian=True,
+                ME_layer=True,
                 filters=12,
-                ls_reg_weight=1e-5,
-                NL_self_attention=False)
-dec_w  = dl.decoder(encoded_dims=64,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=12,
-                    NL_self_attention=False)
-dec_f  = dl.decoder(encoded_dims=64,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=12,
-                    NL_self_attention=False)
-dec_xi = dl.decoder(encoded_dims=64,
-                    output_shape=(hgt,wdt,n_ch),
-                    filters=12,
-                    NL_self_attention=False)
+                output_activation='sigmoid',
+                output_initializer='he_uniform',
+                self_attention=False)
 
 
-D_A = dl.PatchGAN(input_shape=(hgt,wdt,2), dim=12, self_attention=False)
-# D_Z = dl.CriticZ((hgt//(2**(4)),wdt//(2**(4)),64)) # //(2**(4))
-
-# vgg = keras.applications.vgg19.VGG19()
-# metric_vgg = keras.Model(inputs=vgg.inputs, outputs=vgg.layers[3].output)
-
-# metric_model = keras.Sequential()
-# metric_model.add(keras.layers.Lambda(lambda x: tf.concat([x,tf.zeros_like(x[:,:,:,:1])],axis=-1)))
-# metric_model.add(keras.layers.ZeroPadding2D(padding=(88,88)))
-# metric_model.add(metric_vgg)
-# b = metric_model(tf.random.normal((1,hgt,wdt,3),dtype=tf.float32))
-
-IDEAL_op = wf.IDEAL_Layer()
-LWF_op = wf.LWF_Layer(ne,MEBCRN=True)
-F_op = dl.FourierLayer()
-Cov_op = dl.CoVar()
-
-d_loss_fn, g_loss_fn = gan.get_adversarial_losses_fn('wgan')
 cycle_loss_fn = tf.losses.MeanSquaredError()
-cosine_loss = tf.losses.CosineSimilarity()
+uncertain_loss = gan.VarMeanSquaredError()
 
 G_optimizer = keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5, beta_2=0.9)
 D_optimizer = keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5, beta_2=0.9)
@@ -83,60 +61,45 @@ D_optimizer = keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5, beta_2=0.9)
 A2B2A_pool = data.ItemPool(10)
 
 @tf.function
-def train_G(A, B):
-    te = wf.gen_TEvar(ne,orig=True)
-    with tf.GradientTape(persistent=True) as t:
+def train_G(A):
+    # te = wf.gen_TEvar(ne,orig=True)
+    with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        A2Z = enc(A, training=True)
-        A2Z_cov = Cov_op(A2Z)
-        A2Z2B_w = dec_w(A2Z, training=True)
-        A2Z2B_f = dec_f(A2Z, training=True)
-        A2Z2B_xi= dec_xi(A2Z, training=True)
-        A2B = tf.concat([A2Z2B_w,A2Z2B_f,A2Z2B_xi],axis=1)
-        A2B2A = IDEAL_op(A2B, te, training=False)
+        A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
 
-        # A2B_L = tf.concat([A2Z2B_w,A2Z2B_f],axis=1)
-        # A2B2A_L = LWF_op(A2B_L)
+        # Compute R2s map from only-mag images
+        A2B_R2, A2B_R2_nu, A2B_R2_sigma = G_A2R2(A_abs, training=True) # Randomly sampled R2s
+        A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
-        ##################### B Cycle #####################
-        # B2A = IDEAL_op(B, training=False)
-        # B2A2B = G_A2B(B2A, training=True)
+        # Compute FM using complex-valued images and pre-trained model
+        A2B_FM, _, A2B_FM_var = G_A2B(A, training=False) # Mean FM
+        A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
+        A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
-        ############## Discriminative Losses ##############
-        # A2B2A_d_logits = D_A(A2B2A_L, training=False)
-        # A2B2A_g_loss = g_loss_fn(A2B2A_d_logits)
-        A2B2A_g_loss = tf.constant(0.0,dtype=tf.float32)
-
-        ############# Fourier Regularization ##############
-        A_f = F_op(A, training=False)
-        A2B2A_f = F_op(A2B2A, training=False)
+        # Magnitude of water/fat images
+        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+        A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
+        A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
+        A2B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=True))
+        
+        # Variance map mask and attach to recon-A
+        A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
+        A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
+        A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
+        A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
+        A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], only_mag=True)
+        A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
-        # A2Y = tf.reshape(Aa,[A.shape[0]*ne,hgt,wdt,n_ch])
-        # A2Y_m = metric_model(A2Y, training=False)
+        # CHECK
+        A2B2A_cycle_loss = uncertain_loss(A_abs, A2B2A_sampled_var)
         
-        # A2B2A2Y = tf.reshape(A2B2A,[A2B2A.shape[0]*ne,hgt,wdt,n_ch])
-        # A2B2A2Y_m = metric_model(A2B2A2Y, training=False)
+        G_loss = A2B2A_cycle_loss
         
-        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
-        B2A2B_cycle_loss = cycle_loss_fn(B, A2B)
-        A2B2A_f_cycle_loss = cycle_loss_fn(A_f, A2B2A_f)
-        A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
+    G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
 
-        ################ Regularizers #####################
-        activ_reg = tf.add_n(enc.losses)
-        
-        G_loss = A2B2A_g_loss + (A2B2A_cycle_loss + B2A2B_cycle_loss)*1e1 + activ_reg + A2B2A_f_cycle_loss*1e-3
-        G_loss += A2Z_cov_loss*1e-3
-        
-    G_grad = t.gradient(G_loss, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables)
-    G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_w.trainable_variables + dec_f.trainable_variables + dec_xi.trainable_variables))
-
-    return A2B,A2B2A,{'A2B2A_g_loss': A2B2A_g_loss,
-                        'A2B2A_cycle_loss': A2B2A_cycle_loss,
-                        'B2A2B_cycle_loss': B2A2B_cycle_loss,
-                        'A2B2A_f_cycle_loss': A2B2A_f_cycle_loss,
-                        'LS_reg': activ_reg}
+    return A2B,A2B2A,{'A2B2A_cycle_loss': A2B2A_cycle_loss,}
 
 
 @tf.function
@@ -160,23 +123,25 @@ def train_D(A, A2B2A):
             'A2B2A_d_loss': A2B2A_d_loss,}
 
 
-def train_step(A, B):
-    A2B, A2B2A, G_loss_dict = train_G(A, B)
+def train_step(A):
+    A2B, A2B2A, G_loss_dict = train_G(A)
 
-    # cannot autograph `A2B_pool`
-    A2B2A = A2B2A_pool(A2B2A)
-    if False: #ep >= 0:
-        for _ in range(0):
-            D_loss_dict = train_D(A, A2B2A)
-    else:
-        D_aux_val = tf.constant(0.0,dtype=tf.float32)
-        D_loss_dict = {'D_loss': D_aux_val, 'A_d_loss': D_aux_val, 'A2B2A_d_loss': D_aux_val}
-
-    return A2B, A2B2A, G_loss_dict, D_loss_dict
+    return A2B, A2B2A, G_loss_dict
 
 
 # epoch counter
 ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
+
+# checkpoint
+checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
+                                G_optimizer=G_optimizer,
+                                ep_cnt=ep_cnt),
+                           py.join('output', 'Unsup-108', 'checkpoints'),
+                           max_to_keep=5)
+try:  # restore checkpoint including the epoch counter
+    checkpoint.restore().assert_existing_objects_matched()
+except Exception as e:
+    print(e)
 
 # summary
 train_summary_writer = tf.summary.create_file_writer(py.join('output','test-grad','summaries'))
@@ -188,17 +153,19 @@ n_div = len_dataset
 A_prev = None
 for ep in range(20):
     for A, B in tqdm.tqdm(A_B_dataset, desc='Ep. '+str(ep+1), total=len_dataset//bs):
+        # A = tf.expand_dims(A,axis=0)
+        # B = tf.expand_dims(B,axis=0)
+        
         # ==============================================================================
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        A2B, A2B2A, G_loss_dict, D_loss_dict = train_step(A, B)
+        A2B, A2B2A, G_loss_dict = train_step(A)
         A2B2A = tf.reshape(A,[-1,hgt,wdt,n_ch])
         
         # summary
         with train_summary_writer.as_default():
             tl.summary(G_loss_dict, step=G_optimizer.iterations, name='G_losses')
-            tl.summary(D_loss_dict, step=G_optimizer.iterations, name='D_losses')
 
         # sample
         if (G_optimizer.iterations.numpy()+10) % n_div == 0:
@@ -251,9 +218,9 @@ for ep in range(20):
             fig.colorbar(F_ok, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_aux = np.squeeze(A2B[0,2,:,:,1])*2*np.pi
-            r2_ok = axs[1,3].imshow(r2_aux*fm_sc, cmap='twilight',
-                                    interpolation='none', vmin=-fm_sc, vmax=fm_sc)
+            r2_aux = np.squeeze(A2B[0,2,:,:,1])
+            r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[1,3])
             axs[1,3].axis('off')
 
@@ -278,9 +245,9 @@ for ep in range(20):
             fig.colorbar(F_unet, ax=axs[2,2])
             axs[2,2].axis('off')
 
-            r2n_aux = np.squeeze(B[0,2,:,:,1])*2*np.pi
-            r2_unet = axs[2,3].imshow(r2n_aux*fm_sc, cmap='twilight',
-                                 interpolation='none', vmin=-fm_sc, vmax=fm_sc)
+            r2n_aux = np.squeeze(B[0,2,:,:,1])
+            r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
+                                 interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_unet, ax=axs[2,3])
             axs[2,3].axis('off')
 
