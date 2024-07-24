@@ -322,7 +322,7 @@ def sample(A, B, TE=None):
             A2B_WF = wf.get_rho(A,A2B_PM)
             A2B_var = None
 
-        A2B = tf.concat([A2B_WF,A2B_R2,A2B_FM], axis=1)
+        A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B = tf.where(A[:,:3,:,:,:]!=0,A2B,0.0)
 
     return A2B, A2B_var
