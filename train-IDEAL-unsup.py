@@ -442,6 +442,7 @@ if not(args.out_vars == 'FM'):
                                     G_calib=G_calib,
                                     G_optimizer=G_optimizer,
                                     G_R2_optimizer=G_R2_optimizer,
+                                    G_calib_optimizer=G_calib_optimizer,
                                     ep_cnt=ep_cnt),
                                py.join(output_dir, 'checkpoints'),
                                max_to_keep=5)
