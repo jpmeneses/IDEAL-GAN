@@ -38,6 +38,11 @@ if not(hasattr(args,'n_echoes')):
     NE_args = py.args()
     args.__dict__.update(NE_args.__dict__)
 
+if not(hasattr(args,'G_model')):
+    py.arg('--G_model', default='U-Net', choices=['multi-decod','U-Net','MEBCRN'])
+    GM_args = py.args()
+    args.__dict__.update(GM_args.__dict__)
+
 # ==============================================================================
 # =                                   excel                                    =
 # ==============================================================================
