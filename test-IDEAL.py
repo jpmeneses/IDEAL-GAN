@@ -26,6 +26,13 @@ test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
 
+if not(hasattr(args,'UQ')):
+    py.arg('--UQ', type=bool, default=False)
+    py.arg('--UQ_R2s', type=bool, default=False)
+    py.arg('--UQ_calib', type=bool, default=False)
+    UQ_args = py.args()
+    args.__dict__.update(UQ_args.__dict__)
+
 
 # ==============================================================================
 # =                                   excel                                    =
@@ -71,46 +78,40 @@ dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
 
 if args.k_fold == 1:
     acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, ech_idx,
-                                acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                start=404, acqs_data=True, te_data=False, MEBCRN=True)
     acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                end=320, acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                end=320, acqs_data=True, te_data=False, MEBCRN=True)
+    acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                end=320, acqs_data=True, te_data=False, MEBCRN=True)
     testX = np.concatenate((acqs_1,acqs_2),axis=0) # acqs_1[:,:,::8,::8,:]
     testY = np.concatenate((out_maps_1,out_maps_2),axis=0) # out_maps_1[:,:,::8,::8,:]
 
+#CALIB EDIT for the other k-folds
 elif args.k_fold == 2:
     acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                start=320, acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                start=320, acqs_data=True, te_data=False, MEBCRN=True)
     acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                                end=798, acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                end=798, acqs_data=True, te_data=False, MEBCRN=True)
     testX = np.concatenate((acqs_2,acqs_3),axis=0)
     testY = np.concatenate((out_maps_2,out_maps_3),axis=0)
 
 elif args.k_fold == 3:
     acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                                start=798, acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                start=798, acqs_data=True, te_data=False, MEBCRN=True)
     acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                                end=310, acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                end=310, acqs_data=True, te_data=False, MEBCRN=True)
     testX = np.concatenate((acqs_3,acqs_4),axis=0)
     testY = np.concatenate((out_maps_3,out_maps_4),axis=0)
 
 elif args.k_fold == 4:
     testX, testY = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                                start=310, end=1172, acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                start=310, end=1172, acqs_data=True, te_data=False, MEBCRN=True)
 
 elif args.k_fold == 5:
     acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                                start=1172, acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                start=1172, acqs_data=True, te_data=False, MEBCRN=True)
     acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5, ech_idx,
-                                acqs_data=True, te_data=False, MEBCRN=True,
-                                complex_data=(args.G_model=='complex'))
+                                acqs_data=True, te_data=False, MEBCRN=True)
     testX = np.concatenate((acqs_4,acqs_5),axis=0)
     testY = np.concatenate((out_maps_4,out_maps_5),axis=0)
 
@@ -134,7 +135,6 @@ print('Testing output shape:',testY.shape)
 A_B_dataset_test = tf.data.Dataset.from_tensor_slices((testX,testY))
 A_B_dataset_test.batch(1)
 
-# model
 # model
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     if args.out_vars == 'WF-PM':
@@ -171,12 +171,16 @@ elif args.G_model == 'U-Net':
                     self_attention=args.D1_SelfAttention)
     if args.out_vars == 'R2s':
         G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
-                        bayesian=args.UQ,
+                        n_out=n_out,
+                        bayesian=args.UQ_R2s,
                         te_input=args.te_input,
                         te_shape=(args.n_echoes,),
                         filters=args.n_G_filters,
                         output_activation='sigmoid',
                         self_attention=args.D2_SelfAttention)
+        G_calib = tf.keras.Sequential()
+        G_calib.add(tf.keras.layers.Conv2D(1,1,use_bias=False,kernel_initializer='ones',kernel_constraint=tf.keras.constraints.NonNeg()))
+        G_calib.build((None, 1, hgt, wdt, 1))
 
 elif args.G_model == 'MEBCRN':
     if args.out_vars == 'WF-PM':
@@ -195,7 +199,7 @@ else:
 
 # restore
 if args.out_vars == 'R2s':
-    tl.Checkpoint(dict(G_A2B=G_A2B,G_A2R2=G_A2R2), py.join(args.experiment_dir, 'checkpoints')).restore()
+    tl.Checkpoint(dict(G_A2B=G_A2B,G_A2R2=G_A2R2,G_calib=G_calib), py.join(args.experiment_dir, 'checkpoints')).restore()
 else:
     tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
@@ -276,49 +280,41 @@ def sample(A, B, TE=None):
             A2B_var = None
 
     elif args.out_vars == 'R2s':
-        if not(args.G_model == 'complex'):
-            A_real = A[:,:,:,0::2]
-            A_imag = A[:,:,:,1::2]
-            A_abs = tf.abs(tf.complex(A_real,A_imag))
+        A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
         
         # Compute R2s maps using only-mag images
-        if args.UQ:
-            _, A2B_R2, A2B_R2_var = G_A2R2(A_abs, training=False) # Mean R2s
+        A2B_R2 = G_A2R2(A_abs, training=False) # Mean R2s
+        if args.UQ_R2s:
+            A2B_R2_nu = A2B_R2.mean()
+            if args.UQ_calib:
+                A2B_R2_sigma = G_calib(A2B_R2.stddev(), training=False)
+            else:
+                A2B_R2_sigma = A2B_R2.stddev()
         else:
-            A2B_R2 = G_A2R2(A_abs, training=False)
-            A2B_R2_var = None
-        A2B_R2 = tf.where(A[:,:,:,:1]!=0.0,A2B_R2,0.0)
+            A2B_R2_nu = tf.zeros_like(A2B_R2)
+            A2B_R2_sigma = tf.zeros_like(A2B_R2)
 
         # Compute FM from complex-valued images
+        A2B_FM = G_A2B(A, training=False)
         if args.UQ:
-            _, A2B_FM, A2B_var = G_A2B(A, training=False)
-            A2B_FM_var = tf.where(A[:,:,:,:1]!=0.0,A2B_var,0.0)
+            A2B_FM_var = A2B_FM.stddev()
         else:
-            A2B_FM = G_A2B(A, training=False)
-            A2B_FM_var = None
-        A2B_FM = tf.where(A[:,:,:,:1]!=0.0,A2B_FM,0.0)
-        A2B_PM = tf.concat([A2B_R2,A2B_FM], axis=-1)
-
-        # Magnitude of water/fat images
-        A2B_WF = wf.get_rho(A,A2B_PM,complex_data=(args.G_model=='complex'))
-        A2B_WF_real = A2B_WF[:,:,:,0::2]
-        A2B_WF_imag = A2B_WF[:,:,:,1::2]
-        A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
-
-        A2B = tf.concat([A2B_WF,A2B_R2,A2B_FM], axis=-1)
-        A2B_abs = tf.concat([A2B_WF_abs,A2B_R2,A2B_FM], axis=-1)
+            A2B_FM_var = tf.zeros_like(A2B_FM)
+        A2B_PM = tf.concat([A2B_R2.mean(),A2B_FM.mean()], axis=-1)
 
         # Variance map mask
         if args.UQ:
-            A2B_PM_var = tf.concat([A2B_R2_var,A2B_FM_var], axis=-1)
-            A2B_PM_var = tf.where(A2B_PM_var!=0.0,A2B_PM_var,1e-12)
-            A2B_PM_var = tf.where(A[:,:,:,:2]!=0.0,A2B_PM_var,1e-12)
-            A2B_WF_var = wf.PDFF_uncertainty(A,A2B,A2B_PM_var)
-            A2B_WF_var = tf.where(A2B_WF_var!=0.0,A2B_WF_var,1e-12)
-            A2B_WF_var = tf.where(A[:,:,:,:4]!=0.0,A2B_WF_var,1e-12)
-            A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=-1)
+            A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A, A2B_FM, A2B_R2, rem_R2=False)
+            A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)],axis=-1)
+            A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
+            A2B_var = tf.concat([A2B_WF_sigma,A2B_PM_var], axis=1)
+            A2B_var = tf.where(A[:,:3,:,:,:]!=0,A2B_var,1e-6)
         else:
+            A2B_WF = wf.get_rho(A,A2B_PM)
             A2B_var = None
+
+        A2B = tf.concat([A2B_WF,A2B_R2,A2B_FM], axis=1)
+        A2B = tf.where(A[:,:3,:,:,:]!=0,A2B,0.0)
 
     return A2B, A2B_var
 
