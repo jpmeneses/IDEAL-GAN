@@ -317,7 +317,7 @@ def sample(A, B, TE=None):
             A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)],axis=-1)
             A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
             A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=1)
-            A2B_var = tf.where(A[:,:3,:,:,:]!=0,A2B_var,1e-6)
+            A2B_var = tf.where(A[:,:3,:,:,:]!=0,A2B_var,1e-8)
         else:
             A2B_WF = wf.get_rho(A,A2B_PM)
             A2B_var = None
@@ -363,8 +363,8 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
 
     wn_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
     fn_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
-    r2n_aux = np.squeeze(B[:,2,:,:,1])
-    fieldn_aux = np.squeeze(B[:,2,:,:,0])
+    r2n_aux = np.squeeze(B[:,2,:,:,1]) * r2_sc
+    fieldn_aux = np.squeeze(B[:,2,:,:,0]) * fm_sc
     PDFFn_aux = fn_aux/(wn_aux+fn_aux)
     PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
     
