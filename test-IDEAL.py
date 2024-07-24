@@ -170,20 +170,20 @@ elif args.G_model == 'U-Net':
         n_out = 1
     else:
         n_out = 2
-    G_A2B = dl.UNet(input_shape=(ne,hgt,wdt,n_ch),
+    G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                     n_out=n_out,
                     bayesian=args.UQ,
                     ME_layer=args.ME_layer,
                     te_input=args.te_input,
-                    te_shape=(args.n_echoes,),
+                    te_shape=(None,),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
     if args.out_vars == 'R2s':
-        G_A2R2= dl.UNet(input_shape=(ne,hgt,wdt,1),
-                        n_out=n_out,
+        G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
                         bayesian=args.UQ_R2s,
+                        ME_layer=args.ME_layer,
                         te_input=args.te_input,
-                        te_shape=(args.n_echoes,),
+                        te_shape=(None,),
                         filters=args.n_G_filters,
                         output_activation='sigmoid',
                         self_attention=args.D2_SelfAttention)
