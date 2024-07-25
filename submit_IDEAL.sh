@@ -7,4 +7,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=jpmeneses@uc.cl
 
-python train-IDEAL-unsup.py --dataset Unsup-110 --rand_ne False --out_vars R2s --UQ True --UQ_R2s True --UQ_calib True --epochs 50 --epoch_ckpt 4 --lr 0.00001 --beta_1 0.5 --beta_2 0.9
+python train-IDEAL-unsup.py --dataset Unsup-110 --rand_ne False --out_vars R2s --UQ True --UQ_R2s True --UQ_calib True --batch_size 16 --epochs 50 --epoch_ckpt 4 --lr 0.00001 --beta_1 0.5 --beta_2 0.9
