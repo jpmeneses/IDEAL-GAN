@@ -422,7 +422,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     
     if i%args.n_plot == 0 or args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
         if args.UQ:
-            fig,axs=plt.subplots(figsize=(20, 10), nrows=2, ncols=3)
+            fig,axs=plt.subplots(figsize=(20, 10), nrows=3, ncols=5)
 
             # Ground-truth maps in the first row
             FF_ok = axs[0,0].imshow(PDFFn_aux, cmap='jet',
