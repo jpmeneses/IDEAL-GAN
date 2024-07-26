@@ -182,7 +182,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
 elif args.G_model == 'U-Net':
     if args.out_vars == 'WF-PM':
         n_out = 4
-    elif args.out_vars == 'FM' or args.out_vars == 'R2s'::
+    elif args.out_vars == 'FM' or args.out_vars == 'R2s':
         n_out = 1
     else:
         n_out = 2
