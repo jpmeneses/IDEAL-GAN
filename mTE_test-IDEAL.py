@@ -479,7 +479,11 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
             axs[1,4].axis('off')
 
             # Uncertainty maps in the 3rd row
-            fig.delaxes(axs[2,0]) # No PDFF variance map
+            # Plot PDFF absolute error instead of unavailable uncertainty
+            F_err = axs[2,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='gray',
+                              interpolation='none', vmin=0, vmax=.1)
+            fig.colorbar(F_err, ax=axs[2,0]).ax.tick_params(labelsize=14)
+            axs[2,0].axis('off')
 
             W_uq = axs[2,1].matshow(W_var, cmap='gnuplot2',
                                     norm=LogNorm(vmin=1e-2,vmax=1e0))
