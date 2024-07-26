@@ -10,6 +10,7 @@ import data
 import matplotlib.pyplot as plt
 import tqdm
 import xlsxwriter
+from matplotlib.colors import LogNorm
 
 # ==============================================================================
 # =                                   param                                    =
@@ -178,13 +179,26 @@ elif args.G_model == 'U-Net':
         n_out = 1
     else:
         n_out = 2
-    G_A2B = dl.UNet(input_shape=(hgt,wdt,ech_idx),
+    G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                     n_out=n_out,
                     bayesian=args.UQ,
+                    ME_layer=args.ME_layer,
                     te_input=args.te_input,
-                    te_shape=(args.n_echoes,),
+                    te_shape=(None,),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
+    if args.out_vars == 'R2s':
+        G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
+                        bayesian=args.UQ_R2s,
+                        ME_layer=args.ME_layer,
+                        te_input=args.te_input,
+                        te_shape=(None,),
+                        filters=args.n_G_filters,
+                        output_activation='sigmoid',
+                        self_attention=args.D2_SelfAttention)
+        G_calib = tf.keras.Sequential()
+        G_calib.add(tf.keras.layers.Conv2D(1,1,use_bias=False,kernel_initializer='ones',kernel_constraint=tf.keras.constraints.NonNeg()))
+        G_calib.build((None, 1, hgt, wdt, 1))
 
 elif args.G_model == 'MEBCRN':
     if args.out_vars == 'WFc':
@@ -309,6 +323,41 @@ def sample(A, B, TE=None):
     #     A2B_WF_imag = A2B_WF[:,:,:,1::2]
     #     A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
     #     A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
+    elif args.out_vars == 'R2s':
+        A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+        # Compute R2s maps using only-mag images
+        A2B_R2 = G_A2R2(A_abs, training=False) # Mean R2s
+        if args.UQ_R2s:
+            A2B_R2_nu = A2B_R2.mean()
+            if args.UQ_calib:
+                A2B_R2_sigma = G_calib(A2B_R2.stddev(), training=False)
+            else:
+                A2B_R2_sigma = A2B_R2.stddev()
+        else:
+            A2B_R2_nu = tf.zeros_like(A2B_R2)
+            A2B_R2_sigma = tf.zeros_like(A2B_R2)
+
+        # Compute FM from complex-valued images
+        A2B_FM = G_A2B(A, training=False)
+        if args.UQ:
+            A2B_FM_var = A2B_FM.stddev()
+        else:
+            A2B_FM_var = tf.zeros_like(A2B_FM)
+        A2B_PM = tf.concat([A2B_FM.mean(),A2B_R2.mean()], axis=-1)
+
+        # Variance map mask
+        if args.UQ:
+            A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A, A2B_FM, A2B_R2, te=TE, rem_R2=False)
+            A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)],axis=-1)
+            A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
+            A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=1)
+            A2B_var = tf.where(A[:,:3,:,:,:]!=0,A2B_var,1e-8)
+        else:
+            A2B_WF = wf.get_rho(A,A2B_PM)
+            A2B_var = None
+
+        A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
+        A2B = tf.where(A[:,:3,:,:,:]!=0,A2B,0.0)
 
     return A2B, A2B_var
 
@@ -341,19 +390,18 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     A2B_WF = A2B[:,:2,:,:,:]
     A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
 
-    w_aux = np.squeeze(A2B_WF_abs[:,0,:,:,:])
-    f_aux = np.squeeze(A2B_WF_abs[:,1,:,:,:])
-    if not(args.UQ):
-        r2_aux = np.squeeze(A2B[:,2,:,:,1])*r2_sc
-        lmax = r2_sc
-        cmap = 'copper'
-    else:
-        r2_aux = np.squeeze(A2B_var)*fm_sc
-        lmax = 30
-        cmap = 'gnuplot2'
+    w_aux = np.squeeze(tf.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
+    f_aux = np.squeeze(tf.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
+    r2_aux = np.squeeze(A2B[:,2,:,:,1])*r2_sc
     field_aux = np.squeeze(A2B[:,2,:,:,0])*fm_sc
     PDFF_aux = f_aux/(w_aux+f_aux)
     PDFF_aux[np.isnan(PDFF_aux)] = 0.0
+    if args.UQ:
+        # Get water/fat uncertainties
+        W_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,0,:,:,0],A2B_var[:,0,:,:,1])))
+        F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,1,:,:,0],A2B_var[:,1,:,:,1])))
+        r2s_var = np.squeeze(A2B_var[:,2,:,:,1])*(r2_sc**2)
+        field_var = np.squeeze(A2B_var[:,2,:,:,0])*(fm_sc**2)
 
     wn_aux = np.squeeze(B_WF_abs[:,0,:,:,:])
     fn_aux = np.squeeze(B_WF_abs[:,1,:,:,:])
@@ -363,54 +411,137 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     PDFFn_aux[np.isnan(PDFFn_aux)] = 0.0
     
     if i%args.n_plot == 0 or args.dataset == 'phantom_1p5' or args.dataset == 'phantom_3p0':
-        fig,axs=plt.subplots(figsize=(16, plot_hgt), nrows=3, ncols=3)
+        if args.UQ:
+            fig,axs=plt.subplots(figsize=(20, 10), nrows=2, ncols=3)
 
-        # A2B maps in the first row
-        F_ok = axs[0,0].imshow(PDFF_aux, cmap='jet',
-                          interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_ok, ax=axs[0,0]).ax.tick_params(labelsize=14)
-        axs[0,0].axis('off')
+            # Ground-truth maps in the first row
+            FF_ok = axs[0,0].imshow(PDFFn_aux, cmap='jet',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(FF_ok, ax=axs[0,0])
+            axs[0,0].axis('off')
 
-        r2_ok = axs[0,1].imshow(r2_aux, cmap=cmap,
-                                interpolation='none', vmin=0, vmax=lmax)
-        fig.colorbar(r2_ok, ax=axs[0,1]).ax.tick_params(labelsize=14)
-        axs[0,1].axis('off')
+            # Estimated maps in the second row
+            FF_est =axs[1,0].imshow(PDFF_aux, cmap='jet',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(FF_est, ax=axs[1,0])
+            axs[1,0].axis('off')
 
-        field_ok = axs[0,2].imshow(field_aux, cmap='twilight',
-                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_ok, ax=axs[0,2]).ax.tick_params(labelsize=14)
-        axs[0,2].axis('off')
+            # Ground-truth maps
+            W_ok =  axs[0,1].imshow(wn_aux, cmap='bone',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(W_ok, ax=axs[0,1])
+            axs[0,1].axis('off')
 
-        # Ground-truth in the third row
-        F_unet = axs[1,0].imshow(PDFFn_aux, cmap='jet',
-                                interpolation='none', vmin=0, vmax=1)
-        fig.colorbar(F_unet, ax=axs[1,0]).ax.tick_params(labelsize=14)
-        axs[1,0].axis('off')
+            F_ok =  axs[0,2].imshow(fn_aux, cmap='pink',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(F_ok, ax=axs[0,2])
+            axs[0,2].axis('off')
 
-        r2_unet=axs[1,1].imshow(r2n_aux, cmap='copper',
-                                interpolation='none', vmin=0, vmax=r2_sc)
-        fig.colorbar(r2_unet, ax=axs[1,1]).ax.tick_params(labelsize=14)
-        axs[1,1].axis('off')
+            r2_ok = axs[0,3].imshow(r2n_aux, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
+            fig.colorbar(r2_ok, ax=axs[0,3])
+            axs[0,3].axis('off')
 
-        field_unet =axs[1,2].imshow(fieldn_aux, cmap='twilight',
-                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-        fig.colorbar(field_unet, ax=axs[1,2]).ax.tick_params(labelsize=14)
-        axs[1,2].axis('off')
+            field_ok =  axs[0,4].imshow(fieldn_aux, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_ok, ax=axs[0,4])
+            axs[0,4].axis('off')
 
-        F_err = axs[2,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='gray',
-                          interpolation='none', vmin=0, vmax=.1)
-        fig.colorbar(F_err, ax=axs[2,0]).ax.tick_params(labelsize=14)
-        axs[2,0].axis('off')
+            # Estimated images/maps
+            W_est = axs[1,1].imshow(w_aux, cmap='bone',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(W_est, ax=axs[1,1])
+            axs[1,1].axis('off')
 
-        r2_err = axs[2,1].imshow(np.abs(r2_aux-r2n_aux), cmap='pink',
-                                interpolation='none', vmin=0, vmax=lmax/5)
-        fig.colorbar(r2_err, ax=axs[2,1]).ax.tick_params(labelsize=14)
-        axs[2,1].axis('off')
+            F_est = axs[1,2].imshow(f_aux, cmap='pink',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(F_est, ax=axs[1,2])
+            axs[1,2].axis('off')
 
-        field_err = axs[2,2].imshow(np.abs(field_aux-fieldn_aux), cmap='bone',
-                                    interpolation='none', vmin=0, vmax=fm_sc/20)
-        fig.colorbar(field_err, ax=axs[2,2]).ax.tick_params(labelsize=14)
-        axs[2,2].axis('off')
+            r2_est= axs[1,3].imshow(r2_aux, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
+            fig.colorbar(r2_est, ax=axs[1,3])
+            axs[1,3].axis('off')
+
+            field_est = axs[1,4].imshow(field_aux, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_est, ax=axs[1,4])
+            axs[1,4].axis('off')
+
+            # Uncertainty maps in the 3rd row
+            fig.delaxes(axs[2,0]) # No PDFF variance map
+
+            W_uq = axs[2,1].matshow(W_var, cmap='gnuplot2',
+                                    norm=LogNorm(vmin=1e-2,vmax=1e0))
+            fig.colorbar(W_uq, ax=axs[2,1])
+            axs[2,1].axis('off')
+
+            F_uq = axs[2,2].matshow(F_var, cmap='gnuplot2',
+                                    norm=LogNorm(vmin=1e-2,vmax=1e0))
+            fig.colorbar(F_uq, ax=axs[2,2])
+            axs[2,2].axis('off')
+
+            if args.out_vars == 'WF' or args.out_vars == 'FM':
+                fig.delaxes(axs[2,3]) # No R2s variance map
+            else:
+                r2s_uq=axs[2,3].matshow(r2s_var, cmap='gnuplot',
+                                        norm=LogNorm(vmin=1e0,vmax=1e3))
+                fig.colorbar(r2s_uq, ax=axs[2,3])
+                axs[2,3].axis('off')
+
+            field_uq = axs[2,4].matshow(field_var, cmap='gnuplot2',
+                                        norm=LogNorm(vmin=1e-2,vmax=1e1))
+            fig.colorbar(field_uq, ax=axs[2,4])
+            axs[2,4].axis('off')
+        else:
+            fig,axs=plt.subplots(figsize=(16, plot_hgt), nrows=3, ncols=3)
+
+            # A2B maps in the first row
+            F_ok = axs[0,0].imshow(PDFF_aux, cmap='jet',
+                              interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(F_ok, ax=axs[0,0]).ax.tick_params(labelsize=14)
+            axs[0,0].axis('off')
+
+            r2_ok = axs[0,1].imshow(r2_aux, cmap=cmap,
+                                    interpolation='none', vmin=0, vmax=lmax)
+            fig.colorbar(r2_ok, ax=axs[0,1]).ax.tick_params(labelsize=14)
+            axs[0,1].axis('off')
+
+            field_ok = axs[0,2].imshow(field_aux, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_ok, ax=axs[0,2]).ax.tick_params(labelsize=14)
+            axs[0,2].axis('off')
+
+            # Ground-truth in the third row
+            F_unet = axs[1,0].imshow(PDFFn_aux, cmap='jet',
+                                    interpolation='none', vmin=0, vmax=1)
+            fig.colorbar(F_unet, ax=axs[1,0]).ax.tick_params(labelsize=14)
+            axs[1,0].axis('off')
+
+            r2_unet=axs[1,1].imshow(r2n_aux, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
+            fig.colorbar(r2_unet, ax=axs[1,1]).ax.tick_params(labelsize=14)
+            axs[1,1].axis('off')
+
+            field_unet =axs[1,2].imshow(fieldn_aux, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            fig.colorbar(field_unet, ax=axs[1,2]).ax.tick_params(labelsize=14)
+            axs[1,2].axis('off')
+
+            F_err = axs[2,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='gray',
+                              interpolation='none', vmin=0, vmax=.1)
+            fig.colorbar(F_err, ax=axs[2,0]).ax.tick_params(labelsize=14)
+            axs[2,0].axis('off')
+
+            r2_err = axs[2,1].imshow(np.abs(r2_aux-r2n_aux), cmap='pink',
+                                    interpolation='none', vmin=0, vmax=lmax/5)
+            fig.colorbar(r2_err, ax=axs[2,1]).ax.tick_params(labelsize=14)
+            axs[2,1].axis('off')
+
+            field_err = axs[2,2].imshow(np.abs(field_aux-fieldn_aux), cmap='bone',
+                                        interpolation='none', vmin=0, vmax=fm_sc/20)
+            fig.colorbar(field_err, ax=axs[2,2]).ax.tick_params(labelsize=14)
+            axs[2,2].axis('off')
 
         if args.dataset == 'JGalgani' or args.dataset == '3ech':
             fig.suptitle('TE1/dTE: '+str([args.TE1,args.dTE]), fontsize=18)
