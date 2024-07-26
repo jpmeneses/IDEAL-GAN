@@ -64,10 +64,6 @@ ws_SSIM.write(0,4,'A2B FieldMap')
 # =                                    test                                    =
 # ==============================================================================
 
-if args.n_echoes > 0:
-    ech_idx = args.n_echoes * 2
-else:
-    ech_idx = 12
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -115,14 +111,14 @@ else:
     rnc = False
 
 if args.dataset == 'JGalgani' or args.dataset == '3ech':
-    testX, testY=data.load_hdf5(dataset_dir,dataset_hdf5,ech_idx,num_slice_list=num_slice_list,remove_non_central=rnc,
+    testX, testY=data.load_hdf5(dataset_dir,dataset_hdf5,num_slice_list=num_slice_list,remove_non_central=rnc,
                                 acqs_data=True,te_data=False,remove_zeros=True,MEBCRN=True)
     TEs = np.ones((testX.shape[0],1),dtype=np.float32)
 elif args.dataset == 'multiTE':
-    testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
+    testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, custom_list=custom_list,
                                         acqs_data=True,te_data=True,remove_zeros=False,MEBCRN=True)
 else:
-    testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, acqs_data=True, 
+    testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, acqs_data=True, 
                                         te_data=True,remove_zeros=True,MEBCRN=True)
 if args.dataset == 'multiTE':
     testX, testY, TEs = data.group_TEs(testX,testY,TEs,TE1=args.TE1,dTE=args.dTE,MEBCRN=True)
@@ -132,10 +128,11 @@ if args.dataset == 'multiTE':
 ################################################################################
 
 # Overall dataset statistics
-len_dataset,n_out,hgt,wdt,n_ch = np.shape(testY)
+len_dataset,ne,hgt,wdt,n_ch = np.shape(testX)
+_,n_out,_,_,_ = np.shape(testY)
 
 print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',args.n_echoes)
+print('Echoes:',ne)
 print('Output Maps:',n_out)
 
 # Input and output dimensions (testing data)
@@ -150,7 +147,7 @@ A_B_dataset_test.batch(1)
 if args.ME_layer:
     input_shape = (None,None,None,n_ch)
 else:
-    input_shape = (None,None,ech_idx)
+    input_shape = (None,None,2*ne)
 
 if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
     if args.out_vars == 'WF-PM':
@@ -205,7 +202,7 @@ elif args.G_model == 'MEBCRN':
     else:
         n_out = 2
         out_activ = 'sigmoid'
-    G_A2B=dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
+    G_A2B=dl.MEBCRN(input_shape=(ne,hgt,wdt,2),
                     n_outputs=n_out,
                     output_activation=out_activ,
                     filters=args.n_G_filters,
@@ -231,7 +228,7 @@ def sample(A, B, TE=None):
     if args.out_vars == 'WF':
         if args.te_input:
             if TE is None:
-                TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
+                TE = wf.gen_TEvar(ne, bs=A.shape[0], orig=True) # (nb,ne,1)
             A2B_WF = G_A2B([A,TE], training=True)
         else:
             A2B_WF = G_A2B(A, training=True)
@@ -259,7 +256,7 @@ def sample(A, B, TE=None):
     elif args.out_vars == 'PM':
         if args.te_input:
             if TE is None:
-                TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
+                TE = wf.gen_TEvar(ne, bs=A.shape[0], orig=True) # (nb,ne,1)
             A2B_PM = G_A2B([A,TE], training=False)
         else:
             A2B_PM = G_A2B(A, training=False)
@@ -279,7 +276,7 @@ def sample(A, B, TE=None):
     elif args.out_vars == 'WF-PM':
         if args.te_input:
             if TE is None:
-                TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
+                TE = wf.gen_TEvar(ne, bs=A.shape[0], orig=True) # (nb,ne,1)
             A2B_abs = G_A2B([A,TE], training=True)
         else:
             A2B_abs = G_A2B(A, training=True)
