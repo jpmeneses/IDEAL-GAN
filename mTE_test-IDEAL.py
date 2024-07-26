@@ -182,7 +182,7 @@ if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
 elif args.G_model == 'U-Net':
     if args.out_vars == 'WF-PM':
         n_out = 4
-    elif args.out_vars == 'FM':
+    elif args.out_vars == 'FM' or args.out_vars == 'R2s'::
         n_out = 1
     else:
         n_out = 2
@@ -224,7 +224,10 @@ else:
     raise(NameError('Unrecognized Generator Architecture'))
 
 # restore
-tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+if args.out_vars == 'R2s':
+    tl.Checkpoint(dict(G_A2B=G_A2B,G_A2R2=G_A2R2,G_calib=G_calib), py.join(args.experiment_dir, 'checkpoints')).restore()
+else:
+    tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
 def sample(A, B, TE=None):
