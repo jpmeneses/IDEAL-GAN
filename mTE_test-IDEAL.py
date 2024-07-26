@@ -32,6 +32,18 @@ if not(hasattr(args,'field')):
     ds_args = py.args()
     args.__dict__.update(ds_args.__dict__)
 
+if not(hasattr(args,'UQ')):
+    py.arg('--UQ', type=bool, default=False)
+    py.arg('--UQ_R2s', type=bool, default=False)
+    py.arg('--UQ_calib', type=bool, default=False)
+    UQ_args = py.args()
+    args.__dict__.update(UQ_args.__dict__)
+
+if not(hasattr(args,'G_model')):
+    py.arg('--G_model', default='U-Net', choices=['multi-decod','U-Net','MEBCRN'])
+    GM_args = py.args()
+    args.__dict__.update(GM_args.__dict__)
+
 
 # ==============================================================================
 # =                                   excel                                    =
