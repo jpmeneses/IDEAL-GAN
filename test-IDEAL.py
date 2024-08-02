@@ -379,8 +379,8 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
         axs[0,0].axis('off')
 
         # Error w.r.t. reference in the second row
-        FF_est =axs[1,0].imshow(PDFFn_aux, cmap='jet',
-                                interpolation='none', vmin=0, vmax=1)
+        FF_est =axs[1,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='jet',
+                                interpolation='none', vmin=0, vmax=.25)
         fig.colorbar(FF_est, ax=axs[1,0])
         axs[1,0].axis('off')
 
