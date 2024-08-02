@@ -409,9 +409,10 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     if args.UQ:
         # Get water/fat uncertainties
         W_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,0,:,:,0],A2B_var[:,0,:,:,1])))
-        F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,1,:,:,0],A2B_var[:,1,:,:,1])))
-        r2s_var = np.squeeze(A2B_var[:,2,:,:,1])*(r2_sc**2)
-        field_var = np.squeeze(A2B_var[:,2,:,:,0])*(fm_sc**2)
+        WF_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,1,:,:,0],A2B_var[:,1,:,:,1])))
+        F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,3,:,:,0],A2B_var[:,3,:,:,1])))
+        r2s_var = np.squeeze(A2B_var[:,-1,:,:,1])*(r2_sc**2)
+        field_var = np.squeeze(A2B_var[:,-1,:,:,0])*(fm_sc**2)
 
     wn_aux = np.squeeze(B_WF_abs[:,0,:,:,:])
     fn_aux = np.squeeze(B_WF_abs[:,1,:,:,:])
