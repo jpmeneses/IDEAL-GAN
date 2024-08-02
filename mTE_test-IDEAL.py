@@ -361,7 +361,7 @@ def sample(A, B, TE=None):
             A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)],axis=-1)
             A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
             A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=1)
-            A2B_var = tf.where(A[:,:3,:,:,:]!=0,A2B_var,1e-8)
+            A2B_var = tf.where(A[:,:5,:,:,:]!=0,A2B_var,1e-8)
         else:
             A2B_WF = wf.get_rho(A,A2B_PM)
             A2B_var = None
