@@ -380,7 +380,7 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
 
         # Error w.r.t. reference in the second row
         FF_est =axs[1,0].imshow(PDFF_aux-PDFFn_aux, cmap='plasma',
-                                interpolation='none', vmin=-0.2, vmax=0.2)
+                                interpolation='none', vmin=-0.15, vmax=0.15)
         fig.colorbar(FF_est, ax=axs[1,0])
         axs[1,0].axis('off')
 
@@ -408,12 +408,12 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
 
             # Error w.r.t. reference images/maps
             W_est = axs[1,1].imshow(w_aux-wn_aux, cmap='plasma',
-                                    interpolation='none', vmin=-0.2, vmax=0.2)
+                                    interpolation='none', vmin=-0.15, vmax=0.15)
             fig.colorbar(W_est, ax=axs[1,1])
             axs[1,1].axis('off')
 
             F_est = axs[1,2].imshow(f_aux-fn_aux, cmap='plasma',
-                                    interpolation='none', vmin=-0.2, vmax=0.2)
+                                    interpolation='none', vmin=-0.15, vmax=0.15)
             fig.colorbar(F_est, ax=axs[1,2])
             axs[1,2].axis('off')
 
