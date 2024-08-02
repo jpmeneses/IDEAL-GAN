@@ -380,7 +380,7 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
 
         # Error w.r.t. reference in the second row
         FF_est =axs[1,0].imshow(PDFF_aux-PDFFn_aux, cmap='cool',
-                                interpolation='none', vmin=-0.25, vmax=0.25)
+                                interpolation='none', vmin=-0.2, vmax=0.2)
         fig.colorbar(FF_est, ax=axs[1,0])
         axs[1,0].axis('off')
 
@@ -408,22 +408,22 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
 
             # Error w.r.t. reference images/maps
             W_est = axs[1,1].imshow(w_aux-wn_aux, cmap='cool',
-                                    interpolation='none', vmin=-0.25, vmax=0.25)
+                                    interpolation='none', vmin=-0.2, vmax=0.2)
             fig.colorbar(W_est, ax=axs[1,1])
             axs[1,1].axis('off')
 
             F_est = axs[1,2].imshow(f_aux-fn_aux, cmap='cool',
-                                    interpolation='none', vmin=-0.25, vmax=0.25)
+                                    interpolation='none', vmin=-0.2, vmax=0.2)
             fig.colorbar(F_est, ax=axs[1,2])
             axs[1,2].axis('off')
 
             r2_est= axs[1,3].imshow(r2_aux-r2n_aux, cmap='cool',
-                                    interpolation='none', vmin=-r2_sc/4, vmax=r2_sc/4)
+                                    interpolation='none', vmin=-r2_sc/5, vmax=r2_sc/5)
             fig.colorbar(r2_est, ax=axs[1,3])
             axs[1,3].axis('off')
 
             field_est = axs[1,4].imshow(field_aux-fieldn_aux, cmap='cool',
-                                        interpolation='none', vmin=-fm_sc/6, vmax=fm_sc/6)
+                                        interpolation='none', vmin=-r2_sc/5, vmax=r2_sc/5)
             fig.colorbar(field_est, ax=axs[1,4])
             axs[1,4].axis('off')
 
