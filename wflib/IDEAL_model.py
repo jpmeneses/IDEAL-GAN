@@ -531,7 +531,8 @@ def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
     SigM = tf.linalg.matmul(tf.complex(y_Sigma_inv,0.0),M) # (nv,nb,ne,ns)
     MTSigM = tf.linalg.matmul(tf.transpose(M, perm=[0,2,1], conjugate=True),SigM) # (nv,nb,ns,ns)
     rho_cov = tf.linalg.inv(MTSigM)
-    rho_var = tf.transpose(tf.linalg.diag_part(rho_cov),perm=[1,2,0]) # (nb,ns,nv)
+    # rho_var = tf.transpose(tf.linalg.diag_part(rho_cov),perm=[1,2,0]) # (nb,ns,nv)
+    rho_var = tf.transpose(tf.reshape(rho_cov,[num_voxel,n_batch,ns*ns]),perm=[1,2,0]) # (nb,ns^2,nv)
 
     y_samp = tf.transpose(Wm * Smtx, perm=[2,0,1]) # shape = (nv,nb,ne)
     SigY = tf.linalg.matmul(tf.complex(y_Sigma_inv,0.0),tf.expand_dims(y_samp,axis=-1)) # shape = (nv,nb,ne,1)
@@ -544,7 +545,7 @@ def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
     Re_rho = tf.math.real(rho_hat)
     Im_rho = tf.math.imag(rho_hat)
     res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
-    res_rho_var = tf.reshape(tf.abs(rho_var),[n_batch,ns,hgt,wdt,1]) / (rho_sc**2)
+    res_rho_var = tf.reshape(tf.abs(rho_var),[n_batch,ns*ns,hgt,wdt,1]) / (rho_sc**2)
     return res_rho, res_rho_var
 
 

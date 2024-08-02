@@ -317,7 +317,7 @@ def sample(A, B, TE=None):
             A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)],axis=-1)
             A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
             A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=1)
-            A2B_var = tf.where(A[:,:3,:,:,:]!=0,A2B_var,1e-8)
+            A2B_var = tf.where(A[:,:5,:,:,:]!=0,A2B_var,1e-8)
         else:
             A2B_WF = wf.get_rho(A,A2B_PM)
             A2B_var = None
@@ -346,9 +346,10 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
         w_aux = np.squeeze(tf.abs(tf.complex(A2B[:,0,:,:,0],A2B[:,0,:,:,1])))
         f_aux = np.squeeze(tf.abs(tf.complex(A2B[:,1,:,:,0],A2B[:,1,:,:,1])))
         W_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,0,:,:,0],A2B_var[:,0,:,:,1])))
-        F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,1,:,:,0],A2B_var[:,1,:,:,1])))
-        r2s_var = np.squeeze(A2B_var[:,2,:,:,1])*(r2_sc**2)
-        field_var = np.squeeze(A2B_var[:,2,:,:,0])*(fm_sc**2)
+        WF_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,1,:,:,0],A2B_var[:,1,:,:,1])))
+        F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,3,:,:,0],A2B_var[:,3,:,:,1])))
+        r2s_var = np.squeeze(A2B_var[:,-1,:,:,1])*(r2_sc**2)
+        field_var = np.squeeze(A2B_var[:,-1,:,:,0])*(fm_sc**2)
         hgt_plt, wdt_plt, nr, nc = 10, 20, 3, 5
     else:
         w_aux = np.squeeze(A2B[:,:,:,0])
@@ -371,63 +372,66 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     if i%args.n_plot == 0 or args.dataset == 'phantom':
         fig,axs=plt.subplots(figsize=(wdt_plt, hgt_plt), nrows=nr, ncols=nc)
 
-        # Ground-truth maps in the first row
-        FF_ok = axs[0,0].imshow(PDFFn_aux, cmap='jet',
+        # Estimated maps in the first row
+        FF_ok = axs[0,0].imshow(PDFF_aux, cmap='jet',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(FF_ok, ax=axs[0,0])
         axs[0,0].axis('off')
 
-        # Estimated maps in the second row
-        FF_est =axs[1,0].imshow(PDFF_aux, cmap='jet',
+        # Error w.r.t. reference in the second row
+        FF_est =axs[1,0].imshow(PDFFn_aux, cmap='jet',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(FF_est, ax=axs[1,0])
         axs[1,0].axis('off')
 
         if args.UQ:
-            # Ground-truth maps
-            W_ok =  axs[0,1].imshow(wn_aux, cmap='bone',
+            # Estimated maps
+            W_ok =  axs[0,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[0,1])
             axs[0,1].axis('off')
 
-            F_ok =  axs[0,2].imshow(fn_aux, cmap='pink',
+            F_ok =  axs[0,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[0,2])
             axs[0,2].axis('off')
 
-            r2_ok = axs[0,3].imshow(r2n_aux, cmap='copper',
+            r2_ok = axs[0,3].imshow(r2_aux, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[0,3])
             axs[0,3].axis('off')
 
-            field_ok =  axs[0,4].imshow(fieldn_aux, cmap='twilight',
+            field_ok =  axs[0,4].imshow(field_aux, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[0,4])
             axs[0,4].axis('off')
 
-            # Estimated images/maps
-            W_est = axs[1,1].imshow(w_aux, cmap='bone',
-                                    interpolation='none', vmin=0, vmax=1)
+            # Error w.r.t. reference images/maps
+            W_est = axs[1,1].imshow(np.abs(w_aux-wn_aux), cmap='bone',
+                                    interpolation='none', vmin=0, vmax=.25)
             fig.colorbar(W_est, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            F_est = axs[1,2].imshow(f_aux, cmap='pink',
-                                    interpolation='none', vmin=0, vmax=1)
+            F_est = axs[1,2].imshow(np.abs(f_aux-fn_aux), cmap='pink',
+                                    interpolation='none', vmin=0, vmax=.25)
             fig.colorbar(F_est, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_est= axs[1,3].imshow(r2_aux, cmap='copper',
-                                    interpolation='none', vmin=0, vmax=r2_sc)
+            r2_est= axs[1,3].imshow(np.abs(r2_aux-r2n_aux), cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc/4)
             fig.colorbar(r2_est, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_est = axs[1,4].imshow(field_aux, cmap='twilight',
-                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            field_est = axs[1,4].imshow(np.abs(field_aux-fieldn_aux), cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/6, vmax=fm_sc/6)
             fig.colorbar(field_est, ax=axs[1,4])
             axs[1,4].axis('off')
 
             # Uncertainty maps in the 3rd row
-            fig.delaxes(axs[2,0]) # No PDFF variance map
+            WF_uq = axs[2,0].matshow(WF_var, cmap='gnuplot2',
+                                    norm=LogNorm(vmin=1e-2,vmax=1e0))
+            fig.colorbar(WF_uq, ax=axs[2,0])
+            axs[2,0].axis('off')
 
             W_uq = axs[2,1].matshow(W_var, cmap='gnuplot2',
                                     norm=LogNorm(vmin=1e-2,vmax=1e0))

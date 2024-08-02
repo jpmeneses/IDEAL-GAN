@@ -425,64 +425,64 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
             fig,axs=plt.subplots(figsize=(20, 10), nrows=3, ncols=5)
 
             # Ground-truth maps in the first row
-            FF_ok = axs[0,0].imshow(PDFFn_aux, cmap='jet',
+            FF_ok = axs[0,0].imshow(PDFF_aux, cmap='jet',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(FF_ok, ax=axs[0,0])
             axs[0,0].axis('off')
 
             # Estimated maps in the second row
-            FF_est =axs[1,0].imshow(PDFF_aux, cmap='jet',
-                                    interpolation='none', vmin=0, vmax=1)
+            FF_est =axs[1,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='jet',
+                                    interpolation='none', vmin=0, vmax=.25)
             fig.colorbar(FF_est, ax=axs[1,0])
             axs[1,0].axis('off')
 
-            # Ground-truth maps
-            W_ok =  axs[0,1].imshow(wn_aux, cmap='bone',
+            # Estimated maps
+            W_ok =  axs[0,1].imshow(w_aux, cmap='bone',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(W_ok, ax=axs[0,1])
             axs[0,1].axis('off')
 
-            F_ok =  axs[0,2].imshow(fn_aux, cmap='pink',
+            F_ok =  axs[0,2].imshow(f_aux, cmap='pink',
                                     interpolation='none', vmin=0, vmax=1)
             fig.colorbar(F_ok, ax=axs[0,2])
             axs[0,2].axis('off')
 
-            r2_ok = axs[0,3].imshow(r2n_aux, cmap='copper',
+            r2_ok = axs[0,3].imshow(r2_aux, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[0,3])
             axs[0,3].axis('off')
 
-            field_ok =  axs[0,4].imshow(fieldn_aux, cmap='twilight',
+            field_ok =  axs[0,4].imshow(field_aux, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
             fig.colorbar(field_ok, ax=axs[0,4])
             axs[0,4].axis('off')
 
-            # Estimated images/maps
-            W_est = axs[1,1].imshow(w_aux, cmap='bone',
-                                    interpolation='none', vmin=0, vmax=1)
+            # Error w.r.t. reference images/maps
+            W_est = axs[1,1].imshow(np.abs(w_aux-wn_aux), cmap='bone',
+                                    interpolation='none', vmin=0, vmax=.25)
             fig.colorbar(W_est, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            F_est = axs[1,2].imshow(f_aux, cmap='pink',
-                                    interpolation='none', vmin=0, vmax=1)
+            F_est = axs[1,2].imshow(np.abs(f_aux-fn_aux), cmap='pink',
+                                    interpolation='none', vmin=0, vmax=.25)
             fig.colorbar(F_est, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_est= axs[1,3].imshow(r2_aux, cmap='copper',
-                                    interpolation='none', vmin=0, vmax=r2_sc)
+            r2_est= axs[1,3].imshow(np.abs(r2_aux-r2n_aux), cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc/4)
             fig.colorbar(r2_est, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_est = axs[1,4].imshow(field_aux, cmap='twilight',
-                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+            field_est = axs[1,4].imshow(np.abs(field_aux-fieldn_aux), cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/6, vmax=fm_sc/6)
             fig.colorbar(field_est, ax=axs[1,4])
             axs[1,4].axis('off')
 
             # Uncertainty maps in the 3rd row
             # Plot PDFF absolute error instead of unavailable uncertainty
-            F_err = axs[2,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='gray',
-                              interpolation='none', vmin=0, vmax=.1)
-            fig.colorbar(F_err, ax=axs[2,0]).ax.tick_params(labelsize=14)
+            WF_uq = axs[2,0].matshow(WF_var, cmap='gnuplot2',
+                                    norm=LogNorm(vmin=1e-2,vmax=1e0))
+            fig.colorbar(WF_uq, ax=axs[2,0])
             axs[2,0].axis('off')
 
             W_uq = axs[2,1].matshow(W_var, cmap='gnuplot2',
