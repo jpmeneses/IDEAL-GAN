@@ -431,8 +431,8 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
             axs[0,0].axis('off')
 
             # Estimated maps in the second row
-            FF_est =axs[1,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='jet',
-                                    interpolation='none', vmin=0, vmax=.25)
+            FF_est =axs[1,0].imshow(PDFF_aux-PDFFn_aux, cmap='cool',
+                                    interpolation='none', vmin=-0.25, vmax=0.25)
             fig.colorbar(FF_est, ax=axs[1,0])
             axs[1,0].axis('off')
 
@@ -458,22 +458,22 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
             axs[0,4].axis('off')
 
             # Error w.r.t. reference images/maps
-            W_est = axs[1,1].imshow(np.abs(w_aux-wn_aux), cmap='bone',
-                                    interpolation='none', vmin=0, vmax=.25)
+            W_est = axs[1,1].imshow(w_aux-wn_aux, cmap='cool',
+                                    interpolation='none', vmin=-0.25, vmax=0.25)
             fig.colorbar(W_est, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            F_est = axs[1,2].imshow(np.abs(f_aux-fn_aux), cmap='pink',
-                                    interpolation='none', vmin=0, vmax=.25)
+            F_est = axs[1,2].imshow(f_aux-fn_aux, cmap='pink',
+                                    interpolation='none', vmin=-0.25, vmax=0.25)
             fig.colorbar(F_est, ax=axs[1,2])
             axs[1,2].axis('off')
 
-            r2_est= axs[1,3].imshow(np.abs(r2_aux-r2n_aux), cmap='copper',
-                                    interpolation='none', vmin=0, vmax=r2_sc/4)
+            r2_est= axs[1,3].imshow(r2_aux-r2n_aux, cmap='cool',
+                                    interpolation='none', vmin=-r2_sc/4, vmax=r2_sc/4)
             fig.colorbar(r2_est, ax=axs[1,3])
             axs[1,3].axis('off')
 
-            field_est = axs[1,4].imshow(np.abs(field_aux-fieldn_aux), cmap='twilight',
+            field_est = axs[1,4].imshow(field_aux-fieldn_aux, cmap='cool',
                                         interpolation='none', vmin=-fm_sc/6, vmax=fm_sc/6)
             fig.colorbar(field_est, ax=axs[1,4])
             axs[1,4].axis('off')
