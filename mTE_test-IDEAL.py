@@ -464,7 +464,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
             fig.colorbar(W_est, ax=axs[1,1])
             axs[1,1].axis('off')
 
-            F_est = axs[1,2].imshow(f_aux-fn_aux, cmap='pink',
+            F_est = axs[1,2].imshow(f_aux-fn_aux, cmap='plasma',
                                     interpolation='none', vmin=-0.15, vmax=0.15)
             fig.colorbar(F_est, ax=axs[1,2])
             axs[1,2].axis('off')
