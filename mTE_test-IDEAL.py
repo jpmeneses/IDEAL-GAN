@@ -505,7 +505,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
                 axs[2,3].axis('off')
 
             field_uq = axs[2,4].matshow(field_var, cmap='gnuplot2',
-                                        norm=LogNorm(vmin=1e-2,vmax=1e1))
+                                        norm=LogNorm(vmin=1e-3,vmax=1e0))
             fig.colorbar(field_uq, ax=axs[2,4])
             axs[2,4].axis('off')
         else:
@@ -514,48 +514,48 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
             # A2B maps in the first row
             F_ok = axs[0,0].imshow(PDFF_aux, cmap='jet',
                               interpolation='none', vmin=0, vmax=1)
-            fig.colorbar(F_ok, ax=axs[0,0]).ax.tick_params(labelsize=14)
+            fig.colorbar(F_ok, ax=axs[0,0]).ax.tick_params(labelsize=20)
             axs[0,0].axis('off')
 
             r2_ok = axs[0,1].imshow(r2_aux, cmap=cmap,
                                     interpolation='none', vmin=0, vmax=lmax)
-            fig.colorbar(r2_ok, ax=axs[0,1]).ax.tick_params(labelsize=14)
+            fig.colorbar(r2_ok, ax=axs[0,1]).ax.tick_params(labelsize=20)
             axs[0,1].axis('off')
 
             field_ok = axs[0,2].imshow(field_aux, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-            fig.colorbar(field_ok, ax=axs[0,2]).ax.tick_params(labelsize=14)
+            fig.colorbar(field_ok, ax=axs[0,2]).ax.tick_params(labelsize=20)
             axs[0,2].axis('off')
 
             # Ground-truth in the third row
             F_unet = axs[1,0].imshow(PDFFn_aux, cmap='jet',
                                     interpolation='none', vmin=0, vmax=1)
-            fig.colorbar(F_unet, ax=axs[1,0]).ax.tick_params(labelsize=14)
+            fig.colorbar(F_unet, ax=axs[1,0]).ax.tick_params(labelsize=20)
             axs[1,0].axis('off')
 
             r2_unet=axs[1,1].imshow(r2n_aux, cmap='copper',
                                     interpolation='none', vmin=0, vmax=r2_sc)
-            fig.colorbar(r2_unet, ax=axs[1,1]).ax.tick_params(labelsize=14)
+            fig.colorbar(r2_unet, ax=axs[1,1]).ax.tick_params(labelsize=20)
             axs[1,1].axis('off')
 
             field_unet =axs[1,2].imshow(fieldn_aux, cmap='twilight',
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-            fig.colorbar(field_unet, ax=axs[1,2]).ax.tick_params(labelsize=14)
+            fig.colorbar(field_unet, ax=axs[1,2]).ax.tick_params(labelsize=20)
             axs[1,2].axis('off')
 
             F_err = axs[2,0].imshow(np.abs(PDFF_aux-PDFFn_aux), cmap='gray',
                               interpolation='none', vmin=0, vmax=.1)
-            fig.colorbar(F_err, ax=axs[2,0]).ax.tick_params(labelsize=14)
+            fig.colorbar(F_err, ax=axs[2,0]).ax.tick_params(labelsize=20)
             axs[2,0].axis('off')
 
             r2_err = axs[2,1].imshow(np.abs(r2_aux-r2n_aux), cmap='pink',
                                     interpolation='none', vmin=0, vmax=lmax/5)
-            fig.colorbar(r2_err, ax=axs[2,1]).ax.tick_params(labelsize=14)
+            fig.colorbar(r2_err, ax=axs[2,1]).ax.tick_params(labelsize=20)
             axs[2,1].axis('off')
 
             field_err = axs[2,2].imshow(np.abs(field_aux-fieldn_aux), cmap='bone',
                                         interpolation='none', vmin=0, vmax=fm_sc/20)
-            fig.colorbar(field_err, ax=axs[2,2]).ax.tick_params(labelsize=14)
+            fig.colorbar(field_err, ax=axs[2,2]).ax.tick_params(labelsize=20)
             axs[2,2].axis('off')
 
         if args.dataset == 'JGalgani' or args.dataset == '3ech':
