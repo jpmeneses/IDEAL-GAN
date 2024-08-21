@@ -505,7 +505,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
                 axs[2,3].axis('off')
 
             field_uq = axs[2,4].matshow(field_var, cmap='gnuplot2',
-                                        norm=LogNorm(vmin=1e-3,vmax=1e0))
+                                        norm=LogNorm(vmin=1e-5,vmax=1e-2))
             fig.colorbar(field_uq, ax=axs[2,4])
             axs[2,4].axis('off')
         else:
