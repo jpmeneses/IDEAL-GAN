@@ -413,7 +413,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
         F_var = np.squeeze(tf.abs(tf.complex(A2B_var[:,3,:,:,0],A2B_var[:,3,:,:,1])))
         r2s_var = np.squeeze(A2B_var[:,-1,:,:,1])*(r2_sc**2)
         field_var = np.squeeze(A2B_var[:,-1,:,:,0])*(fm_sc**2)
-        field_var = np.where(field_var>=((fm_sc**2)*1e-8),field_var,1e-5)
+        field_var = np.where(field_var!=((fm_sc**2)*1e-8),field_var,1e-5)
 
     wn_aux = np.squeeze(B_WF_abs[:,0,:,:,:])
     fn_aux = np.squeeze(B_WF_abs[:,1,:,:,:])
