@@ -22,6 +22,7 @@ py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
+py.arg('--sd_noise', type=float, default=0.0)
 py.arg('--n_plot',type=int,default=50)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
@@ -230,7 +231,10 @@ else:
     tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
-def sample(A, B, TE=None):
+def sample(A, B, TE=None, sd=0.0):
+    if sd > 0.0:
+        A_ns = tf.keras.layers.GaussianNoise(stddev=sd*tf.math.reduce_std(A))(A,training=True)
+        A = tf.where(A!=0.0,A_ns,0.0)
     # Back-up A
     A_ME = A
     if not(args.ME_layer):
@@ -394,9 +398,9 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
     
     if args.dataset == 'JGalgani' or args.dataset == '3ech':
-        A2B, A2B_var = sample(A, B)
+        A2B, A2B_var = sample(A, B, sd=args.sd_noise)
     else:
-        A2B, A2B_var = sample(A, B, TE_smp)
+        A2B, A2B_var = sample(A, B, TE_smp, sd=args.sd_noise)
     A2B_WF = A2B[:,:2,:,:,:]
     A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
 
