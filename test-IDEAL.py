@@ -21,6 +21,7 @@ py.arg('--experiment_dir',default='output/WF-IDEAL')
 py.arg('--te_input', type=bool, default=False)
 py.arg('--D1_SelfAttention',type=bool, default=True)
 py.arg('--D2_SelfAttention',type=bool, default=False)
+py.arg('--sd_noise', type=float, default=0.0)
 py.arg('--n_plot', type=int, default=30)
 test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
@@ -213,7 +214,10 @@ else:
     tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 @tf.function
-def sample(A, B, TE=None):
+def sample(A, B, TE=None, sd=0.0):
+    if sd > 0.0:
+        A_ns = tf.keras.layers.GaussianNoise(stddev=sd*tf.math.reduce_std(A))(A,training=True)
+        A = tf.where(A!=0.0,A_ns,0.0)
     # Estimate A2B
     if args.out_vars == 'WF':
         if args.te_input:
@@ -336,7 +340,7 @@ i = 0
 for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
     A = tf.expand_dims(A,axis=0)
     B = tf.expand_dims(B,axis=0)
-    A2B, A2B_var = sample(A,B)
+    A2B, A2B_var = sample(A,B,sd=args.sd_noise)
 
     r2_aux = np.squeeze(A2B[:,2,:,:,1])*r2_sc
     field_aux = np.squeeze(A2B[:,2,:,:,0])*fm_sc
