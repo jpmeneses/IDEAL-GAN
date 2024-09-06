@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import time
 import tqdm
 import xlsxwriter
 import matplotlib.pyplot as plt
@@ -54,6 +55,7 @@ ws_MAE.write(0,1,'Fat')
 ws_MAE.write(0,2,'PDFF')
 ws_MAE.write(0,3,'R2*')
 ws_MAE.write(0,4,'FieldMap')
+ws_MAE.write(0,5,'Time')
 
 ws_MSE = workbook.add_worksheet('RMSE')
 ws_MSE.write(0,0,'Water')
@@ -340,7 +342,11 @@ i = 0
 for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
     A = tf.expand_dims(A,axis=0)
     B = tf.expand_dims(B,axis=0)
+    
+    t1 = time.process_time()
     A2B, A2B_var = sample(A,B,sd=args.sd_noise)
+    t2 = time.process_time()
+    # print("Elapsed time during the whole program in seconds:",t2-t1)
 
     r2_aux = np.squeeze(A2B[:,2,:,:,1])*r2_sc
     field_aux = np.squeeze(A2B[:,2,:,:,0])*fm_sc
@@ -514,6 +520,7 @@ for A, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_d
     ws_MAE.write(i+1,2,MAE_pdff)
     ws_MAE.write(i+1,3,MAE_r2)
     ws_MAE.write(i+1,4,MAE_fm)
+    ws_MAE.write(i+1,5,t2-t1)
 
     # SSIM
     w_ssim = structural_similarity(w_aux,wn_aux,multichannel=False)
