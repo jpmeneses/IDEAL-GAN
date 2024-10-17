@@ -321,9 +321,10 @@ def UNet(
         return keras.Model(inputs=inputs1, outputs=output)
 
 
-def PDF_sample(input_shape):
+def CSE_sample(input_shape):
     mean = inputs1 = keras.Input(input_shape)
     std = inputs2 = keras.Input(input_shape)
+    std = keras.layers.concatenate([std,std])
     x_prob = keras.layers.concatenate([mean, std])
     out_prob = tfp.layers.DistributionLambda(
                 lambda t: tfp.distributions.Normal(
