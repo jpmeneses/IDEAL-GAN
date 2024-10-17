@@ -7,7 +7,7 @@ __pycache__/
 DiscTest.py
 PM-scaling.ipynb
 metrics-test.ipynb
-submit_metrics.sh
+submit_*
 test_h5py.py
 TE-idx.ipynb
 out_*
