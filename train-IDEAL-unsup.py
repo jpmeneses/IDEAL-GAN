@@ -416,6 +416,7 @@ def sample(A, B):
         A2B2A_abs_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
     elif args.noiseQ:
         A2B2A_sampled_var = tf.concat([A2B2A, A_noise_comp], axis=-1) # shape: [nb,ne,hgt,wdt,4]
+        A2B_PM_var = None
     else:
         A2B_PM_var = None
 
