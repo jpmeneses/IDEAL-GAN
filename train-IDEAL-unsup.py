@@ -217,7 +217,7 @@ def train_G(A, B):
             A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=(args.out_vars=='FM'))
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
         elif args.noiseQ:
-            A2B2A_sampled_var = tf.concat([A2B2A, A_noise, A_noise], axis=-1) # shape: [nb,ne,hgt,wdt,4]
+            A2B2A_sampled_var = tf.concat([A2B2A, A_noise_comp], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
         if args.UQ or args.noiseQ:
@@ -415,7 +415,7 @@ def sample(A, B):
         A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
         A2B2A_abs_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
     elif args.noiseQ:
-        A2B2A_abs_sampled_var = tf.concat([A2B2A, A_noise, A_noise], axis=-1) # shape: [nb,ne,hgt,wdt,4]
+        A2B2A_abs_sampled_var = tf.concat([A2B2A, A_noise_comp], axis=-1) # shape: [nb,ne,hgt,wdt,4]
     else:
         A2B_PM_var = None
 
