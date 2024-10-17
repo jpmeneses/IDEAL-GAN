@@ -202,7 +202,8 @@ def train_G(A, B):
 
         if args.noiseQ:
             A_noise = G_noise(A2B2A, training=True)
-            A2B2A = acqs_sampler([A2B2A,A_noise], training=True)
+            A_noise_comp = tf.concat([A_noise,A_noise],axis=-1)
+            A2B2A = acqs_sampler([A2B2A,A_noise_comp], training=True)
 
         # Stddev map mask and attach to recon-A
         if args.UQ:
@@ -364,7 +365,8 @@ def sample(A, B):
 
         if args.noiseQ:
             A_noise = G_noise(A2B2A, training=False)
-            A2B2A = acqs_sampler([A2B2A,A_noise], training=False)
+            A_noise_comp = tf.concat([A_noise,A_noise],axis=-1)
+            A2B2A = acqs_sampler([A2B2A,A_noise_comp], training=False)
 
         # Magnitude of water/fat images
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
