@@ -416,7 +416,7 @@ def sample(A, B):
         A2B2A_abs_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
     elif args.noiseQ:
         A2B2A_sampled_var = tf.concat([A2B2A, A_noise_comp], axis=-1) # shape: [nb,ne,hgt,wdt,4]
-        A2B2A_var = None
+        A2B2A_var = A_noise_comp
         A2B_PM_var = None
     else:
         A2B2A_var = None
@@ -665,6 +665,10 @@ for ep in range(args.epochs):
                     fig.colorbar(ech1_var_ok, ax=axs[2,5])
                 else:
                     r2_aux = np.squeeze(A2B[:,2,:,:,1])
+                    ech1_var_aux = np.squeeze(A2B2A_var[:,-1,:,:,0])
+                    ech1_var_ok= axs[2,5].imshow(ech1_var_aux, cmap='gnuplot2',
+                                            interpolation='none', vmin=0, vmax=0.05)
+                    fig.colorbar(ech1_var_ok, ax=axs[2,5])
                     fig.delaxes(axs[1,3])
                     fig.delaxes(axs[1,5])
                     fig.delaxes(axs[2,3])
