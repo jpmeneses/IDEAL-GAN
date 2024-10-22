@@ -38,6 +38,8 @@ py.arg('--epoch_ckpt', type=int, default=20)  # num. of epochs to save a checkpo
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
+py.arg('--sel_weight', type=bool, default=False)
+py.arg('--sel_weight_pwr', type=float, default=1.0)
 py.arg('--FM_aug', type=bool, default=False)
 py.arg('--FM_mean', type=float, default=1.0)
 py.arg('--R2_TV_weight', type=float, default=0.0)
@@ -223,6 +225,18 @@ def train_G(B, te=None):
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
         B_PM = B[:,2:,:,:,:]
 
+        ############## Selective weighting ################
+        if args.sel_weight:
+            sel_w = 0.0
+            for echo in range(3):
+                obs_phase = tf.math.atan2(B2A[:,echo:(echo+1),:,:,1:],B2A[:,echo:(echo+1),:,:,:1])
+                phi_phase = 2*np.pi*B[:,2:,:,:,:1]*fm_sc * te[0,echo,0]
+                phi_phase += tf.math.atan2(B[:,:1,:,:,1:],B[:,:1,:,:,:1])
+                sel_w += (1/6) * tf.math.cos(obs_phase-phi_phase) + (1/6)
+                sel_w **= args.sel_weight_pwr
+        else:
+            sel_w = 1.0
+
         if args.out_vars == 'WF':
             # Compute model's output
             if args.te_input:
@@ -287,7 +301,9 @@ def train_G(B, te=None):
             B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
             
             # Compute loss
-            sup_loss = sup_loss_fn(B_PM, B2A2B_PM)
+            if args.sel_weight:
+                sel_w = tf.concat([sel_w,sel_w],axis=-1)
+            sup_loss = sup_loss_fn(sel_w*B_PM, sel_w*B2A2B_PM)
 
         # elif args.out_vars == 'WF-PM':
         #     # Compute model's output
