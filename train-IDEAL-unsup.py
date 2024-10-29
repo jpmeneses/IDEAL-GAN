@@ -170,7 +170,7 @@ def train_G(A, B):
     A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        A2B_FM = G_A2B(A, training=True)
+        A2B_FM = G_A2B(A, training=not(args.noiseQ))
         if args.UQ:
             A2B_FM_sigma = A2B_FM.stddev()
         else:
@@ -239,8 +239,8 @@ def train_G(A, B):
         G_loss = A2B2A_cycle_loss + reg_term
         
     if args.noiseQ:
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables + G_noise.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables + G_noise.trainable_variables))
+        G_grad = t.gradient(G_loss, G_noise.trainable_variables)
+        G_optimizer.apply_gradients(zip(G_grad, G_noise.trainable_variables))
     else:
         G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
         G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
@@ -500,7 +500,7 @@ val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summarie
 val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(valY))//10
+n_div = np.ceil(total_steps/len(valY))
 
 # main loop
 for ep in range(args.epochs):
