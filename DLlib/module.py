@@ -220,6 +220,7 @@ def UNet(
     n_out=1,
     skip_con=True,
     bayesian=False,
+    std_out=False,
     ME_layer=False,
     te_input=False,
     te_shape=(6,),
@@ -292,31 +293,34 @@ def UNet(
     output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
-    if bayesian:
+    if bayesian or std_out:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         # Compute standard deviation (sigma; NOT sigma^2)
         out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
         if ME_layer:
             out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
-        x_prob = keras.layers.concatenate([output,out_var])
-        if output_activation == 'tanh':
-            output = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.Normal(
-                            loc=t[...,:n_out],
-                            scale=t[...,n_out:])
-                        )(x_prob)
-        else:
-            # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
-            output = tfp.layers.DistributionLambda(
-                        lambda t: tfp.distributions.TruncatedNormal(
-                            loc=t[...,:n_out],
-                            scale=t[...,n_out:],
-                            low=0.0,
-                            high=1e4),
-                        )(x_prob) # Random variable: R2s**2/r2s_var
+        if bayesian:
+            x_prob = keras.layers.concatenate([output,out_var])
+            if output_activation == 'tanh':
+                output = tfp.layers.DistributionLambda(
+                            lambda t: tfp.distributions.Normal(
+                                loc=t[...,:n_out],
+                                scale=t[...,n_out:])
+                            )(x_prob)
+            else:
+                # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
+                output = tfp.layers.DistributionLambda(
+                            lambda t: tfp.distributions.TruncatedNormal(
+                                loc=t[...,:n_out],
+                                scale=t[...,n_out:],
+                                low=0.0,
+                                high=1e4),
+                            )(x_prob) # Random variable: R2s**2/r2s_var
 
     if te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)
+    elif std_out:
+        return keras.Model(inputs=inputs1, outputs=[output,out_var])
     else:
         return keras.Model(inputs=inputs1, outputs=output)
 

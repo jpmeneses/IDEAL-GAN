@@ -128,6 +128,7 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                 bayesian=args.UQ,
+                std_out=args.noiseQ,
                 ME_layer=args.ME_layer,
                 filters=args.n_G_filters,
                 self_attention=args.D1_SelfAttention)
@@ -144,10 +145,6 @@ if args.out_vars == 'R2s' or args.out_vars == 'PM':
     G_calib.build((None, 1, hgt, wdt, 1))
 
 # To estimate the noise on CSE-MRI
-G_noise=dl.UNet(input_shape=(None,hgt,wdt,n_ch),
-                ME_layer=args.ME_layer,
-                filters=args.n_G_filters,
-                output_activation='sigmoid')
 acqs_sampler = dl.CSE_sample((None,hgt,wdt,n_ch))
 
 
@@ -170,7 +167,10 @@ def train_G(A, B):
     A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        A2B_FM = G_A2B(A, training=not(args.noiseQ))
+        if args.noiseQ:
+            A2B_FM, A_noise = G_A2B(A, training=not(args.noiseQ))
+        else:
+            A2B_FM = G_A2B(A, training=not(args.noiseQ))
         if args.UQ:
             A2B_FM_sigma = A2B_FM.stddev()
         else:
@@ -201,7 +201,6 @@ def train_G(A, B):
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
 
         if args.noiseQ:
-            A_noise = G_noise(A2B2A, training=True)
             A_noise_comp = tf.concat([A_noise,A_noise],axis=1)
             for ni in range(A.shape[1]-2):
                 A_noise_comp = tf.concat([A_noise_comp,A_noise],axis=1)
@@ -238,12 +237,8 @@ def train_G(A, B):
         
         G_loss = A2B2A_cycle_loss + reg_term
         
-    if args.noiseQ:
-        G_grad = t.gradient(G_loss, G_noise.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_noise.trainable_variables))
-    else:
-        G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-        G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
+    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
     
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
             'WF_loss': WF_abs_loss,
@@ -353,7 +348,10 @@ def train_step(A, B):
 @tf.function
 def sample(A, B):
     if args.out_vars == 'FM':
-        A2B_FM = G_A2B(A, training=False)
+        if args.noiseQ:
+            A2B_FM, A_noise = G_A2B(A, training=False)
+        else:
+            A2B_FM = G_A2B(A, training=False)
         if args.UQ:
             A2B_FM_var = A2B_FM.stddev()
             A2B_R2_nu = tf.zeros_like(A2B_FM_var)
@@ -367,7 +365,6 @@ def sample(A, B):
         A2B = tf.concat([A2B_WF, A2B_PM],axis=1)
 
         if args.noiseQ:
-            A_noise = G_noise(A2B2A, training=False)
             A_noise_comp = tf.concat([A_noise,A_noise],axis=1)
             for ni in range(A.shape[1]-2):
                 A_noise_comp = tf.concat([A_noise_comp,A_noise],axis=1)
@@ -468,7 +465,6 @@ ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
 checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
-                                G_noise=G_noise,
                                 G_optimizer=G_optimizer,
                                 ep_cnt=ep_cnt),
                            py.join(output_dir, 'checkpoints'),
@@ -477,7 +473,6 @@ if not(args.out_vars == 'FM'):
     checkpoint_2=tl.Checkpoint(dict(G_A2B=G_A2B,
                                     G_A2R2=G_A2R2,
                                     G_calib=G_calib,
-                                    G_noise=G_noise,
                                     G_optimizer=G_optimizer,
                                     G_R2_optimizer=G_R2_optimizer,
                                     G_calib_optimizer=G_calib_optimizer,
