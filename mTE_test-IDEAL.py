@@ -527,8 +527,8 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
             fig.colorbar(F_ok, ax=axs[0,0]).ax.tick_params(labelsize=20)
             axs[0,0].axis('off')
 
-            r2_ok = axs[0,1].imshow(r2_aux, cmap=cmap,
-                                    interpolation='none', vmin=0, vmax=lmax)
+            r2_ok = axs[0,1].imshow(r2_aux, cmap='copper',
+                                    interpolation='none', vmin=0, vmax=r2_sc)
             fig.colorbar(r2_ok, ax=axs[0,1]).ax.tick_params(labelsize=20)
             axs[0,1].axis('off')
 
@@ -559,7 +559,7 @@ for A, TE_smp, B in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', tot
             axs[2,0].axis('off')
 
             r2_err = axs[2,1].imshow(np.abs(r2_aux-r2n_aux), cmap='pink',
-                                    interpolation='none', vmin=0, vmax=lmax/5)
+                                    interpolation='none', vmin=0, vmax=r2_sc/5)
             fig.colorbar(r2_err, ax=axs[2,1]).ax.tick_params(labelsize=20)
             axs[2,1].axis('off')
 
