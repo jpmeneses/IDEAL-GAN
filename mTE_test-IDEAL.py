@@ -28,6 +28,11 @@ test_args = py.args()
 args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
 
+if not(hasattr(args,'ME_layer')):
+    py.arg('--ME_layer', type=bool, default=False)
+    ME_args = py.args()
+    args.__dict__.update(ME_args.__dict__)
+
 if not(hasattr(args,'field')):
     py.arg('--field', type=float, default=1.5)
     ds_args = py.args()
