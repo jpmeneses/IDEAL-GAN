@@ -54,9 +54,6 @@ dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
 X, Y, TE=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=3, end=4, te_data=True, MEBCRN=True)
 
-X = X[:,:,::4,::4,:]
-Y = Y[:,:,::4,::4,:]
-
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(X)
 _,_,_,_,n_out = np.shape(Y)
