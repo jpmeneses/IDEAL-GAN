@@ -20,6 +20,7 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
+py.arg('--phase_only', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--epochs', type=int, default=20000)
 py.arg('--epoch_decay', type=int, default=15000)  # epoch to start decaying learning rate
@@ -108,6 +109,9 @@ def train_G(A, B, te=None):
         # Split A2B param maps
         A2B_R2 = A2B_PM[...,1:]
         A2B_FM = A2B_PM[...,:1]
+
+        if args.phase_only:
+            A2B_PM = tf.concat([A2B_FM,tf.zeros_like(A2B_R2)],axis=-1)
 
         # Compute water/fat
         A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
