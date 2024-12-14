@@ -446,6 +446,7 @@ def MDWF_Generator(
 
 def PM_Generator(
     input_shape,
+    n_out=1,
     ME_layer=True,
     te_input=False,
     te_shape=(6,),
@@ -543,8 +544,8 @@ def PM_Generator(
         # Update counter
         cont += 1
 
-    x2 = keras.layers.Conv2D(1, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
-    x3 = keras.layers.Conv2D(1, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
+    x2 = keras.layers.Conv2D(n_out, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
+    x3 = keras.layers.Conv2D(n_out, (1, 1), activation='tanh', kernel_initializer='glorot_normal')(x3)
     
     if ME_layer:
         outputs = keras.layers.concatenate([x3,x2])
