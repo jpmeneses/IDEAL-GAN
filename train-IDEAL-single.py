@@ -51,7 +51,7 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
-X, Y, TE=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
+X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=3, end=4, te_data=True, MEBCRN=True)
 
 # Overall dataset statistics
@@ -66,7 +66,8 @@ print('Output Maps:',n_out)
 print('Training input shape:',X.shape)
 print('Training output shape:',Y.shape)
 
-# A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY,TE)).batch(1)
+A_B_dataset = tf.data.Dataset.from_tensor_slices((X,Y,te)).batch(1)
+train_iter = cycle(A_B_dataset)
 
 # ==============================================================================
 # =                                   models                                   =
@@ -158,23 +159,25 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
 
+A, B, TE = next(train_iter)
+
 # Magnitude of recon MR images at each echo
-im_ech1 = np.squeeze(np.abs(tf.complex(X[:,0,:,:,0],X[:,0,:,:,1])))
-im_ech2 = np.squeeze(np.abs(tf.complex(X[:,1,:,:,0],X[:,1,:,:,1])))
-if X.shape[1] >= 3:
-    im_ech3 = np.squeeze(np.abs(tf.complex(X[:,2,:,:,0],X[:,2,:,:,1])))
-if X.shape[1] >= 4:
-    im_ech4 = np.squeeze(np.abs(tf.complex(X[:,3,:,:,0],X[:,3,:,:,1])))
-if X.shape[1] >= 5:
-    im_ech5 = np.squeeze(np.abs(tf.complex(X[:,4,:,:,0],X[:,4,:,:,1])))
-if X.shape[1] >= 6:
-    im_ech6 = np.squeeze(np.abs(tf.complex(X[:,5,:,:,0],X[:,5,:,:,1])))
+im_ech1 = np.squeeze(np.abs(tf.complex(A[:,0,:,:,0],A[:,0,:,:,1])))
+im_ech2 = np.squeeze(np.abs(tf.complex(A[:,1,:,:,0],A[:,1,:,:,1])))
+if A.shape[1] >= 3:
+    im_ech3 = np.squeeze(np.abs(tf.complex(A[:,2,:,:,0],A[:,2,:,:,1])))
+if A.shape[1] >= 4:
+    im_ech4 = np.squeeze(np.abs(tf.complex(A[:,3,:,:,0],A[:,3,:,:,1])))
+if A.shape[1] >= 5:
+    im_ech5 = np.squeeze(np.abs(tf.complex(A[:,4,:,:,0],A[:,4,:,:,1])))
+if A.shape[1] >= 6:
+    im_ech6 = np.squeeze(np.abs(tf.complex(A[:,5,:,:,0],A[:,5,:,:,1])))
 
 # Ground-truth arrays
-wn_aux = np.squeeze(np.abs(tf.complex(Y[:,0,:,:,0],Y[:,0,:,:,1])))
-fn_aux = np.squeeze(np.abs(tf.complex(Y[:,1,:,:,0],Y[:,1,:,:,1])))
-r2n_aux = np.squeeze(Y[:,2,:,:,1])
-fieldn_aux = np.squeeze(Y[:,2,:,:,0])
+wn_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
+fn_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+r2n_aux = np.squeeze(B[:,2,:,:,1])
+fieldn_aux = np.squeeze(B[:,2,:,:,0])
 
 # main loop
 for ep in range(args.epochs):
@@ -185,7 +188,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    A2B_WF_abs, A2B_PM, G_loss_dict = train_step(X, Y, te=TE)
+    A2B_WF_abs, A2B_PM, G_loss_dict = train_step(A, B, te=TE)
 
     # # summary
     with train_summary_writer.as_default():
@@ -206,28 +209,28 @@ for ep in range(args.epochs):
                               interpolation='none', vmin=0, vmax=1)
         axs[0,1].set_title('2nd Echo')
         axs[0,1].axis('off')
-        if X.shape[1] >= 3:
+        if A.shape[1] >= 3:
             acq_ech3 = axs[0,2].imshow(im_ech3, cmap='gist_earth',
                                   interpolation='none', vmin=0, vmax=1)
             axs[0,2].set_title('3rd Echo')
             axs[0,2].axis('off')
         else:
             fig.delaxes(axs[0,2])
-        if X.shape[1] >= 4:
+        if A.shape[1] >= 4:
             acq_ech4 = axs[0,3].imshow(im_ech4, cmap='gist_earth',
                                   interpolation='none', vmin=0, vmax=1)
             axs[0,3].set_title('4th Echo')
             axs[0,3].axis('off')
         else:
             fig.delaxes(axs[0,3])
-        if X.shape[1] >= 5:
+        if A.shape[1] >= 5:
             acq_ech5 = axs[0,4].imshow(im_ech5, cmap='gist_earth',
                                   interpolation='none', vmin=0, vmax=1)
             axs[0,4].set_title('5th Echo')
             axs[0,4].axis('off')
         else:
             fig.delaxes(axs[0,4])
-        if X.shape[1] >= 6:
+        if A.shape[1] >= 6:
             acq_ech6 = axs[0,5].imshow(im_ech6, cmap='gist_earth',
                                   interpolation='none', vmin=0, vmax=1)
             axs[0,5].set_title('6th Echo')
@@ -285,7 +288,7 @@ for ep in range(args.epochs):
         fig.delaxes(axs[2,0])
         fig.delaxes(axs[2,5])
 
-        fig.suptitle('TE1/dTE: '+str([TE[0,0,0],np.mean(np.diff(TE,axis=1))]), fontsize=16)
+        fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE,axis=1))]), fontsize=16)
 
         # plt.show()
         plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
