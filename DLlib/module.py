@@ -453,6 +453,7 @@ def PM_Generator(
     filters=72,
     num_layers=4,
     dropout=0.0,
+    R2_init='glorot_normal',
     FM_init='glorot_normal',
     R2_self_attention=False,
     FM_self_attention=True,
@@ -545,7 +546,7 @@ def PM_Generator(
         # Update counter
         cont += 1
 
-    x2 = keras.layers.Conv2D(n_out, (1, 1), activation='sigmoid', kernel_initializer='glorot_normal')(x2)
+    x2 = keras.layers.Conv2D(n_out, (1, 1), activation='sigmoid', kernel_initializer=R2_init)(x2)
     x3 = keras.layers.Conv2D(n_out, (1, 1), activation='tanh', kernel_initializer=FM_init)(x3)
     
     if ME_layer:
