@@ -29,6 +29,7 @@ py.arg('--lr', type=float, default=0.001)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
 py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE', 'MSLE'])
+py.arg('--FM_init', default='glorot_normal', choices=['MSE', 'MAE', 'MSLE'])
 py.arg('--FM_TV_weight', type=float, default=0.0)
 py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
@@ -78,6 +79,7 @@ train_iter = cycle(A_B_dataset)
 
 G_A2B = dl.PM_Generator(input_shape=(None,hgt,wdt,n_ch),
                         filters=args.n_G_filters,
+                        FM_init=args.FM_init,
                         R2_self_attention=args.D1_SelfAttention,
                         FM_self_attention=args.D2_SelfAttention)
 
