@@ -80,6 +80,7 @@ train_iter = cycle(A_B_dataset)
 
 G_A2B = dl.PM_Generator(input_shape=(None,hgt,wdt,n_ch),
                         filters=args.n_G_filters,
+                        R2_init=args.R2_init,
                         FM_init=args.FM_init,
                         R2_self_attention=args.D1_SelfAttention,
                         FM_self_attention=args.D2_SelfAttention)
