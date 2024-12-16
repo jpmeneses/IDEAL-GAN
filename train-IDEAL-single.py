@@ -139,7 +139,7 @@ def train_G(A, B, te=None):
     return A2B_WF_abs, A2B_PM, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
                                 'WF_loss': WF_abs_loss,
                                 'R2_loss': R2_loss,
-                                'FM_loss': FM_loss
+                                'FM_loss': FM_loss,
                                 'TV_FM': FM_TV,
                                 'L1_FM': FM_L1}
 
