@@ -29,6 +29,8 @@ py.arg('--lr', type=float, default=0.001)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
 py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE', 'MSLE'])
+py.arg('--FM_TV_weight', type=float, default=0.0)
+py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 py.arg('--D2_SelfAttention',type=bool, default=True)
 args = py.args()
@@ -119,20 +121,27 @@ def train_G(A, B, te=None):
         # Magnitude of water/fat images
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
         
-        G_loss = loss_fn(A, A2B2A)
+        G_loss = A2B2A_cycle_loss = loss_fn(A, A2B2A)
 
         ############### Splited losses ####################
         WF_abs_loss = loss_fn(B_WF_abs, A2B_WF_abs)
         R2_loss = loss_fn(B_PM[...,1:], A2B_R2)
         FM_loss = loss_fn(B_PM[...,:1], A2B_FM)
 
+        ################ Regularizers #####################
+        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM[:,0,:,:,:]))
+        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3,4)))
+        G_loss += FM_TV * args.FM_TV_weight + FM_L1 * args.FM_L1_weight
+
     G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
 
-    return A2B_WF_abs, A2B_PM, {'G_loss': G_loss,
+    return A2B_WF_abs, A2B_PM, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
                                 'WF_loss': WF_abs_loss,
                                 'R2_loss': R2_loss,
-                                'FM_loss': FM_loss}
+                                'FM_loss': FM_loss
+                                'TV_FM': FM_TV,
+                                'L1_FM': FM_L1}
 
 
 def train_step(A, B, te=None):
