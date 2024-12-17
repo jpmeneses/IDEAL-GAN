@@ -20,6 +20,7 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
+py.arg('--grad_mode', default='bipolar', choices=['unipolar','bipolar'])
 py.arg('--phase_only', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--epochs', type=int, default=20000)
@@ -55,9 +56,14 @@ r2_sc = 200.0
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
+if args.grad_mode == 'bipolar':
+    dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
+    start, end = 3, 4
+else:
+    dataset_hdf5_1 = 'INTA_GC_384_complex_2D.hdf5'
+    start, end = 12, 13
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
-                        start=3, end=4, te_data=True, MEBCRN=True)
+                        start=start, end=end, te_data=True, MEBCRN=True)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(X)
