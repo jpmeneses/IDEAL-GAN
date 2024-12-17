@@ -60,7 +60,7 @@ if args.grad_mode == 'bipolar':
     dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
     start, end = 3, 4
 else:
-    dataset_hdf5_1 = 'INTA_GC_384_complex_2D.hdf5'
+    dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
     start, end = 12, 13
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=start, end=end, te_data=True, MEBCRN=True)
