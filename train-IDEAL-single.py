@@ -185,20 +185,20 @@ py.mkdir(sample_dir)
 A, B, TE = next(train_iter)
 
 # Magnitude of recon MR images at each echo
-im_ech1 = np.squeeze(np.abs(tf.complex(A[:,0,:,:,0],A[:,0,:,:,1])))
-im_ech2 = np.squeeze(np.abs(tf.complex(A[:,1,:,:,0],A[:,1,:,:,1])))
+im_ech1 = np.squeeze(np.abs(tf.complex(A[:1,0,:,:,0],A[:1,0,:,:,1])))
+im_ech2 = np.squeeze(np.abs(tf.complex(A[:1,1,:,:,0],A[:1,1,:,:,1])))
 if A.shape[1] >= 3:
-    im_ech3 = np.squeeze(np.abs(tf.complex(A[:,2,:,:,0],A[:,2,:,:,1])))
+    im_ech3 = np.squeeze(np.abs(tf.complex(A[:1,2,:,:,0],A[:1,2,:,:,1])))
 if A.shape[1] >= 4:
-    im_ech4 = np.squeeze(np.abs(tf.complex(A[:,3,:,:,0],A[:,3,:,:,1])))
+    im_ech4 = np.squeeze(np.abs(tf.complex(A[:1,3,:,:,0],A[:1,3,:,:,1])))
 if A.shape[1] >= 5:
-    im_ech5 = np.squeeze(np.abs(tf.complex(A[:,4,:,:,0],A[:,4,:,:,1])))
+    im_ech5 = np.squeeze(np.abs(tf.complex(A[:1,4,:,:,0],A[:1,4,:,:,1])))
 if A.shape[1] >= 6:
-    im_ech6 = np.squeeze(np.abs(tf.complex(A[:,5,:,:,0],A[:,5,:,:,1])))
+    im_ech6 = np.squeeze(np.abs(tf.complex(A[:1,5,:,:,0],A[:1,5,:,:,1])))
 
 # Ground-truth arrays
-wn_aux = np.squeeze(np.abs(tf.complex(B[:,0,:,:,0],B[:,0,:,:,1])))
-fn_aux = np.squeeze(np.abs(tf.complex(B[:,1,:,:,0],B[:,1,:,:,1])))
+wn_aux = np.squeeze(np.abs(tf.complex(B[:1,0,:,:,0],B[:1,0,:,:,1])))
+fn_aux = np.squeeze(np.abs(tf.complex(B[:1,1,:,:,0],B[:1,1,:,:,1])))
 r2n_aux = np.squeeze(B[:,2,:,:,1])
 fieldn_aux = np.squeeze(B[:,2,:,:,0])
 
@@ -262,25 +262,25 @@ for ep in range(args.epochs):
             fig.delaxes(axs[0,5])
 
         # A2B maps in the second row
-        w_aux = np.squeeze(A2B_WF_abs[:,0,...])
+        w_aux = np.squeeze(A2B_WF_abs[:1,0,...])
         W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(W_ok, ax=axs[1,1])
         axs[1,1].axis('off')
 
-        f_aux = np.squeeze(A2B_WF_abs[:,1,...])
+        f_aux = np.squeeze(A2B_WF_abs[:1,1,...])
         F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(F_ok, ax=axs[1,2])
         axs[1,2].axis('off')
 
-        r2_aux = np.squeeze(A2B_PM[...,1])
+        r2_aux = np.squeeze(A2B_PM[:1,...,1])
         r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
                                 interpolation='none', vmin=0, vmax=r2_sc)
         fig.colorbar(r2_ok, ax=axs[1,3])
         axs[1,3].axis('off')
 
-        field_aux = np.squeeze(A2B_PM[...,0])
+        field_aux = np.squeeze(A2B_PM[:1,...,0])
         field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
         fig.colorbar(field_ok, ax=axs[1,4])
