@@ -154,7 +154,7 @@ else:
                         te_input=args.te_input,
                         te_shape=(echoes,),
                         filters=args.n_G_filters,
-                        self_attention=args.D1_SelfAttention)
+                        self_attention=args.D2_SelfAttention)
     else:
         nn_out = 2
     G_A2B = dl.UNet(input_shape=(echoes,hgt,wdt,n_ch),
