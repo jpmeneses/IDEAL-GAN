@@ -199,8 +199,8 @@ if A.shape[1] >= 6:
 # Ground-truth arrays
 wn_aux = np.squeeze(np.abs(tf.complex(B[:1,0,:,:,0],B[:1,0,:,:,1])))
 fn_aux = np.squeeze(np.abs(tf.complex(B[:1,1,:,:,0],B[:1,1,:,:,1])))
-r2n_aux = np.squeeze(B[:,2,:,:,1])
-fieldn_aux = np.squeeze(B[:,2,:,:,0])
+r2n_aux = np.squeeze(B[:1,2,:,:,1])
+fieldn_aux = np.squeeze(B[:1,2,:,:,0])
 
 # main loop
 for ep in range(args.epochs):
@@ -311,7 +311,7 @@ for ep in range(args.epochs):
         fig.delaxes(axs[2,0])
         fig.delaxes(axs[2,5])
 
-        fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE,axis=1))]), fontsize=16)
+        fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE[:1,...],axis=1))]), fontsize=16)
 
         # plt.show()
         plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
