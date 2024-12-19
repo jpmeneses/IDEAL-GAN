@@ -249,15 +249,18 @@ def UNet(
             dropout=dropout,
             norm=norm
             )
+
+        if te_input:
+            # Fully-connected network for processing the vector with echo-times
+            y = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=-1))(te)
+            y = keras.layers.RNN(keras.layers.LSTMCell(6))(y)
+            y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(y)
+            # Adaptive Instance Normalization for Style-Transfer
+            x = AdaIN(x, y)
+        
         down_layers.append(x)
         x = keras.layers.MaxPooling2D((2, 2))(x)
         
-        if te_input and l==1:
-            # Fully-connected network for processing the vector with echo-times
-            y = keras.layers.Dense(filters,activation='relu',kernel_initializer='he_uniform')(te)
-            # Adaptive Instance Normalization for Style-Trasnfer
-            x = AdaIN(x, y)
-
         filters = filters * 2  # double the number of filters with each layer
 
     x = _conv2d_block(
