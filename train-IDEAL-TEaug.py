@@ -363,7 +363,7 @@ def train_G_R2(B, te=None):
         WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
 
         ################ Regularizers #####################
-        R2_TV = tf.reduce_sum(tf.image.total_variation(np.squeeze(B2A2B_R2,axis=1))) * args.R2_TV_weight
+        R2_TV = tf.reduce_sum(tf.image.total_variation(tf.squeeze(B2A2B_R2,axis=1))) * args.R2_TV_weight
         R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_R2),axis=(1,2,3,4))) * args.R2_L1_weight
         reg_term = R2_TV + R2_L1
         
