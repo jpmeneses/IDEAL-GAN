@@ -350,13 +350,6 @@ def train_G_R2(B, te=None):
         B2A2B_PM = tf.concat([B2A2B_FM,B2A2B_R2],axis=-1)
         B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
-        # Restore field-map when necessary
-        if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-            B2A2B_FM = (B2A2B_FM - 0.5) * 2
-            if not(args.DL_gen):
-                B2A2B_FM = tf.where(B[:,:,:,:1]!=0.0,B2A2B_FM,0.0)
-            B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
-
         # Compute water/fat
         B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te=te)
         
