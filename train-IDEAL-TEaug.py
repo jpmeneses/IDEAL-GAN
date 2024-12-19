@@ -23,11 +23,12 @@ from itertools import cycle
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
-py.arg('--DL_experiment_dir', default='output/GAN-238')
-py.arg('--n_per_epoch', type=int, default=10000)
+py.arg('--DL_partial_real', type=bool, default=False)
+py.arg('--DL_filename', default='LDM_ds')
+py.arg('--sigma_noise', type=float, default=0.0)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--field', type=float, default=1.5)
-py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','MEBCRN'])
+py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','2U-Net'])
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
 py.arg('--te_input', type=bool, default=True)
 py.arg('--n_G_filters', type=int, default=72)
@@ -104,23 +105,21 @@ if args.DL_gen:
     trainY = np.zeros((args.n_per_epoch,1,1,1,1),dtype=np.float32)
 else:
     trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
-valX    = acqs_1
-valY    = out_maps_1
 
 # Overall dataset statistics
 len_dataset,_,_,_,_ = np.shape(trainY)
-_,n_out,hgt,wdt,n_ch = np.shape(valY)
+_,n_out,hgt,wdt,n_ch = np.shape(out_maps_1)
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',echoes)
 
 # Input and output dimensions (validations data)
-print('Output shape:',valY.shape)
+print('Output shape:',out_maps_1.shape)
 
 B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
 B_dataset = B_dataset.batch(args.batch_size).shuffle(len(trainY))
-A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
-A_B_dataset_val.batch(1)
+B_dataset_val = tf.data.Dataset.from_tensor_slices(out_maps_1)
+B_dataset_val.batch(1)
 
 # ==============================================================================
 # =                                   models                                   =
@@ -144,65 +143,28 @@ if args.G_model == 'multi-decod':
                                 filters=args.n_G_filters,
                                 R2_self_attention=args.D1_SelfAttention,
                                 FM_self_attention=args.D2_SelfAttention)
-elif args.G_model == 'U-Net':
+else:
     if args.out_vars == 'WF-PM':
         nn_out = 4
+    elif args.G_model == '2U-Net':
+        nn_out = 1
+        G_A2R2= dl.UNet(input_shape=(echoes,hgt,wdt,1),
+                        n_out=nn_out,
+                        ME_layer=True,
+                        te_input=args.te_input,
+                        te_shape=(echoes,),
+                        filters=args.n_G_filters,
+                        self_attention=args.D1_SelfAttention)
     else:
         nn_out = 2
     G_A2B = dl.UNet(input_shape=(echoes,hgt,wdt,n_ch),
                     n_out=nn_out,
+                    ME_layer=True,
                     te_input=args.te_input,
-                    te_shape=(args.n_echoes,),
+                    te_shape=(echoes,),
                     filters=args.n_G_filters,
                     self_attention=args.D1_SelfAttention)
-elif args.G_model == 'MEBCRN':
-    if args.out_vars=='WFc':
-        nn_out = 4
-        out_activ = None
-    else:
-        nn_out = 2
-        out_activ = 'sigmoid'
-    G_A2B=dl.MEBCRN(input_shape=(echoes,hgt,wdt,n_ch),
-                    n_outputs=nn_out,
-                    output_activation=out_activ,
-                    n_res_blocks=9,
-                    n_downsamplings=0,
-                    filters=args.n_G_filters,
-                    self_attention=args.D1_SelfAttention)
-else:
-    raise(NameError('Unrecognized Generator Architecture'))
-
-if args.DL_gen:
-    enc= dl.encoder(input_shape=(DL_args.n_echoes,hgt,wdt,n_ch),
-                    encoded_dims=DL_args.encoded_size,
-                    filters=DL_args.n_G_filters,
-                    num_layers=DL_args.n_downsamplings,
-                    num_res_blocks=DL_args.n_res_blocks,
-                    NL_self_attention=DL_args.NL_SelfAttention
-                    )
-    dec_w =  dl.decoder(encoded_dims=DL_args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=DL_args.n_G_filters,
-                        num_layers=DL_args.n_downsamplings,
-                        num_res_blocks=DL_args.n_res_blocks,
-                        NL_self_attention=DL_args.NL_SelfAttention
-                        )
-    dec_f =  dl.decoder(encoded_dims=DL_args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        filters=DL_args.n_G_filters,
-                        num_layers=DL_args.n_downsamplings,
-                        num_res_blocks=DL_args.n_res_blocks,
-                        NL_self_attention=DL_args.NL_SelfAttention
-                        )
-    dec_xi = dl.decoder(encoded_dims=DL_args.encoded_size,
-                        output_shape=(hgt,wdt,n_ch),
-                        n_groups=DL_args.n_groups_PM,
-                        filters=DL_args.n_G_filters,
-                        num_layers=DL_args.n_downsamplings,
-                        num_res_blocks=DL_args.n_res_blocks,
-                        NL_self_attention=DL_args.NL_SelfAttention
-                        )
-    tl.Checkpoint(dict(enc=enc,dec_w=dec_w,dec_f=dec_f,dec_xi=dec_xi), py.join(args.DL_experiment_dir, 'checkpoints')).restore()
+        
 
 IDEAL_op = wf.IDEAL_Layer(field=args.field)
 
@@ -210,6 +172,7 @@ sup_loss_fn = tf.losses.MeanAbsoluteError()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+G_R2_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
 # ==============================================================================
 # =                                 train step                                 =
@@ -217,26 +180,27 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(B, te=None):
+    ##################### B Cycle #####################
+    B2A = IDEAL_op(B, te=te, training=False)
+    B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
+    B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A),axis=-1,keepdims=True))
+
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
+    B_PM = B[:,2:,:,:,:]
+
+    ############## Selective weighting ################
+    if args.sel_weight:
+        sel_w = 0.0
+        for echo in range(3):
+            obs_phase = tf.math.atan2(B2A[:,echo:(echo+1),:,:,1:],B2A[:,echo:(echo+1),:,:,:1])
+            phi_phase = 2*np.pi*B[:,2:,:,:,:1]*fm_sc * te[0,echo,0]
+            phi_phase += tf.math.atan2(B[:,:1,:,:,1:],B[:,:1,:,:,:1])
+            sel_w += (1/6) * tf.math.cos(obs_phase-phi_phase) + (1/6)
+            sel_w **= args.sel_weight_pwr
+    else:
+        sel_w = 1.0
+
     with tf.GradientTape() as t:
-        ##################### B Cycle #####################
-        B2A = IDEAL_op(B, te=te, training=False)
-        B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
-
-        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
-        B_PM = B[:,2:,:,:,:]
-
-        ############## Selective weighting ################
-        if args.sel_weight:
-            sel_w = 0.0
-            for echo in range(3):
-                obs_phase = tf.math.atan2(B2A[:,echo:(echo+1),:,:,1:],B2A[:,echo:(echo+1),:,:,:1])
-                phi_phase = 2*np.pi*B[:,2:,:,:,:1]*fm_sc * te[0,echo,0]
-                phi_phase += tf.math.atan2(B[:,:1,:,:,1:],B[:,:1,:,:,:1])
-                sel_w += (1/6) * tf.math.cos(obs_phase-phi_phase) + (1/6)
-                sel_w **= args.sel_weight_pwr
-        else:
-            sel_w = 1.0
-
         if args.out_vars == 'WF':
             # Compute model's output
             if args.te_input:
@@ -280,6 +244,12 @@ def train_G(B, te=None):
                 B2A2B_PM = G_A2B([B2A,te], training=True)
             else:
                 B2A2B_PM = G_A2B(B2A, training=True)
+            if args.G_model == '2U-Net':
+                if args.te_input:
+                    B2A2B_R2 = G_A2R2([B2A_abs,te], training=False)
+                else:
+                    B2A2B_R2 = G_A2R2(B2A_abs, training=False)
+                B2A2B_PM = tf.concat([B2A2B_PM,B2A2B_R2],axis=-1)
             if not(args.DL_gen):
                 B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
@@ -359,14 +329,76 @@ def train_G(B, te=None):
             'L1_R2': R2_L1,
             'L1_FM': FM_L1}
 
+@tf.function
+def train_G_R2(B, te=None):
+    ##################### B Cycle #####################
+    B2A = IDEAL_op(B, te=te, training=False)
+    B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
+    B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A),axis=-1,keepdims=True))
+
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
+    B_PM = B[:,2:,:,:,:]
+
+    with tf.GradientTape() as t:
+        # Compute model's output
+        if args.te_input:
+            B2A2B_FM = G_A2B([B2A,te], training=False)
+            B2A2B_R2 = G_A2R2([B2A_abs,te], training=True)
+        else:
+            B2A2B_FM = G_A2B(B2A, training=False)
+            B2A2B_R2 = G_A2R2(B2A_abs, training=True)
+        B2A2B_PM = tf.concat([B2A2B_FM,B2A2B_R2],axis=-1)
+        B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
+
+        # Split A2B param maps
+        B2A2B_R2 = B2A2B_PM[:,0,:,:,1:]
+        B2A2B_FM = B2A2B_PM[:,0,:,:,:1]
+
+        # Restore field-map when necessary
+        if args.G_model=='U-Net' or args.G_model=='MEBCRN':
+            B2A2B_FM = (B2A2B_FM - 0.5) * 2
+            if not(args.DL_gen):
+                B2A2B_FM = tf.where(B[:,:,:,:1]!=0.0,B2A2B_FM,0.0)
+            B2A2B_PM = tf.concat([B2A2B_R2,B2A2B_FM],axis=-1)
+
+        # Compute water/fat
+        B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te=te)
+        
+        # Magnitude of water/fat images
+        B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
+        
+        # Compute loss
+        R2_loss = sup_loss_fn(B_PM[...,1:], B2A2B_R2)
+
+        ############### Splited losses ####################
+        WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
+
+        ################ Regularizers #####################
+        R2_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_R2)) * args.R2_TV_weight
+        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
+        reg_term = R2_TV + R2_L1
+        
+        G_loss = R2_loss + reg_term
+        
+    G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
+    G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
+
+    return {'R2_loss': R2_loss,
+            'TV_R2': R2_TV,
+            'L1_R2': R2_L1}
+
+
 
 def train_step(B, te=None):
     G_loss_dict = train_G(B, te)
+    if args.G_model == '2U-Net':
+        G_loss_dict_aux = train_G_R2(B, te)
+        G_loss_dict.update(G_loss_dict_aux)
     return G_loss_dict
 
 
 @tf.function
-def sample(A, B, te=None):
+def sample(B, te=None):
     # Split B
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
     B_PM = B[:,2:,:,:,:]
@@ -374,13 +406,14 @@ def sample(A, B, te=None):
     # Compute B2A (+ noise) and estimate B2A2B
     B2A = IDEAL_op(B, te=te, training=False)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
+    B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A),axis=-1,keepdims=True))
     
     # Estimate A2B
     if args.out_vars == 'WF':
         if args.te_input:
-            B2A2B_WF_abs = G_A2B([B2A,te], training=True)
+            B2A2B_WF_abs = G_A2B([B2A,te], training=False)
         else:
-            B2A2B_WF_abs = G_A2B(B2A, training=True)
+            B2A2B_WF_abs = G_A2B(B2A, training=False)
         B2A2B_WF_abs = tf.where(B_WF_abs!=0.0,B2A2B_WF_abs,0.0)
         B2A2B_WF = tf.concat([B2A2B_WF_abs, tf.zeros_like(B2A2B_WF_abs)], axis=1)
         B2A2B_PM = tf.zeros_like(B_PM)
@@ -407,9 +440,15 @@ def sample(A, B, te=None):
     #     val_sup_loss = sup_loss_fn(B_WF, B2A2B_WF)
     elif args.out_vars == 'PM':
         if args.te_input:
-            B2A2B_PM = G_A2B([B2A,te], training=True)
+            B2A2B_PM = G_A2B([B2A,te], training=False)
         else:
-            B2A2B_PM = G_A2B(B2A, training=True)
+            B2A2B_PM = G_A2B(B2A, training=False)
+        if args.G_model == '2U-Net':
+            if args.te_input:
+                B2A2B_R2 = G_A2R2([B2A_abs,te], training=False)
+            else:
+                B2A2B_R2 = G_A2R2(B2A_abs, training=False)
+            B2A2B_PM = tf.concat([B2A2B_PM,B2A2B_R2],axis=-1)
         B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
         B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
         B2A2B_FM = B2A2B_PM[:,:,:,:,:1]
@@ -450,19 +489,9 @@ def sample(A, B, te=None):
                         'R2_loss': R2_loss,
                         'FM_loss': FM_loss}
 
-def validation_step(A, B, TE):
-    B2A, B2A2B_abs, val_B2A2B_dict = sample(A, B, TE)
+def validation_step(B, TE):
+    B2A, B2A2B_abs, val_B2A2B_dict = sample(B, TE)
     return B2A, B2A2B_abs, val_B2A2B_dict
-
-if args.DL_gen:
-    @tf.function
-    def gen_sample(Z,TE=None):
-        # Z2B2A Cycle
-        Z2B_w = dec_w(Z, training=False)
-        Z2B_f = dec_f(Z, training=False)
-        Z2B_xi= dec_xi(Z, training=False)
-        Z2B = tf.concat([Z2B_w,Z2B_f,Z2B_xi],axis=1)
-        return Z2B
 
 # ==============================================================================
 # =                                    run                                     =
@@ -487,10 +516,10 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'validation'))
 
 # sample
-val_iter = cycle(A_B_dataset_val)
+val_iter = cycle(B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(valY))
+n_div = np.ceil(total_steps/len(out_maps_1))
 
 # main loop
 for ep in range(args.epochs):
@@ -502,12 +531,6 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for B in B_dataset:
-        if args.DL_gen:
-            hls = hgt//(2**(DL_args.n_downsamplings))
-            wls = wdt//(2**(DL_args.n_downsamplings))
-            z_shape = (1,hls,wls,DL_args.encoded_size)
-            Z = tf.random.normal(z_shape,seed=0,dtype=tf.float32)
-            B = gen_sample(Z)
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
@@ -556,8 +579,7 @@ for ep in range(args.epochs):
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
-            A, B = next(val_iter)
-            A = tf.expand_dims(A, axis=0)
+            B = next(val_iter)
             B = tf.expand_dims(B, axis=0)
             B_WF = B[:,:2,:,:,:]
             B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
@@ -567,7 +589,7 @@ for ep in range(args.epochs):
             else:
                 TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel, 1)
             
-            B2A, B2A2B, val_A2B_dict = validation_step(A, B, TE_valid)
+            B2A, B2A2B, val_A2B_dict = validation_step(B, TE_valid)
             B2A2B_WF = B2A2B[:,:2,:,:,:]
             B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
 
