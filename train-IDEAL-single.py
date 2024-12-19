@@ -61,7 +61,7 @@ if args.grad_mode == 'bipolar':
     start, end = 3, 4
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
-    start, end = 12, 13
+    start, end = 10, 15
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=start, end=end, te_data=True, MEBCRN=True)
 
@@ -77,7 +77,7 @@ print('Output Maps:',n_out)
 print('Training input shape:',X.shape)
 print('Training output shape:',Y.shape)
 
-A_B_dataset = tf.data.Dataset.from_tensor_slices((X,Y,te)).batch(1)
+A_B_dataset = tf.data.Dataset.from_tensor_slices((X,Y,te)).batch(len_dataset)
 train_iter = cycle(A_B_dataset)
 
 # ==============================================================================
