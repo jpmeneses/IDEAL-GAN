@@ -21,18 +21,15 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--grad_mode', default='bipolar', choices=['unipolar','bipolar'])
-py.arg('--phase_only', type=bool, default=False)
 py.arg('--n_G_filters', type=int, default=36)
-py.arg('--epochs', type=int, default=20000)
-py.arg('--epoch_decay', type=int, default=15000)  # epoch to start decaying learning rate
-py.arg('--epoch_ckpt', type=int, default=1000)  # num. of epochs to save a checkpoint
-py.arg('--lr', type=float, default=0.001)
+py.arg('--epochs', type=int, default=7000)
+py.arg('--epoch_decay', type=int, default=7000)  # epoch to start decaying learning rate
+py.arg('--epoch_ckpt', type=int, default=500)  # num. of epochs to save a checkpoint
+py.arg('--lr', type=float, default=0.0008)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
 py.arg('--main_loss', default='MSE', choices=['MSE', 'MAE', 'MSLE'])
-py.arg('--R2_init', default='glorot_normal', choices=['glorot_normal', 'zeros', 'ones'])
-py.arg('--FM_init', default='glorot_normal', choices=['glorot_normal', 'zeros', 'ones'])
-py.arg('--FM_TV_weight', type=float, default=0.0)
+py.arg('--FM_TV_weight', type=float, default=0.0001)
 py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 py.arg('--D2_SelfAttention',type=bool, default=True)
@@ -63,7 +60,8 @@ else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
     start, end = 10, 15
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
-                        start=start, end=end, te_data=True, MEBCRN=True)
+                        start=start, end=end, te_data=True, MEBCRN=True,
+                        mag_and_phase=True, unwrap=True)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(X)
@@ -84,14 +82,22 @@ train_iter = cycle(A_B_dataset)
 # =                                   models                                   =
 # ==============================================================================
 
-G_A2B = dl.PM_Generator(input_shape=(None,hgt,wdt,n_ch),
-                        filters=args.n_G_filters,
-                        R2_init=args.R2_init,
-                        FM_init=args.FM_init,
-                        R2_self_attention=args.D1_SelfAttention,
-                        FM_self_attention=args.D2_SelfAttention)
+G_mag = dl.UNet(input_shape=(ne,hgt,wdt,1),
+                n_out=n_out,
+                ME_layer=True,
+                filters=args.n_G_filters,
+                output_activation='sigmoid',
+                self_attention=args.D1_SelfAttention)
 
-IDEAL_op = wf.IDEAL_Layer()
+G_pha = dl.UNet(input_shape=(ne,hgt,wdt,1),
+                n_out=n_out,
+                ME_layer=True,
+                filters=args.n_G_filters,
+                output_activation='linear',
+                self_attention=args.D2_SelfAttention)
+
+IDEAL_op = wf.IDEAL_mag_Layer()
+APD_loss_fn = gan.AbsolutePhaseDisparity()
 
 if args.main_loss == 'MSE':
     loss_fn = tf.losses.MeanSquaredError()
@@ -111,40 +117,35 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(A, B, te=None):
-    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
-    B_PM = B[:,2:,:,:,:]
+    A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+    A_pha = tf.math.atan2(A[...,1:],A[...,:1])
     with tf.GradientTape() as t:
         # Compute model's output
-        A2B_PM = G_A2B(A, training=True)
-        A2B_PM = tf.where(A[:,:1,...]!=0.0,A2B_PM,0.0)
+        A2B_mag = G_mag(A_mag, training=True)
+        A2B_pha = G_pha(A_pha, training=True)
 
-        # Split A2B param maps
-        A2B_R2 = A2B_PM[...,1:]
-        A2B_FM = A2B_PM[...,:1]
+        A2B = tf.concat([A2B_mag,A2B_pha],axis=1)
+        A2B = tf.where(B!=0.0,A2B,0.0)
 
-        if args.phase_only:
-            A2B_PM = tf.concat([A2B_FM,tf.zeros_like(A2B_R2)],axis=-1)
+        A2B_WF_abs = A2B[:,:1,:,:,:2]
+        A2B_PM = A2B[...,2:]
 
-        # Compute water/fat
-        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
-        
-        # Magnitude of water/fat images
-        A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
-        
+        A2B2A = IDEAL_op(A2B, training=False)
+
         G_loss = A2B2A_cycle_loss = loss_fn(A, A2B2A)
 
         ############### Splited losses ####################
-        WF_abs_loss = loss_fn(B_WF_abs, A2B_WF_abs)
-        R2_loss = loss_fn(B_PM[...,1:], A2B_R2)
-        FM_loss = loss_fn(B_PM[...,:1], A2B_FM)
+        WF_abs_loss = loss_fn(B[:,:1,:,:,:2], A2B[:,:1,:,:,:2])
+        R2_loss = loss_fn(B[:,:1,:,:,2:], A2B[:,:1,:,:,2:])
+        FM_loss = loss_fn(B[:,1:,:,:,2:], A2B[:,1:,:,:,2:])
 
         ################ Regularizers #####################
-        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM[:,0,:,:,:]))
-        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B_FM),axis=(1,2,3,4)))
+        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B[:,1,:,:,2:]))
+        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B[:,1:,:,:,2:]),axis=(1,2,3,4)))
         G_loss += FM_TV * args.FM_TV_weight + FM_L1 * args.FM_L1_weight
 
-    G_grad = t.gradient(G_loss, G_A2B.trainable_variables)
-    G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
+    G_grad = t.gradient(G_loss, G_mag.trainable_variables + G_pha.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables + G_pha.trainable_variables))
 
     return A2B_WF_abs, A2B_PM, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
                                 'WF_loss': WF_abs_loss,
@@ -166,7 +167,8 @@ def train_step(A, B, te=None):
 ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
-checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
+checkpoint = tl.Checkpoint(dict(G_mag=G_mag,
+                                G_pha=G_pha,
                                 G_optimizer=G_optimizer,
                                 ep_cnt=ep_cnt),
                            py.join(output_dir, 'checkpoints'),
@@ -197,10 +199,10 @@ if A.shape[1] >= 6:
     im_ech6 = np.squeeze(np.abs(tf.complex(A[:1,5,:,:,0],A[:1,5,:,:,1])))
 
 # Ground-truth arrays
-wn_aux = np.squeeze(np.abs(tf.complex(B[:1,0,:,:,0],B[:1,0,:,:,1])))
-fn_aux = np.squeeze(np.abs(tf.complex(B[:1,1,:,:,0],B[:1,1,:,:,1])))
-r2n_aux = np.squeeze(B[:1,2,:,:,1])
-fieldn_aux = np.squeeze(B[:1,2,:,:,0])
+wn_aux = np.squeeze(B[:1,:1,:,:,0])
+fn_aux = np.squeeze(B[:1,:1,:,:,1])
+r2n_aux = np.squeeze(B[:1,:1,:,:,2])
+fieldn_aux = np.squeeze(B[:1,1:,:,:,2])
 
 # main loop
 for ep in range(args.epochs):
@@ -262,25 +264,25 @@ for ep in range(args.epochs):
             fig.delaxes(axs[0,5])
 
         # A2B maps in the second row
-        w_aux = np.squeeze(A2B_WF_abs[:1,0,...])
+        w_aux = np.squeeze(A2B_WF_abs[:1,0,:,:,0])
         W_ok =  axs[1,1].imshow(w_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(W_ok, ax=axs[1,1])
         axs[1,1].axis('off')
 
-        f_aux = np.squeeze(A2B_WF_abs[:1,1,...])
+        f_aux = np.squeeze(A2B_WF_abs[:1,0,:,:,1])
         F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(F_ok, ax=axs[1,2])
         axs[1,2].axis('off')
 
-        r2_aux = np.squeeze(A2B_PM[:1,...,1])
+        r2_aux = np.squeeze(A2B_PM[:1,0,:,:,0])
         r2_ok = axs[1,3].imshow(r2_aux*r2_sc, cmap='copper',
                                 interpolation='none', vmin=0, vmax=r2_sc)
         fig.colorbar(r2_ok, ax=axs[1,3])
         axs[1,3].axis('off')
 
-        field_aux = np.squeeze(A2B_PM[:1,...,0])
+        field_aux = np.squeeze(A2B_PM[:1,0,:,:,0])
         field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
         fig.colorbar(field_ok, ax=axs[1,4])
