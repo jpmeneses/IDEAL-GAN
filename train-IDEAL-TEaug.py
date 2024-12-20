@@ -567,7 +567,7 @@ for ep in range(args.epochs):
                         step=G_optimizer.iterations, name='G learning rate')
 
         # sample
-        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200):
+        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200//args.batch_size):
             B = next(val_iter)
             B = tf.expand_dims(B, axis=0)
             B_WF = B[:,:2,:,:,:]
