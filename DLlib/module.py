@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import tensorflow_addons as tfa
 import tensorflow.keras as keras
 import tensorflow_probability as tfp
 
@@ -17,7 +16,7 @@ def _get_norm_layer(norm):
     elif norm == 'batch_norm':
         return keras.layers.BatchNormalization
     elif norm == 'instance_norm':
-        return tfa.layers.InstanceNormalization
+        return tf.layers.GroupNormalization
     elif norm == 'layer_norm':
         return keras.layers.LayerNormalization
 
@@ -56,7 +55,10 @@ def _conv2d_block(
         padding=padding,
         use_bias=False,
         )(inputs)
-    c = Norm()(c)
+    if norm=="instance_norm":
+        c = Norm(groups=filters)(c)
+    else:
+        c = Norm()(c)
     if dropout > 0.0:
         c = keras.layers.SpatialDropout2D(dropout)(c)
     c = keras.layers.Conv2D(
@@ -68,7 +70,10 @@ def _conv2d_block(
         padding=padding,
         use_bias=False,
         )(c)
-    c = Norm()(c)
+    if norm=="instance_norm":
+        c = Norm(groups=filters)(c)
+    else:
+        c = Norm()(c)
     return c
 
 
@@ -81,14 +86,20 @@ def _residual_block(x, norm, groups=1, Bayes=False):
         h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
     else:
         h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
-    h = Norm()(h)
+    if norm=="instance_norm":
+        h = Norm(groups=dim)(h)
+    else:
+        h = Norm()(h)
     h = tf.nn.leaky_relu(h)
 
     if Bayes:
         h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
     else:
         h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
-    h = Norm()(h)
+    if norm=="instance_norm":
+        h = Norm(groups=dim)(h)
+    else:
+        h = Norm()(h)
 
     return keras.layers.add([x, h])
 
@@ -158,22 +169,28 @@ def PatchGAN(input_shape,
         h = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(h)
 
     # 1
-    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, in_kernel, strides=2, padding='same', groups=n_groups, kernel_initializer='he_normal'))
+    conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(dim, in_kernel, strides=2, padding='same', groups=n_groups, kernel_initializer='he_normal'))
     h = conv2d(h)
     h = tf.nn.leaky_relu(h, alpha=0.2)
 
     for _ in range(n_downsamplings - 1):
         dim = min(dim * 2, dim_ * 16)
-        conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=2, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
+        conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=2, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
         h = conv2d(h)
-        h = Norm()(h)
+        if norm=="instance_norm":
+            h = Norm(groups=dim)(h)
+        else:
+            h = Norm()(h)
         h = tf.nn.leaky_relu(h, alpha=0.2)
 
     # 2
     dim = min(dim * 2, dim_ * 16)
-    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=1, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
+    conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=1, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
     h = conv2d(h)
-    h = Norm()(h)
+    if norm=="instance_norm":
+        h = Norm(groups=dim)(h)
+    else:
+        h = Norm()(h)
     h = tf.nn.leaky_relu(h, alpha=0.2)
 
     # Self-attention
@@ -181,7 +198,7 @@ def PatchGAN(input_shape,
         h = SelfAttention(ch=dim)(h)
 
     # 3
-    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(1, n_kernel, strides=1, padding='same', kernel_initializer='glorot_normal'))
+    conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(1, n_kernel, strides=1, padding='same', kernel_initializer='glorot_normal'))
     h = conv2d(h)
 
     if cGAN:
@@ -753,7 +770,10 @@ def decoder(
         for n_res in range(num_res_blocks):
             x = _residual_block(x, norm=norm, groups=n_groups)
 
-    x = Norm()(x)
+    if norm=="instance_norm":
+        x = Norm(groups=filters[l+1])(x)
+    else:
+        x = Norm()(x)
     if bayes_layer:
         x = keras.layers.Conv2D(filters[-1],3,padding="same",groups=n_groups,activation=output_activation,kernel_initializer=output_initializer)(x)
         x_r = keras.layers.Lambda(lambda z: z[...,:filters[-1]//2])(x)
@@ -807,7 +827,10 @@ def Bayes_decoder(
             _x = _upsample(filt_iter, (2, 2), strides=(2, 2), padding='same', method='Interpol_Conv')(_x)
             for n_res in range(num_res_blocks):
                 _x = _residual_block(_x, norm=norm, Bayes=True)
-        _x = Norm()(_x)
+        if norm=="instance_norm":
+            _x = Norm(groups=filt_iter)(_x)
+        else:
+            _x = Norm()(_x)
         _x = tfp.layers.Convolution2DFlipout(1,3,padding='same',activation=output_activation)(_x)
         x_list_out.append(_x)
     x = keras.layers.concatenate(x_list_out)
