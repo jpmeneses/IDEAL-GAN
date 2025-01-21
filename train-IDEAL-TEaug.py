@@ -558,6 +558,7 @@ for ep in range(args.epochs):
         else:
             te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 
+        print(tf.config.experimental.get_memory_info("GPU:0"))
         G_loss_dict = train_step(B, te=te_var)
 
         # # summary
