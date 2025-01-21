@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 
 import tensorflow as tf
 import tensorflow.keras as keras
+
+import os
+os.environ['TF_DEVICE_MIN_SYS_MEMORY_IN_MB'] = '8000'
+
 import tf2lib as tl
 import tf2gan as gan
 import DLlib as dl
