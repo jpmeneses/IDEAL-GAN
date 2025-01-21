@@ -17,7 +17,7 @@ def _get_norm_layer(norm):
     elif norm == 'batch_norm':
         return keras.layers.BatchNormalization
     elif norm == 'instance_norm':
-        return tfa.layers.GroupNormalization
+        return tfa.layers.InstanceNormalization
     elif norm == 'layer_norm':
         return keras.layers.LayerNormalization
 
