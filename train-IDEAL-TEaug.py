@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 
 import tensorflow as tf
 import tensorflow.keras as keras
+
+gpu = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(device=gpu[0], enable=True)
+
 import tf2lib as tl
 import tf2gan as gan
 import DLlib as dl
@@ -15,9 +19,6 @@ import wflib as wf
 import data
 
 from itertools import cycle
-
-gpu = tf.config.list_physical_devices('GPU')
-tf.config.experimental.set_memory_growth(device=gpu[0], enable=True)
 
 # ==============================================================================
 # =                                   param                                    =
