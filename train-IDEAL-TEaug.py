@@ -16,6 +16,9 @@ import data
 
 from itertools import cycle
 
+gpu = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(device=gpu[0], enable=True)
+
 # ==============================================================================
 # =                                   param                                    =
 # ==============================================================================
