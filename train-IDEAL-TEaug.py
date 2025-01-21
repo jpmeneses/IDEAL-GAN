@@ -500,6 +500,8 @@ try:  # restore checkpoint including the epoch counter
 except Exception as e:
     print(e)
 
+print(tf.config.experimental.get_memory_info("GPU:0"))
+
 # summary
 train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'train'))
 val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'validation'))
