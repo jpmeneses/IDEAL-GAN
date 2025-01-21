@@ -500,8 +500,6 @@ try:  # restore checkpoint including the epoch counter
 except Exception as e:
     print(e)
 
-print(tf.config.experimental.get_memory_info("GPU:0"))
-
 # summary
 train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'train'))
 val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'validation'))
@@ -527,27 +525,27 @@ for ep in range(args.epochs):
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
-        p = np.random.rand()
-        if p <= 0.4:
-            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
+        # p = np.random.rand()
+        # if p <= 0.4:
+        #     B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
 
-            # Random 90 deg rotations
-            B = tf.image.rot90(B,k=np.random.randint(3))
+        #     # Random 90 deg rotations
+        #     B = tf.image.rot90(B,k=np.random.randint(3))
 
-            # Random horizontal reflections
-            B = tf.image.random_flip_left_right(B)
+        #     # Random horizontal reflections
+        #     B = tf.image.random_flip_left_right(B)
 
-            # Random vertical reflections
-            B = tf.image.random_flip_up_down(B)
+        #     # Random vertical reflections
+        #     B = tf.image.random_flip_up_down(B)
 
-            B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+        #     B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
 
-            # Random off-resonance field-map scaling factor
-            if args.FM_aug:
-                B_FM = B[:,2:,:,:,:1] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
-                B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
-                B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
-        print(tf.config.experimental.get_memory_info("GPU:0"))
+        #     # Random off-resonance field-map scaling factor
+        #     if args.FM_aug:
+        #         B_FM = B[:,2:,:,:,:1] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
+        #         B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
+        #         B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
+        # print(tf.config.experimental.get_memory_info("GPU:0"))
         # ==============================================================================
 
         # ==============================================================================
