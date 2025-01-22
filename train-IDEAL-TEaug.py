@@ -154,6 +154,7 @@ else:
                         te_input=args.te_input,
                         te_shape=(echoes,),
                         filters=args.n_G_filters,
+                        output_activation='sigmoid',
                         self_attention=args.D2_SelfAttention)
     else:
         nn_out = 2
