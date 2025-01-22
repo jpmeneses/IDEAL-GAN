@@ -510,8 +510,6 @@ sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
 n_div = np.ceil(total_steps/len(out_maps_1))
 
-print(tf.config.experimental.get_memory_info("GPU:0"))
-
 # main loop
 for ep in range(args.epochs):
     if ep < ep_cnt:
@@ -545,7 +543,7 @@ for ep in range(args.epochs):
         #         B_FM = B[:,2:,:,:,:1] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
         #         B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
         #         B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
-        # print(tf.config.experimental.get_memory_info("GPU:0"))
+        
         # ==============================================================================
 
         # ==============================================================================
@@ -561,7 +559,6 @@ for ep in range(args.epochs):
         else:
             te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 
-        print(tf.config.experimental.get_memory_info("GPU:0"))
         G_loss_dict = train_step(B, te=te_var)
 
         # # summary
