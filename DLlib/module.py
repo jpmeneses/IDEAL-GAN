@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import tensorflow_addons as tfa
 import tensorflow.keras as keras
 import tensorflow_probability as tfp
 
@@ -17,7 +16,7 @@ def _get_norm_layer(norm):
     elif norm == 'batch_norm':
         return keras.layers.BatchNormalization
     elif norm == 'instance_norm':
-        return tfa.layers.InstanceNormalization
+        return keras.layers.GroupNormalization
     elif norm == 'layer_norm':
         return keras.layers.LayerNormalization
 
@@ -56,7 +55,10 @@ def _conv2d_block(
         padding=padding,
         use_bias=False,
         )(inputs)
-    c = Norm()(c)
+    if norm=="instance_norm":
+        c = Norm(groups=filters)(c)
+    else:
+        c = Norm()(c)
     if dropout > 0.0:
         c = keras.layers.SpatialDropout2D(dropout)(c)
     c = keras.layers.Conv2D(
@@ -68,7 +70,10 @@ def _conv2d_block(
         padding=padding,
         use_bias=False,
         )(c)
-    c = Norm()(c)
+    if norm=="instance_norm":
+        c = Norm(groups=filters)(c)
+    else:
+        c = Norm()(c)
     return c
 
 
@@ -81,14 +86,20 @@ def _residual_block(x, norm, groups=1, Bayes=False):
         h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
     else:
         h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
-    h = Norm()(h)
+    if norm=="instance_norm":
+        h = Norm(groups=dim)(h)
+    else:
+        h = Norm()(h)
     h = tf.nn.leaky_relu(h)
 
     if Bayes:
         h = tfp.layers.Convolution2DFlipout(dim, 3, padding='same')(h)
     else:
         h = keras.layers.Conv2D(dim, 3, groups=groups, kernel_initializer='he_normal', padding='same', use_bias=False)(h)
-    h = Norm()(h)
+    if norm=="instance_norm":
+        h = Norm(groups=dim)(h)
+    else:
+        h = Norm()(h)
 
     return keras.layers.add([x, h])
 
@@ -166,14 +177,20 @@ def PatchGAN(input_shape,
         dim = min(dim * 2, dim_ * 16)
         conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=2, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
         h = conv2d(h)
-        h = Norm()(h)
+        if norm=="instance_norm":
+            h = Norm(groups=dim)(h)
+        else:
+            h = Norm()(h)
         h = tf.nn.leaky_relu(h, alpha=0.2)
 
     # 2
     dim = min(dim * 2, dim_ * 16)
     conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=1, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
     h = conv2d(h)
-    h = Norm()(h)
+    if norm=="instance_norm":
+        h = Norm(groups=dim)(h)
+    else:
+        h = Norm()(h)
     h = tf.nn.leaky_relu(h, alpha=0.2)
 
     # Self-attention
