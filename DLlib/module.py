@@ -477,7 +477,7 @@ def PM_Generator(
     FM_init='glorot_normal',
     R2_self_attention=False,
     FM_self_attention=True,
-    norm='instance_norm'):
+    norm='batch_norm'):
     
     x = inputs = keras.Input(input_shape)
     if te_input:
