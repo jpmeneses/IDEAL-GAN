@@ -40,7 +40,7 @@ def _conv2d_block(
     kernel_initializer="he_normal",
     activation='relu',
     padding="same",
-    norm="instance_norm"
+    norm="batch_norm"
 ):
     Norm = _get_norm_layer(norm)
     if downsampling:
@@ -247,7 +247,7 @@ def UNet(
     output_activation='tanh',
     output_initializer='glorot_normal',
     self_attention=False,
-    norm='instance_norm'):
+    norm='batch_norm'):
 
     x = inputs1 = keras.Input(input_shape)
     if te_input:
