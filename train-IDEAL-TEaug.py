@@ -147,6 +147,7 @@ else:
     if args.out_vars == 'WF-PM':
         nn_out = 4
     elif args.G_model == '2U-Net':
+        n_ch = 1
         nn_out = 1
         G_A2R2= dl.UNet(input_shape=(echoes,hgt,wdt,1),
                         n_out=nn_out,
