@@ -491,9 +491,11 @@ def validation_step(B, TE):
 ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
-checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
-                                G_optimizer=G_optimizer,
-                                ep_cnt=ep_cnt),
+ckpt_dict = dict(G_A2B=G_A2B, G_optimizer=G_optimizer, ep_cnt=ep_cnt)
+if args.G_model == '2U-Net':
+    ckpt_dict_aux = dict(G_A2R2=G_A2R2, G_R2_optimizer=G_R2_optimizer)
+    ckpt_dict.update(ckpt_dict_aux)
+checkpoint = tl.Checkpoint(ckpt_dict,
                            py.join(output_dir, 'checkpoints'),
                            max_to_keep=5)
 try:  # restore checkpoint including the epoch counter
