@@ -92,8 +92,6 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
             out_mag = np.expand_dims(np.concatenate((out_w_mag,out_f_mag,out_maps[:,:,:,4:5]),axis=-1),axis=1)
             out_w_pha = np.where(out_w_mag>0,np.arctan2(out_maps[:,:,:,1:2],out_maps[:,:,:,0:1]),0.0)
             out_f_pha = np.where(out_f_mag>0,np.arctan2(out_maps[:,:,:,3:4],out_maps[:,:,:,2:3]),0.0)
-            out_w_pha = np.expand_dims(out_w_pha,axis=-1)
-            out_f_pha = np.expand_dims(out_f_pha,axis=-1)
             out_pha = np.expand_dims(np.concatenate((out_w_pha/(3*np.pi),out_f_pha/(3*np.pi),out_maps[:,:,:,5:]),axis=-1),axis=1)
             out_maps = np.concatenate((out_mag,out_pha),axis=1)
             ns,_,hgt,wdt,_ = out_maps.shape
