@@ -58,7 +58,7 @@ if args.grad_mode == 'bipolar':
     start, end = 3, 4
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
-    start, end = 10, 15
+    start, end = 11, 14
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=start, end=end, te_data=True, MEBCRN=True,
                         mag_and_phase=True, unwrap=True)
@@ -222,7 +222,7 @@ for ep in range(args.epochs):
                     step=G_optimizer.iterations, name='G learning rate')
 
     # sample
-    if (G_optimizer.iterations.numpy() % 1000 == 0) or (G_optimizer.iterations.numpy() < 50):
+    if (G_optimizer.iterations.numpy() % args.epoch_ckpt == 0) or (G_optimizer.iterations.numpy() < 50):
         fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
 
         # Acquisitions in the first row
