@@ -281,7 +281,8 @@ def IDEAL_mag(out_maps, params):
     pha_bip = tf.complex(out_maps[:,1,:,:,0],0.0) * np.pi
     pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
     pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
-    bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.range(1,ne+1,dtype=tf.float32))
+    pha_tog = tf.range(1,ne+1,dtype=tf.float32)
+    bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
     bip_cnst = tf.complex(0.0,bip_cnst)
     exp_ph = tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
 
