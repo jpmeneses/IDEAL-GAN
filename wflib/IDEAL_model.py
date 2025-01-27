@@ -302,8 +302,8 @@ def IDEAL_mag(out_maps, params):
     S_hat = tf.expand_dims(S_hat, -1)
 
     # Split into real and imaginary channels
-    Re_gt = tf.math.real(S_hat)
-    Im_gt = tf.math.imag(S_hat)
+    Re_gt = tf.abs(S_hat)
+    Im_gt = tf.math.atan2(tf.math.imag(S_hat),tf.math.real(S_hat)) / np.pi
     res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
 
     # def grad(upstream, variables=params): # Must be same shape as out_maps

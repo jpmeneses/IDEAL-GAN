@@ -118,7 +118,7 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 @tf.function
 def train_G(A, B, te=None):
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-    A_pha = tf.math.atan2(A[...,1:],A[...,:1])
+    A_pha = tf.math.atan2(A[...,1:],A[...,:1]) / np.pi
     with tf.GradientTape() as t:
         # Compute model's output
         A2B_mag = G_mag(A_mag, training=True)
@@ -135,7 +135,7 @@ def train_G(A, B, te=None):
 
         A2B2A = IDEAL_op(A2B, training=False)
 
-        G_loss = A2B2A_cycle_loss = loss_fn(A, A2B2A)
+        G_loss = A2B2A_cycle_loss = loss_fn(A_mag, A2B2A[...,:1]) + loss_fn(A_pha, A2B2A[...,1:])
 
         ############### Splited losses ####################
         WF_abs_loss = loss_fn(B[:,:1,:,:,:2], A2B[:,:1,:,:,:2])
