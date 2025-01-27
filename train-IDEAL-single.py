@@ -285,7 +285,7 @@ for ep in range(args.epochs):
         fig.colorbar(r2_ok, ax=axs[1,3])
         axs[1,3].axis('off')
 
-        field_aux = np.squeeze(A2B_PM[:1,0,:,:,0])
+        field_aux = np.squeeze(A2B_PM[:1,1,:,:,0])
         field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
         fig.colorbar(field_ok, ax=axs[1,4])
