@@ -93,7 +93,7 @@ G_pha = dl.UNet(input_shape=(ne,hgt,wdt,1),
                 n_out=n_out,
                 ME_layer=True,
                 filters=args.n_G_filters,
-                output_activation='linear',
+                output_activation='tanh',
                 self_attention=args.D2_SelfAttention)
 
 IDEAL_op = wf.IDEAL_mag_Layer()
