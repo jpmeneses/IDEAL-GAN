@@ -124,8 +124,8 @@ def train_G(A, B, te=None):
         A2B_mag = G_mag(A_mag, training=True)
         A2B_pha = G_pha(A_pha, training=True)
 
-        if args.grad_mode == 'unipolar':
-            A2B_pha = tf.concat([tf.zeros_like(A2B_pha[...,:1]),A2B_pha[...,1:]],axis=-1)
+        # if args.grad_mode == 'unipolar':
+        #     A2B_pha = tf.concat([tf.zeros_like(A2B_pha[...,:1]),A2B_pha[...,1:]],axis=-1)
 
         A2B = tf.concat([A2B_mag,A2B_pha],axis=1)
         A2B = tf.where(B!=0.0,A2B,0.0)

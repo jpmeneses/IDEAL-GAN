@@ -270,21 +270,21 @@ def IDEAL_mag(out_maps, params):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
-    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,1]) * np.pi # * 3
-    pha_rho_rav = tf.reshape(pha_rho, [n_batch, -1]) # (nb,nv)
-    pha_rho_rav = tf.expand_dims(pha_rho_rav,1) # (nb,1,nv)
-    exp_ph = tf.linalg.matmul(tf.ones([n_batch,ne,1],dtype=tf.complex64), pha_rho_rav) # (nb,ne,nv)
+    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:2]) * np.pi # * 3
+    pha_rho = tf.transpose(pha_rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
+    pha_rho_rav = tf.reshape(pha_rho, [n_batch, ns, -1]) # (nb,ns,nv)
+    rho_mtx *= tf.math.exp(pha_rho_rav)
 
     r2s = out_maps[:,0,:,:,2] * r2_sc
     phi = out_maps[:,1,:,:,2] * fm_sc
 
-    pha_bip = tf.complex(out_maps[:,1,:,:,0],0.0) * np.pi
-    pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
-    pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
-    pha_tog = tf.range(1,ne+1,dtype=tf.float32)
-    bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
-    bip_cnst = tf.complex(0.0,bip_cnst)
-    exp_ph += tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
+    # pha_bip = tf.complex(out_maps[:,1,:,:,0],0.0) * np.pi
+    # pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
+    # pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
+    # pha_tog = tf.range(1,ne+1,dtype=tf.float32)
+    # bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
+    # bip_cnst = tf.complex(0.0,bip_cnst)
+    # exp_ph += tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
