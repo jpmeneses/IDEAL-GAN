@@ -284,7 +284,7 @@ def IDEAL_mag(out_maps, params):
     pha_tog = tf.range(1,ne+1,dtype=tf.float32)
     bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
     bip_cnst = tf.complex(0.0,bip_cnst)
-    exp_ph = tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
+    exp_ph += tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
