@@ -291,7 +291,7 @@ def IDEAL_mag(out_maps, params):
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
-    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav) + exp_ph) # (nb,ne,nv)
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # + exp_ph) # (nb,ne,nv)
 
     # Matrix operations
     Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
