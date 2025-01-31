@@ -117,8 +117,8 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 
 @tf.function
 def train_G(A, B, te=None):
-    A_mag = A[...,:1]
-    A_pha = A[...,1:]
+    A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+    A_pha = tf.math.atan2(A[...,1:],A[...,:1]) / np.pi
     with tf.GradientTape() as t:
         # Compute model's output
         A2B_mag = G_mag(A_mag, training=True)
