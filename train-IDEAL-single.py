@@ -135,7 +135,7 @@ def train_G(A, B, te=None):
 
         A2B2A = IDEAL_op(A2B, training=False)
 
-        G_loss = A2B2A_cycle_loss = loss_fn(A_mag, A2B2A[...,:1]) + loss_fn(A_pha, A2B2A[...,1:])
+        G_loss = A2B2A_cycle_loss = loss_fn(A, A2B2A)
 
         ############### Splited losses ####################
         WF_abs_loss = loss_fn(B[:,:1,:,:,:2], A2B[:,:1,:,:,:2])
@@ -151,11 +151,11 @@ def train_G(A, B, te=None):
     G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables + G_pha.trainable_variables))
 
     return A2B_WF, A2B_PM, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
-                                'WF_loss': WF_abs_loss,
-                                'R2_loss': R2_loss,
-                                'FM_loss': FM_loss,
-                                'TV_FM': FM_TV,
-                                'L1_FM': FM_L1}
+                            'WF_loss': WF_abs_loss,
+                            'R2_loss': R2_loss,
+                            'FM_loss': FM_loss,
+                            'TV_FM': FM_TV,
+                            'L1_FM': FM_L1}
 
 
 def train_step(A, B, te=None):

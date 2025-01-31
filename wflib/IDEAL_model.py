@@ -270,7 +270,7 @@ def IDEAL_mag(out_maps, params):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
-    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:2]) * np.pi # * 3
+    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:2]) * np.pi * 4
     pha_rho = tf.transpose(pha_rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
     pha_rho_rav = tf.reshape(pha_rho, [n_batch, ns, -1]) # (nb,ns,nv)
     rho_mtx *= tf.math.exp(pha_rho_rav)
@@ -302,8 +302,8 @@ def IDEAL_mag(out_maps, params):
     S_hat = tf.expand_dims(S_hat, -1)
 
     # Split into real and imaginary channels
-    Re_gt = tf.abs(S_hat)
-    Im_gt = tf.math.atan2(tf.math.imag(S_hat),tf.math.real(S_hat)) / np.pi
+    Re_gt = tf.math.real(S_hat)
+    Im_gt = tf.math.imag(S_hat)
     res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
 
     # def grad(upstream, variables=params): # Must be same shape as out_maps
