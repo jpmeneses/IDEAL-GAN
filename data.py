@@ -93,8 +93,8 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
             out_w_pha = np.where(out_w_mag>0,np.arctan2(out_maps[:,:,:,1:2],out_maps[:,:,:,0:1]),0.0)
             out_f_pha = np.where(out_f_mag>0,np.arctan2(out_maps[:,:,:,3:4],out_maps[:,:,:,2:3]),0.0)
             if unwrap:
-                out_w_pha = np.expand_dims(unwrap_slices(np.squeeze(out_w_pha,axis=-1)),axis=-1)
-                out_f_pha = np.expand_dims(unwrap_slices(np.squeeze(out_f_pha,axis=-1)),axis=-1)
+                out_w_pha = unwrap_slices(np.squeeze(out_w_pha,axis=-1))
+                out_f_pha = unwrap_slices(np.squeeze(out_f_pha,axis=-1))
                 k_phase = 3*np.pi
             else:
                 k_phase = np.pi
@@ -120,18 +120,8 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
                 acqs = acqs_real + 1j*acqs_imag
             elif MEBCRN:
                 acqs = np.zeros([len(out_maps),acqs_real.shape[-1],hgt,wdt,2],dtype='single')
-                if mag_and_phase:
-                    acqs[:,:,:,:,0] = np.transpose(np.sqrt(acqs_real**2+acqs_imag**2),(0,3,1,2))
-                    acqs_phase = np.arctan2(acqs_imag,acqs_real)
-                    if unwrap:
-                        for pha_ech in range(acqs_image.shape[-1]):
-                            acqs_phase[...,pha_ech] = unwrap_slices(acqs_phase[...,pha_ech])/(3*np.pi)
-                    else:
-                        acqs_phase = acqs_phase/np.pi
-                    acqs[:,:,:,:,1] = np.transpose(acqs_phase,(0,3,1,2))
-                else:
-                    acqs[:,:,:,:,0] = np.transpose(acqs_real,(0,3,1,2))
-                    acqs[:,:,:,:,1] = np.transpose(acqs_imag,(0,3,1,2))
+                acqs[:,:,:,:,0] = np.transpose(acqs_real,(0,3,1,2))
+                acqs[:,:,:,:,1] = np.transpose(acqs_imag,(0,3,1,2))
         if te_data:
             if complex_data:
                 TEs = TEs[idxs_list,:ech_idx]
