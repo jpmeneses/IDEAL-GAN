@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import h5py
-# from skimage.restoration import unwrap_phase
+from skimage.restoration import unwrap_phase
 h5py._errors.unsilence_errors()
 
 class ItemPool:
@@ -31,11 +31,11 @@ class ItemPool:
         return tf.stack(out_items, axis=0)
 
 
-# def unwrap_slices(x):
-#     y = np.zeros_like(x)
-#     for i in range(x.shape[0]):
-#         y[i,:,:] = unwrap_phase(x[i,:,:],wrap_around=True)
-#     return np.expand_dims(y,axis=-1)
+def unwrap_slices(x):
+    y = np.zeros_like(x)
+    for i in range(x.shape[0]):
+        y[i,:,:] = unwrap_phase(x[i,:,:],wrap_around=False)
+    return np.expand_dims(y,axis=-1)
 
 
 def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_slice_list=None,
@@ -92,7 +92,13 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
             out_mag = np.expand_dims(np.concatenate((out_w_mag,out_f_mag,out_maps[:,:,:,4:5]),axis=-1),axis=1)
             out_w_pha = np.where(out_w_mag>0,np.arctan2(out_maps[:,:,:,1:2],out_maps[:,:,:,0:1]),0.0)
             out_f_pha = np.where(out_f_mag>0,np.arctan2(out_maps[:,:,:,3:4],out_maps[:,:,:,2:3]),0.0)
-            out_pha = np.expand_dims(np.concatenate((out_w_pha/np.pi,out_f_pha/np.pi,out_maps[:,:,:,5:]),axis=-1),axis=1)
+            if unwrap_phase:
+                out_w_pha = np.expand_dims(unwrap_slices(np.squeeze(out_w_pha,axis=-1)),axis=-1)
+                out_f_pha = np.expand_dims(unwrap_slices(np.squeeze(out_f_pha,axis=-1)),axis=-1)
+                k_phase = 3*np.pi
+            else:
+                k_phase = np.pi
+            out_pha = np.expand_dims(np.concatenate((out_w_pha/k_phase,out_f_pha/k_phase,out_maps[:,:,:,5:]),axis=-1),axis=1)
             out_maps = np.concatenate((out_mag,out_pha),axis=1)
             ns,_,hgt,wdt,_ = out_maps.shape
         else: # SHAPE: [BS,Nmaps,H,W,2]
@@ -114,8 +120,18 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
                 acqs = acqs_real + 1j*acqs_imag
             elif MEBCRN:
                 acqs = np.zeros([len(out_maps),acqs_real.shape[-1],hgt,wdt,2],dtype='single')
-                acqs[:,:,:,:,0] = np.transpose(acqs_real,(0,3,1,2))
-                acqs[:,:,:,:,1] = np.transpose(acqs_imag,(0,3,1,2))
+                if mag_and_phase:
+                    acqs[:,:,:,:,0] = np.transpose(np.sqrt(acqs_real**2+acqs_imag**2),(0,3,1,2))
+                    acqs_phase = np.atan2(acqs_imag,acqs_real)
+                    if unwrap_phase:
+                        for pha_ech in range(acqs_image.shape[-1]):
+                            acqs_phase[...,pha_ech] = unwrap_slices(acqs_phase[...,pha_ech])/(3*np.pi)
+                    else:
+                        acqs_phase = acqs_phase/np.pi
+                    acqs[:,:,:,:,1] = np.transpose(acqs_phase,(0,3,1,2))
+                else:
+                    acqs[:,:,:,:,0] = np.transpose(acqs_real,(0,3,1,2))
+                    acqs[:,:,:,:,1] = np.transpose(acqs_imag,(0,3,1,2))
         if te_data:
             if complex_data:
                 TEs = TEs[idxs_list,:ech_idx]
