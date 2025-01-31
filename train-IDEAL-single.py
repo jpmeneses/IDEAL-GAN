@@ -275,7 +275,7 @@ for ep in range(args.epochs):
 
         wp_aux = np.squeeze(A2B_WF[:1,1,:,:,0])
         Wp_ok =  axs[1,1].imshow(wp_aux, cmap='twilight',
-                                interpolation='none', vmin=-1, vmax=1)
+                                interpolation='none')#, vmin=-1, vmax=1)
         fig.colorbar(Wp_ok, ax=axs[1,1])
         axs[1,1].axis('off')
 
@@ -287,7 +287,7 @@ for ep in range(args.epochs):
 
         fp_aux = np.squeeze(A2B_WF[:1,1,:,:,1])
         Fp_ok =  axs[1,3].imshow(fp_aux, cmap='twilight',
-                                interpolation='none', vmin=-1, vmax=1)
+                                interpolation='none')#, vmin=-1, vmax=1)
         fig.colorbar(Fp_ok, ax=axs[1,3])
         axs[1,3].axis('off')
 
@@ -299,7 +299,7 @@ for ep in range(args.epochs):
 
         field_aux = np.squeeze(A2B_PM[:1,1,:,:,0])
         field_ok =  axs[1,5].imshow(field_aux*fm_sc, cmap='twilight',
-                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+                                    interpolation='none', vmin=-1.5*fm_sc, vmax=1.5*fm_sc)
         fig.colorbar(field_ok, ax=axs[1,5])
         axs[1,5].axis('off')
 
