@@ -320,7 +320,7 @@ for ep in range(args.epochs):
         axs[2,3].axis('off')
 
         field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                                interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+                                interpolation='none', vmin=-fm_sc, vmax=fm_sc)
         fig.colorbar(field_unet, ax=axs[2,4])
         axs[2,4].axis('off')
         fig.delaxes(axs[2,0])
