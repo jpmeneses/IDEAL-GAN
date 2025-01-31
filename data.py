@@ -122,7 +122,7 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
                 acqs = np.zeros([len(out_maps),acqs_real.shape[-1],hgt,wdt,2],dtype='single')
                 if mag_and_phase:
                     acqs[:,:,:,:,0] = np.transpose(np.sqrt(acqs_real**2+acqs_imag**2),(0,3,1,2))
-                    acqs_phase = np.atan2(acqs_imag,acqs_real)
+                    acqs_phase = np.arctan2(acqs_imag,acqs_real)
                     if unwrap:
                         for pha_ech in range(acqs_image.shape[-1]):
                             acqs_phase[...,pha_ech] = unwrap_slices(acqs_phase[...,pha_ech])/(3*np.pi)
