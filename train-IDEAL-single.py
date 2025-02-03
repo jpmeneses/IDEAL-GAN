@@ -324,8 +324,17 @@ for ep in range(args.epochs):
                                 interpolation='none', vmin=-fm_sc, vmax=fm_sc)
         fig.colorbar(field_unet, ax=axs[2,4])
         axs[2,4].axis('off')
+
         fig.delaxes(axs[2,0])
-        fig.delaxes(axs[2,5])
+
+        if args.grad_mode == 'bipolar'
+            bp_aux = np.squeeze(A2B_PM[:1,1,:,:,1])
+            bp_ok =  axs[2,5].imshow(bp_aux, cmap='twilight',
+                                    interpolation='none')#, vmin=-1, vmax=1)
+            fig.colorbar(bp_ok, ax=axs[2,5])
+            axs[2,5].axis('off')
+        else:
+            fig.delaxes(axs[2,5])
 
         fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE[:1,...],axis=1))]), fontsize=16)
 
