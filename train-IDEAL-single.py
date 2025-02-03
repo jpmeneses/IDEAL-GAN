@@ -125,7 +125,6 @@ def train_G(A, B, te=None):
         A2B_pha = G_pha(A_pha, training=True)
 
         A2B_mag = tf.where(B[:,:1,...]!=0.0,A2B_mag,0.0)
-        A2B_pha = tf.where(B[:,1:,...]!=0.0,A2B_pha,0.0)
 
         if args.grad_mode == 'bipolar':
             A2B_mag = tf.concat([A2B_mag,tf.zeros_like(A2B_mag[...,:1])],axis=-1)
@@ -301,7 +300,7 @@ for ep in range(args.epochs):
 
         field_aux = np.squeeze(A2B_PM[:1,1,:,:,0])
         field_ok =  axs[1,5].imshow(field_aux*fm_sc, cmap='twilight',
-                                    interpolation='none', vmin=-1.5*fm_sc, vmax=1.5*fm_sc)
+                                    interpolation='none', vmin=-fm_sc, vmax=fm_sc)
         fig.colorbar(field_ok, ax=axs[1,5])
         axs[1,5].axis('off')
 
