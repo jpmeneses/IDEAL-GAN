@@ -55,10 +55,10 @@ r2_sc = 200.0
 dataset_dir = '../datasets/'
 if args.grad_mode == 'bipolar':
     dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
-    start, end = 3, 4
+    start, end, bip_pha_out = 3, 4, 1
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
-    start, end = 11, 14
+    start, end, bip_pha_out = 11, 14, 0
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=start, end=end, te_data=True, MEBCRN=True,
                         mag_and_phase=True, unwrap=False)
@@ -90,7 +90,7 @@ G_mag = dl.UNet(input_shape=(ne,hgt,wdt,1),
                 self_attention=args.D1_SelfAttention)
 
 G_pha = dl.UNet(input_shape=(ne,hgt,wdt,1),
-                n_out=n_out,
+                n_out=n_out+bip_pha_out,
                 ME_layer=True,
                 filters=args.n_G_filters,
                 output_activation='linear',
@@ -124,11 +124,13 @@ def train_G(A, B, te=None):
         A2B_mag = G_mag(A_mag, training=True)
         A2B_pha = G_pha(A_pha, training=True)
 
-        # if args.grad_mode == 'unipolar':
-        #     A2B_pha = tf.concat([tf.zeros_like(A2B_pha[...,:1]),A2B_pha[...,1:]],axis=-1)
+        A2B_mag = tf.where(B[:,:1,...]!=0.0,A2B_mag,0.0)
+        A2B_pha = tf.where(B[:,1:,...]!=0.0,A2B_pha,0.0)
+
+        if args.grad_mode == 'bipolar':
+            A2B_mag = tf.concat([A2B_mag,tf.zeros_like(A2B_mag[...,:1])],axis=-1)
 
         A2B = tf.concat([A2B_mag,A2B_pha],axis=1)
-        A2B = tf.where(B!=0.0,A2B,0.0)
 
         A2B_WF = A2B[...,:2]
         A2B_PM = A2B[...,2:]

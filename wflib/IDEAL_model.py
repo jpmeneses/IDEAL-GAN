@@ -278,20 +278,23 @@ def IDEAL_mag(out_maps, params):
     r2s = out_maps[:,0,:,:,2] * r2_sc
     phi = out_maps[:,1,:,:,2] * fm_sc
 
-    # pha_bip = tf.complex(out_maps[:,1,:,:,0],0.0) * np.pi
-    # pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
-    # pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
-    # pha_tog = tf.range(1,ne+1,dtype=tf.float32)
-    # bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
-    # bip_cnst = tf.complex(0.0,bip_cnst)
-    # exp_ph += tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
-
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
-    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # + exp_ph) # (nb,ne,nv)
+    if out_maps.shape[-1] > 3:
+        pha_bip = tf.complex(out_maps[:,1,:,:,3:],0.0) * np.pi
+        pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
+        pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
+        pha_tog = tf.range(1,ne+1,dtype=tf.float32)
+        bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
+        bip_cnst = tf.complex(0.0,bip_cnst)
+        exp_ph += tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
+    else:
+        exp_ph = tf.constant(0.0,dtype=tf.complex64)
+
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav) + exp_ph) # (nb,ne,nv)
 
     # Matrix operations
     Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
