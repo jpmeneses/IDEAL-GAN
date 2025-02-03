@@ -55,7 +55,7 @@ r2_sc = 200.0
 dataset_dir = '../datasets/'
 if args.grad_mode == 'bipolar':
     dataset_hdf5_1 = 'Bip12_NRef_384_complex_2D.hdf5'
-    start, end, bip_pha_out = 3, 4, 1
+    start, end, bip_pha_out = 3, 6, 1
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
     start, end, bip_pha_out = 11, 14, 0
@@ -134,7 +134,7 @@ def train_G(A, B, te=None):
         A2B_WF = A2B[...,:2]
         A2B_PM = A2B[...,2:]
 
-        A2B2A = IDEAL_op(A2B, training=False)
+        A2B2A = IDEAL_op(A2B, te, training=False)
 
         G_loss = A2B2A_cycle_loss = loss_fn(A, A2B2A)
 
