@@ -54,7 +54,7 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 if args.grad_mode == 'bipolar':
-    dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
+    dataset_hdf5_1 = 'Bip12_NRef_384_complex_2D.hdf5'
     start, end, bip_pha_out = 3, 4, 1
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
