@@ -21,6 +21,8 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--grad_mode', default='bipolar', choices=['unipolar','bipolar'])
+py.arg('--n_echoes', type=int, default=6, choices=[6, 12])
+py.arg('--data_idx', type=int, default=3)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--epochs', type=int, default=7000)
 py.arg('--epoch_decay', type=int, default=7000)  # epoch to start decaying learning rate
@@ -54,13 +56,16 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 if args.grad_mode == 'bipolar':
-    dataset_hdf5_1 = 'Bip12_NRef_384_complex_2D.hdf5'
-    start, end, bip_pha_out = 3, 6, 1
+    if args.n_echoes == 6:
+        dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
+    else:
+        dataset_hdf5_1 = 'Bip12_NRef_384_complex_2D.hdf5'
+    bip_pha_out = 1
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
-    start, end, bip_pha_out = 11, 14, 0
+    bip_pha_out = 0
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
-                        start=start, end=end, te_data=True, MEBCRN=True,
+                        start=args.data_idx, end=args.data_idx+3, te_data=True, MEBCRN=True,
                         mag_and_phase=True, unwrap=False)
 
 # Overall dataset statistics
