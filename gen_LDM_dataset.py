@@ -192,6 +192,7 @@ else:
     writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 
 # main loop
+n_vol = 0
 for k in range(args.n_samples//args.batch_size):
     Z = tf.random.normal((args.batch_size,hgt_ls,wdt_ls,args.encoded_size), seed=args.seed, dtype=tf.float32)
     if args.VQ_encoder:
@@ -206,7 +207,7 @@ for k in range(args.n_samples//args.batch_size):
             X = tf.clip_by_value(X,0.0,1.0)
             pre_filename = 'PDFF_p00_'
             end_filename = '_gen'
-            volun_name = 'v' + str(i).zfill(3)
+            volun_name = 'v' + str(n_vol+i).zfill(3)
             filename = pre_filename + volun_name + end_filename
             path = py.join(args.experiment_dir,"out_dicom",'PDFF','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
             py.mkdir(path)
@@ -225,6 +226,7 @@ for k in range(args.n_samples//args.batch_size):
 
             example = tf.train.Example(features=tf.train.Features(feature=features))
             writer.write(example.SerializeToString())
+    n_vol += Z2B.shape[0]
 
 if not(args.save_dicom):
     writer.close()
