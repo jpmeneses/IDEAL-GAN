@@ -202,8 +202,8 @@ for k in range(args.n_samples//args.batch_size):
 
     for i in range(Z2B.shape[0]):
         if args.save_dicom:
-            X = Z2B[:,0,:,:,1]/(Z2B[:,0,:,:,0]+Z2B[:,0,:,:,1])
-            X = tf.where(tf.math.is_nan(X),0.0,X)
+            X = Z2B[:,0,:,:,1]#/(Z2B[:,0,:,:,0]+Z2B[:,0,:,:,1])
+            # X = tf.where(tf.math.is_nan(X),0.0,X)
             X = tf.clip_by_value(X,0.0,1.0)
             pre_filename = 'PDFF_p00_'
             end_filename = '_gen'
@@ -214,7 +214,7 @@ for k in range(args.n_samples//args.batch_size):
             image3d = X.numpy()
             image3d = np.moveaxis(image3d,0,-1)
             # Populate required values for file meta information
-            ds = data.gen_ds(i, method_prefix)
+            ds = data.gen_ds(n_vol+i, method_prefix)
             data.write_dicom(ds, image3d, path, filename, 0, np.shape(image3d)[2])
         else:
             acqs_i = Z2B2A[i,...]
