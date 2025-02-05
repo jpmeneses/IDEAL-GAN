@@ -3,6 +3,7 @@
 import math
 import numpy as np
 import tensorflow as tf
+import tensorflow_addons as tfa
 import tensorflow.keras.layers as nn
 
 from tensorflow import keras, einsum
@@ -124,7 +125,7 @@ class Block(Layer):
     def __init__(self, dim, groups=8):
         super(Block, self).__init__()
         self.proj = nn.Conv2D(dim, kernel_size=3, strides=1, padding='SAME')
-        self.norm = keras.layers.GroupNormalization(groups, epsilon=1e-05)
+        self.norm = tfa.layers.GroupNormalization(groups, epsilon=1e-05)
         self.act = SiLU()
 
 
