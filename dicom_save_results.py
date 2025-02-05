@@ -13,10 +13,6 @@ import wflib as wf
 import data
 
 import os
-import pydicom
-from pydicom.dataset import Dataset, FileDataset
-from pydicom.uid import ExplicitVRLittleEndian
-import pydicom._storage_sopclass_uids
 
 # ==============================================================================
 # =                                   param                                    =

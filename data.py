@@ -2,6 +2,12 @@ import numpy as np
 import tensorflow as tf
 import h5py
 from skimage.restoration import unwrap_phase
+
+import pydicom
+from pydicom.dataset import Dataset, FileDataset
+from pydicom.uid import ExplicitVRLittleEndian
+import pydicom._storage_sopclass_uids
+
 h5py._errors.unsilence_errors()
 
 class ItemPool:
