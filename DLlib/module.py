@@ -685,7 +685,7 @@ def encoder(
     ls_mean_activ='leaky_relu',
     ls_reg_weight=1.0,
     NL_self_attention=True,
-    norm='instance_norm'):
+    norm='batch_norm'):
 
     x = inputs1 = keras.Input(input_shape)
 
@@ -746,7 +746,7 @@ def decoder(
     output_initializer='glorot_normal',
     bayes_layer=False,
     NL_self_attention=True,
-    norm='instance_norm'):
+    norm='batch_norm'):
     Norm = _get_norm_layer(norm)
 
     hgt,wdt,n_out = output_shape
