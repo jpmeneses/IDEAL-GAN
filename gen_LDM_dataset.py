@@ -201,13 +201,13 @@ for k in range(args.n_samples//args.batch_size):
     for i in range(Z2B.shape[0]):
         if args.save_dicom:
             X = Z2B[:,0,:,:,1]/(Z2B[:,0,:,:,0]+Z2B[:,0,:,:,1])
-            X[np.isnan(X)] = 0.0
-            np.clip(X,0,1,out=X)
+            X = tf.where(tf.math.is_nan(X),0.0,X)
+            X = tf.clip_by_value(X,0.0,1.0)
             pre_filename = 'PDFF_p00_'
             end_filename = '_gen'
             volun_name = 'v' + str(i).zfill(3)
             filename = pre_filename + volun_name + end_filename
-            image3d = np.squeeze(X[i:i+1,:,:])
+            image3d = np.squeeze(X[i:i+1,...],axis=[1,-1])
             image3d = np.moveaxis(image3d,0,-1)
             # Populate required values for file meta information
             ds = data.gen_ds(i)
