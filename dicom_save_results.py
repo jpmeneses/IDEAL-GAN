@@ -331,4 +331,6 @@ for idx in range(len(n_slices)):
   ds = data.gen_ds(idx+ini_idx)
 
   for i in range(0, np.shape(image3d)[2]):
-    data.write_dicom(ds, image3d[:,:,i], volun_name, method_prefix, filename, i, np.shape(image3d)[2])
+    path = py.join(args.experiment_dir,"out_dicom",args.map,'Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
+    py.mkdir(path)
+    data.write_dicom(ds, image3d[:,:,i], path, filename, i, np.shape(image3d)[2])

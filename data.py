@@ -386,12 +386,12 @@ def gen_ds(idx,method_prefix='m000'):
     return ds
 
 
-def write_dicom(ds, pixel_array, nvol, meth, filename, level, slices):
+def write_dicom(ds, pixel_array, path, filename, level, slices):
     image2d = np.squeeze(pixel_array)*255
     image2d = image2d.astype(np.uint16)
 
-    path = py.join(args.experiment_dir,"out_dicom",args.map,'Volunteer-'+nvol[1:],'Method-'+meth[1:])
-    py.mkdir(path)
+    # path = py.join(args.experiment_dir,"out_dicom",args.map,'Volunteer-'+nvol[1:],'Method-'+meth[1:])
+    # py.mkdir(path)
     suffix = "_s" + str(level).zfill(2) + ".dcm"
 
     filename_endian= py.join(path, filename + suffix)

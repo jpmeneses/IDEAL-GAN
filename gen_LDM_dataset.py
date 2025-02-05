@@ -208,11 +208,13 @@ for k in range(args.n_samples//args.batch_size):
             end_filename = '_gen'
             volun_name = 'v' + str(i).zfill(3)
             filename = pre_filename + volun_name + end_filename
+            path = py.join(args.experiment_dir,"out_dicom",'PDFF','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
+            py.mkdir(path)
             image3d = X.numpy()
             image3d = np.moveaxis(image3d,0,-1)
             # Populate required values for file meta information
             ds = data.gen_ds(i, method_prefix)
-            data.write_dicom(ds, image3d, volun_name, method_prefix, filename, 0, np.shape(image3d)[2])
+            data.write_dicom(ds, image3d, path, filename, 0, np.shape(image3d)[2])
         else:
             acqs_i = Z2B2A[i,...]
             out_maps_i = Z2B[i,...]
