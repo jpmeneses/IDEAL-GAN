@@ -207,7 +207,7 @@ for k in range(args.n_samples//args.batch_size):
             end_filename = '_gen'
             volun_name = 'v' + str(i).zfill(3)
             filename = pre_filename + volun_name + end_filename
-            image3d = np.squeeze(X[i:i+1,...],axis=(1,-1))
+            image3d = X.numpy()
             image3d = np.moveaxis(image3d,0,-1)
             # Populate required values for file meta information
             ds = data.gen_ds(i)
