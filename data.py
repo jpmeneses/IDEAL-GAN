@@ -331,3 +331,68 @@ def _float_feature(value):
 def _int64_feature(value):
     """Returns an int64_list from a bool / enum / int / uint."""
     return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
+
+
+#################################################################################
+############################ DICOM GEN FUNCTIONS ################################
+#################################################################################
+
+def gen_ds(idx):
+    # DICOM constant information
+    file_meta = pydicom.Dataset()
+    file_meta.MediaStorageSOPClassUID = pydicom._storage_sopclass_uids.MRImageStorage
+    file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+    file_meta.TransferSyntaxUID= pydicom.uid.ExplicitVRLittleEndian
+
+    ds = Dataset()
+    ds.file_meta = file_meta
+
+    ds.is_little_endian = True
+    ds.is_implicit_VR = False
+
+    ds.SOPClassUID = pydicom._storage_sopclass_uids.MRImageStorage
+    ds.PatientName = "Volunteer^" + str(idx).zfill(3) + "^-" + method_prefix
+    ds.PatientID = str(idx).zfill(6) # "123456"
+
+    ds.Modality = "MR"
+    ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+    ds.StudyInstanceUID = pydicom.uid.generate_uid()
+    ds.FrameOfReferenceUID = pydicom.uid.generate_uid()
+
+    ## These are the necessary imaging components of the FileDataset object.
+    ds.BitsStored = 16
+    ds.BitsAllocated = 16
+    ds.SamplesPerPixel = 1
+    ds.HighBit = 15
+
+    ds.ImagePositionPatient = r"0\0\1"
+    ds.ImageOrientationPatient = r"1\0\0\0\-1\0"
+    ds.ImageType = r"ORIGINAL\PRIMARY\AXIAL"
+
+    ds.RescaleIntercept = "0"
+    ds.RescaleSlope = "0.4"
+    ds.PixelSpacing = r"1\1"
+    ds.PhotometricInterpretation = "MONOCHROME2"
+    ds.PixelRepresentation = 1
+
+    return ds
+
+
+def write_dicom(ds, pixel_array, nvol, meth, filename, level, slices):
+    image2d = np.squeeze(pixel_array)*255
+    image2d = image2d.astype(np.uint16)
+
+    path = py.join(args.experiment_dir,"out_dicom",args.map,'Volunteer-'+nvol[1:],'Method-'+meth[1:])
+    py.mkdir(path)
+    suffix = "_s" + str(level).zfill(2) + ".dcm"
+
+    filename_endian= py.join(path, filename + suffix)
+    ds.ImagesInAcquisition = str(slices)
+    ds.InstanceNumber = level
+
+    ds.Columns = image2d.shape[0]
+    ds.Rows = image2d.shape[1]
+    ds.PixelData = image2d.tobytes()
+
+    ds.save_as(filename_endian)
+    return
