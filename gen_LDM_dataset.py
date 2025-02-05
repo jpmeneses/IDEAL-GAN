@@ -13,6 +13,7 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir', default='output/GAN-100')
+py.arg('--save_dicom', type=bool, default=False)
 py.arg('--ds_filename', default='LDM_ds')
 py.arg('--MEBCRN', type=bool, default=True)
 py.arg('--DDIM', type=bool, default=False)
@@ -180,10 +181,14 @@ z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
 tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
 
 # sample
-ds_dir = 'tfrecord'
-ds_filename = args.ds_filename + '_' + str(args.n_samples)
-py.mkdir(ds_dir)
-writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
+if args.save_dicom:
+    save_dir = py.join(args.experiment_dir, 'out_dicom', args.map)
+    py.mkdir(save_dir)
+else:
+    ds_dir = 'tfrecord'
+    ds_filename = args.ds_filename + '_' + str(args.n_samples)
+    py.mkdir(ds_dir)
+    writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 
 # main loop
 for k in range(args.n_samples//args.batch_size):
@@ -194,14 +199,29 @@ for k in range(args.n_samples//args.batch_size):
         Z2B, Z2B2A = sample(Z, z_std, inference_timesteps=args.infer_steps, ns=k)
 
     for i in range(Z2B.shape[0]):
-        acqs_i = Z2B2A[i,...]
-        out_maps_i = Z2B[i,...]
-        features = {'acqs': data._bytes_feature(tf.io.serialize_tensor(acqs_i)),
-                    'acq_shape': data._int64_feature(list(acqs_i.shape)),
-                    'out_maps': data._bytes_feature(tf.io.serialize_tensor(out_maps_i)),
-                    'out_shape': data._int64_feature(list(out_maps_i.shape))}
+        if args.save_dicom:
+            X = Z2B[:,0,:,:,1]/(Z2B[:,0,:,:,0]+Z2B[:,0,:,:,1])
+            X[np.isnan(X)] = 0.0
+            np.clip(X,0,1,out=X)
+            pre_filename = 'PDFF_p00_'
+            end_filename = '_gen'
+            volun_name = 'v' + str(i).zfill(3)
+            filename = pre_filename + volun_name + end_filename
+            image3d = np.squeeze(X[i:i+1,:,:])
+            image3d = np.moveaxis(image3d,0,-1)
+            # Populate required values for file meta information
+            ds = data.gen_ds(i)
+            data.write_dicom(ds, image3d, volun_name, method_prefix, filename, i, np.shape(image3d)[2])
+        else:
+            acqs_i = Z2B2A[i,...]
+            out_maps_i = Z2B[i,...]
+            features = {'acqs': data._bytes_feature(tf.io.serialize_tensor(acqs_i)),
+                        'acq_shape': data._int64_feature(list(acqs_i.shape)),
+                        'out_maps': data._bytes_feature(tf.io.serialize_tensor(out_maps_i)),
+                        'out_shape': data._int64_feature(list(out_maps_i.shape))}
 
-        example = tf.train.Example(features=tf.train.Features(feature=features))
-        writer.write(example.SerializeToString())
+            example = tf.train.Example(features=tf.train.Features(feature=features))
+            writer.write(example.SerializeToString())
 
-writer.close()
+if not(args.save_dicom):
+    writer.close()
