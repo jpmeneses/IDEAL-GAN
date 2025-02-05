@@ -182,7 +182,7 @@ tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpo
 
 # sample
 if args.save_dicom:
-    save_dir = py.join(args.experiment_dir, 'out_dicom', args.map)
+    save_dir = py.join(args.experiment_dir, 'out_dicom', 'PDFF')
     py.mkdir(save_dir)
 else:
     ds_dir = 'tfrecord'
