@@ -343,7 +343,7 @@ def _int64_feature(value):
 ############################ DICOM GEN FUNCTIONS ################################
 #################################################################################
 
-def gen_ds(idx):
+def gen_ds(idx,method_prefix='m000'):
     # DICOM constant information
     file_meta = pydicom.Dataset()
     file_meta.MediaStorageSOPClassUID = pydicom._storage_sopclass_uids.MRImageStorage
