@@ -562,6 +562,7 @@ for ep in range(args.epochs):
                 B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
 
         if args.bip_grad:
+            B_FM = B[:,2:,:,:,:1]
             x_lim = np.random.uniform(0.1,0.5)
             x = tf.linspace(-x_lim,x_lim,B_FM.shape[2])
             X, Y = tf.meshgrid(x, x)
