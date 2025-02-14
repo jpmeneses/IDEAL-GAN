@@ -460,8 +460,8 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
-    if out_maps.shape[-1] > 3:
-        pha_bip = tf.complex(param_maps[:,1:,:,:,:1],0.0) * np.pi
+    if param_maps.shape[1] > 3:
+        pha_bip = tf.complex(param_maps[:,-1,:,:,0],0.0) * np.pi
         pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
         pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
         pha_tog = tf.range(1,ne+1,dtype=tf.float32)
