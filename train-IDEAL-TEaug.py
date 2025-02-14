@@ -27,6 +27,7 @@ py.arg('--DL_partial_real', type=bool, default=False)
 py.arg('--DL_filename', default='LDM_ds')
 py.arg('--sigma_noise', type=float, default=0.0)
 py.arg('--n_echoes', type=int, default=6)
+py.arg('--bip_grad', type=bool, default=False)
 py.arg('--field', type=float, default=1.5)
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','2U-Net'])
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
@@ -73,6 +74,10 @@ if args.n_echoes > 0:
 else:
     ech_idx = 12
     echoes = None
+if args.bip_grad:
+    bip_out = 1
+else:
+    bip_out = 0
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -159,7 +164,7 @@ else:
     else:
         nn_out = 2
     G_A2B = dl.UNet(input_shape=(echoes,hgt,wdt,n_ch),
-                    n_out=nn_out,
+                    n_out=nn_out+bip_out,
                     ME_layer=True,
                     te_input=args.te_input,
                     te_shape=(echoes,),
@@ -250,6 +255,9 @@ def train_G(B, te=None):
                     B2A2B_R2 = G_A2R2([B2A_abs,te], training=False)
                 else:
                     B2A2B_R2 = G_A2R2(B2A_abs, training=False)
+                if args.bip_grad:
+                    B2A2B_PM = tf.transpose(B2A2B_PM, perm=[0,4,2,3,1])
+                    B2A2B_R2 = tf.concat([B2A2B_R2,tf.zeros_like(B2A2B_R2)],axis=1)
                 B2A2B_PM = tf.concat([B2A2B_PM,B2A2B_R2],axis=-1)
             if not(args.DL_gen):
                 B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
@@ -348,6 +356,9 @@ def train_G_R2(B, te=None):
         else:
             B2A2B_FM = G_A2B(B2A, training=False)
             B2A2B_R2 = G_A2R2(B2A_abs, training=True)
+        if args.bip_grad:
+            B2A2B_FM = tf.transpose(B2A2B_FM, perm=[0,4,2,3,1])
+            B2A2B_R2 = tf.concat([B2A2B_R2,tf.zeros_like(B2A2B_R2)],axis=1)
         B2A2B_PM = tf.concat([B2A2B_FM,B2A2B_R2],axis=-1)
         B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
 
@@ -438,6 +449,9 @@ def sample(B, te=None):
                 B2A2B_R2 = G_A2R2([B2A_abs,te], training=False)
             else:
                 B2A2B_R2 = G_A2R2(B2A_abs, training=False)
+            if args.bip_grad:
+                B2A2B_PM = tf.transpose(B2A2B_PM, perm=[0,4,2,3,1])
+                B2A2B_R2 = tf.concat([B2A2B_R2,tf.zeros_like(B2A2B_R2)],axis=1)
             B2A2B_PM = tf.concat([B2A2B_PM,B2A2B_R2],axis=-1)
         B2A2B_PM = tf.where(B_PM!=0.0,B2A2B_PM,0.0)
         B2A2B_R2 = B2A2B_PM[:,:,:,:,1:]
@@ -526,26 +540,35 @@ for ep in range(args.epochs):
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
-        # p = np.random.rand()
-        # if p <= 0.4:
-        #     B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
+        p = np.random.rand()
+        if p <= 0.4:
+            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
 
-        #     # Random 90 deg rotations
-        #     B = tf.image.rot90(B,k=np.random.randint(3))
+            # Random 90 deg rotations
+            B = tf.image.rot90(B,k=np.random.randint(3))
 
-        #     # Random horizontal reflections
-        #     B = tf.image.random_flip_left_right(B)
+            # Random horizontal reflections
+            B = tf.image.random_flip_left_right(B)
 
-        #     # Random vertical reflections
-        #     B = tf.image.random_flip_up_down(B)
+            # Random vertical reflections
+            B = tf.image.random_flip_up_down(B)
 
-        #     B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+            B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
 
-        #     # Random off-resonance field-map scaling factor
-        #     if args.FM_aug:
-        #         B_FM = B[:,2:,:,:,:1] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
-        #         B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
-        #         B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
+            # Random off-resonance field-map scaling factor
+            if args.FM_aug:
+                B_FM = B[:,2:,:,:,:1] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
+                B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
+                B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
+
+        if args.bip_grad:
+            x_lim = np.random.uniform(0.1,0.5)
+            x = tf.linspace(-x_lim,x_lim,B_FM.shape[2])
+            X, Y = tf.meshgrid(x, x)
+            B_bp = tf.ones_like(B_FM)
+            B_bp = tf.where(B_FM!=0.0,tf.expand_dims(X,axis=-1),0.0)
+            B_bp = tf.concat([B_bp,tf.zeros_like(B_bp)],axis=-1)
+            B = tf.concat([B,B_bp],axis=1)
         
         # ==============================================================================
 
@@ -558,7 +581,11 @@ for ep in range(args.epochs):
         else:
             ne_sel = 0
         if args.field == 3.0:
-            te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+            te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], 
+                                TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+        elif args.bip_grad:
+            te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0],
+                                d_TE_min=0.9e-3, d_TE_d=0.3e-3)
         else:
             te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 
@@ -579,6 +606,8 @@ for ep in range(args.epochs):
 
             if args.field == 3.0:
                 TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel, 1, TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+            elif args.bip_grad:
+                TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel, 1, d_TE_min=0.9e-3, d_TE_d=0.3e-3)
             else:
                 TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel, 1)
             
