@@ -577,7 +577,10 @@ for ep in range(args.epochs):
         # ==============================================================================
         
         if args.n_echoes == 0:
-            ne_sel = np.random.randint(3,7)
+            if args.bip_grad:
+                ne_sel = np.random.randint(6,13)
+            else:
+                ne_sel = np.random.randint(3,7)
         else:
             ne_sel = 0
         if args.field == 3.0:
