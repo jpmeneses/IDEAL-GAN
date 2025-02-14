@@ -156,7 +156,7 @@ def IDEAL_model(out_maps, params):
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
     if out_maps.shape[1] > 3:
-        pha_bip = tf.complex(out_maps[:,-1:,:,:,:1],0.0) * np.pi
+        pha_bip = tf.complex(out_maps[:,-1,:,:,0],0.0) * np.pi
         pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
         pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
         pha_tog = tf.range(1,ne+1,dtype=tf.float32)
@@ -449,8 +449,8 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
     Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # (nb,ne,nv)
 
     if MEBCRN:
-        r2s = param_maps[:,:,:,:,1:] * r2_sc
-        phi = param_maps[:,:,:,:,:1] * fm_sc
+        r2s = param_maps[:,:1,:,:,1:] * r2_sc
+        phi = param_maps[:,:1,:,:,:1] * fm_sc
     else:
         r2s = param_maps[:,:,:,:1] * r2_sc
         phi = param_maps[:,:,:,1:] * fm_sc
@@ -460,7 +460,18 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
-    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav)) # shape = (nb,ne,nv)
+    if out_maps.shape[-1] > 3:
+        pha_bip = tf.complex(param_maps[:,1:,:,:,:1],0.0) * np.pi
+        pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
+        pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
+        pha_tog = tf.range(1,ne+1,dtype=tf.float32)
+        bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
+        bip_cnst = tf.complex(0.0,bip_cnst)
+        exp_ph = tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
+    else:
+        exp_ph = tf.constant(0.0,dtype=tf.complex64)
+
+    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav) + exp_ph) # shape = (nb,ne,nv)
 
     # Matrix operations
     WmS = Wm * Smtx # (nb,ne,nv)
