@@ -232,7 +232,7 @@ for k in range(args.n_samples//args.batch_size):
             path_3 = py.join(args.experiment_dir,"out_dicom",'MultiEcho','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
             py.mkdir(path_3)
             for j in range(X3.shape[1]):
-                X3_echo = tf.squeeze(X3[:,j,:,:],axis=1)
+                X3_echo = X3[:,j,:,:]
                 image3d_3 = X3_echo.numpy()
                 image3d_3 = np.moveaxis(image3d_3,0,-1)
                 data.write_dicom(ds, image3d_3, path_3, filename_3, j, np.shape(image3d_3)[2])
