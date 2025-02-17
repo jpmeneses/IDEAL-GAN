@@ -147,7 +147,7 @@ def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
     Z = tf.math.multiply_no_nan(Z,Z_std)
     Z2B_mag = dec_mag(Z, training=False)
     Z2B_pha = dec_pha(Z, training=False)
-    Z2B_pha = tf.concat([tf.zeros_like(Z2B_pha[:,:,:,:,:1]),Z2B_pha],axis=-1)
+    Z2B_pha = tf.concat([Z2B_pha[:,:,:,:,:1],Z2B_pha],axis=-1)
     Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
     Z2B2A = IDEAL_op(Z2B, training=False)
     if not(args.MEBCRN):
@@ -235,7 +235,7 @@ for k in range(args.n_samples//args.batch_size):
                 X3_echo = X3[:,j,:,:]
                 image3d_3 = X3_echo.numpy()
                 image3d_3 = np.moveaxis(image3d_3,0,-1)
-                data.write_dicom(ds, image3d_3, path_3, filename_3, j, np.shape(image3d_3)[2])
+                data.write_dicom(ds, image3d_3, path_3, filename_3, j, X3.shape[1])
         else:
             acqs_i = Z2B2A[i,...]
             out_maps_i = Z2B[i,...]
