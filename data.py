@@ -345,7 +345,7 @@ def _int64_feature(value):
 ############################ DICOM GEN FUNCTIONS ################################
 #################################################################################
 
-def gen_ds(idx,method_prefix='m000'):
+def gen_ds(idx,method_prefix='m000',R2s=False):
     # DICOM constant information
     file_meta = pydicom.Dataset()
     file_meta.MediaStorageSOPClassUID = pydicom._storage_sopclass_uids.MRImageStorage
@@ -378,7 +378,10 @@ def gen_ds(idx,method_prefix='m000'):
     ds.ImageType = r"ORIGINAL\PRIMARY\AXIAL"
 
     ds.RescaleIntercept = "0"
-    ds.RescaleSlope = "0.4"
+    if R2s:
+        ds.RescaleSlope = "0.78"
+    else:
+        ds.RescaleSlope = "0.4"
     ds.PixelSpacing = r"1\1"
     ds.PhotometricInterpretation = "MONOCHROME2"
     ds.PixelRepresentation = 1
