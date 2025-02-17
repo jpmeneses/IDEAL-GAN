@@ -471,7 +471,7 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
     else:
         exp_ph = tf.constant(0.0,dtype=tf.complex64)
 
-    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav) + exp_ph) # shape = (nb,ne,nv)
+    Wm = tf.math.exp(tf.linalg.matmul(-2*np.pi * te_complex, xi_rav) - exp_ph) # shape = (nb,ne,nv)
 
     # Matrix operations
     WmS = Wm * Smtx # (nb,ne,nv)
