@@ -207,36 +207,35 @@ for k in range(args.n_samples//args.batch_size):
     for i in range(Z2B.shape[0]):
         if args.save_dicom:
             volun_name = 'v' + str(n_vol+i).zfill(3)
-            ds = data.gen_ds(n_vol+i, method_prefix)
             # Write PDFF maps
-            X1 = Z2B[i:i+1,0,:,:,1]/(Z2B[i:i+1,0,:,:,0]+Z2B[i:i+1,0,:,:,1])
+            X1 = tf.squeeze(Z2B[i,0,:,:,1]/(Z2B[i,0,:,:,0]+Z2B[i,0,:,:,1]))
             X1 = tf.clip_by_value(X1,0.0,1.0)
             filename_1 = pre_filename_1 + volun_name + end_filename
             path_1 = py.join(args.experiment_dir,"out_dicom",'PDFF','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
             py.mkdir(path_1)
-            image3d_1 = X1.numpy()
-            image3d_1 = np.moveaxis(image3d_1,0,-1)
-            data.write_dicom(ds, image3d_1, path_1, filename_1, 0, np.shape(image3d_1)[2])
+            image2d_1 = X1.numpy()
+            ds1 = data.gen_ds(n_vol+i, method_prefix)
+            data.write_dicom(ds1, image2d_1, path_1, filename_1, 0, 1)
             # Write R2s maps
-            X2 = Z2B[i:i+1,0,:,:,2] * 200.0
-            X2 = tf.clip_by_value(X2,0.0,200.0)
+            X2 = tf.squeeze(Z2B[i,0,:,:,2] )
+            X2 = tf.clip_by_value(X2,0.0,1.0)
             filename_2 = pre_filename_2 + volun_name + end_filename
             path_2 = py.join(args.experiment_dir,"out_dicom",'R2s','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
             py.mkdir(path_2)
-            image3d_2 = X2.numpy()
-            image3d_2 = np.moveaxis(image3d_2,0,-1)
-            data.write_dicom(ds, image3d_2, path_2, filename_2, 0, np.shape(image3d_2)[2])
+            image2d_2 = X2.numpy()
+            ds2 = data.gen_ds(n_vol+i, method_prefix, R2s=True)
+            data.write_dicom(ds2, image2d_2, path_2, filename_2, 0, 1)
             # Write multi-echo magnitude images
-            X3 = tf.math.sqrt(tf.reduce_sum(tf.square(Z2B2A),axis=-1)) # [BS,NE,H,W]
+            X3 = tf.math.sqrt(tf.reduce_sum(tf.square(Z2B2A[i,...]),axis=-1)) 
+            X3 = tf.squeeze(X3)
             X3 = tf.clip_by_value(X3,0.0,1.0)
             filename_3 = pre_filename_3 + volun_name + end_filename
             path_3 = py.join(args.experiment_dir,"out_dicom",'MultiEcho','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
             py.mkdir(path_3)
-            for j in range(X3.shape[1]):
-                X3_echo = X3[:,j,:,:]
-                image3d_3 = X3_echo.numpy()
-                image3d_3 = np.moveaxis(image3d_3,0,-1)
-                data.write_dicom(ds, image3d_3, path_3, filename_3, j, X3.shape[1])
+            ds3 = data.gen_ds(n_vol+i, method_prefix)
+            for j in range(X3.shape[0]):
+                image2d_3 = tf.squeeze(X3[j,...])
+                data.write_dicom(ds, image2d_3.numpy(), path_3, filename_3, j, X3.shape[0])
         else:
             acqs_i = Z2B2A[i,...]
             out_maps_i = Z2B[i,...]
