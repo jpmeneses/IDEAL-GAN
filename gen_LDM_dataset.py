@@ -216,7 +216,7 @@ for k in range(args.n_samples//args.batch_size):
             py.mkdir(path_1)
             image3d_1 = X1.numpy()
             image3d_1 = np.moveaxis(image3d_1,0,-1)
-            data.write_dicom(ds1, image3d_1, path_1, filename_1, 0, np.shape(image3d_1)[2])
+            data.write_dicom(ds, image3d_1, path_1, filename_1, 0, np.shape(image3d_1)[2])
             # Write R2s maps
             X2 = Z2B[i:i+1,0,:,:,2] * 200.0
             X2 = tf.clip_by_value(X2,0.0,200.0)
