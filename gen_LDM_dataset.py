@@ -235,7 +235,7 @@ for k in range(args.n_samples//args.batch_size):
             ds3 = data.gen_ds(n_vol+i, method_prefix)
             for j in range(X3.shape[0]):
                 image2d_3 = tf.squeeze(X3[j,...])
-                data.write_dicom(ds, image2d_3.numpy(), path_3, filename_3, j, X3.shape[0])
+                data.write_dicom(ds3, image2d_3.numpy(), path_3, filename_3, j, X3.shape[0])
         else:
             acqs_i = Z2B2A[i,...]
             out_maps_i = Z2B[i,...]
