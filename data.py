@@ -405,5 +405,5 @@ def write_dicom(ds, pixel_array, path, filename, level, slices):
     ds.Rows = image2d.shape[1]
     ds.PixelData = image2d.tobytes()
 
-    ds.save_as(filename_endian)
+    ds.save_as(filename_endian, enforce_file_format=True)
     return
