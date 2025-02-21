@@ -564,7 +564,7 @@ for ep in range(args.epochs):
         if args.bip_grad:
             B_FM = B[:,2:,:,:,:1]
             x_lim = np.random.uniform(0.1,0.5)
-            x_off = np.random.uniform(0.0,0.1)
+            x_off = np.random.uniform(0.0,0.01)
             x = tf.linspace(-x_lim,x_lim,B_FM.shape[2]) + x_off
             X, Y = tf.meshgrid(x, x)
             B_bp = tf.ones_like(B_FM)
