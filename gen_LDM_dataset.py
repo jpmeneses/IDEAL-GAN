@@ -13,7 +13,6 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir', default='output/GAN-100')
-py.arg('--save_dicom', type=bool, default=False)
 py.arg('--ds_filename', default='LDM_ds')
 py.arg('--MEBCRN', type=bool, default=True)
 py.arg('--DDIM', type=bool, default=False)
@@ -181,19 +180,18 @@ z_std = tf.Variable(initial_value=0.0, trainable=False, dtype=tf.float32)
 tl.Checkpoint(dict(unet=unet,z_std=z_std), py.join(args.experiment_dir, 'checkpoints_ldm')).restore()
 
 # sample
-if args.save_dicom:
-    method_prefix = 'm999'
-    pre_filename_1 = 'PDFF_p00_'
-    pre_filename_2 = 'R2s_p00_'
-    pre_filename_3 = 'multiecho_p00_'
-    end_filename = '_gen'
-    save_dir = py.join(args.experiment_dir, 'out_dicom', 'PDFF')
-    py.mkdir(save_dir)
-else:
-    ds_dir = 'tfrecord'
-    ds_filename = args.ds_filename + '_' + str(args.n_samples)
-    py.mkdir(ds_dir)
-    writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
+method_prefix = 'm999'
+pre_filename_1 = 'PDFF_p00_'
+pre_filename_2 = 'R2s_p00_'
+pre_filename_3 = 'multiecho_p00_'
+end_filename = '_gen'
+save_dir = py.join(args.experiment_dir, 'out_dicom', 'PDFF')
+py.mkdir(save_dir)
+
+ds_dir = 'tfrecord'
+ds_filename = args.ds_filename + '_' + str(args.n_samples)
+py.mkdir(ds_dir)
+writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 
 # main loop
 n_vol = 0
@@ -205,48 +203,46 @@ for k in range(args.n_samples//args.batch_size):
         Z2B, Z2B2A = sample(Z, z_std, inference_timesteps=args.infer_steps, ns=k)
 
     for i in range(Z2B.shape[0]):
-        if args.save_dicom:
-            volun_name = 'v' + str(n_vol+i).zfill(3)
-            # Write PDFF maps
-            X1 = tf.squeeze(Z2B[i,0,:,:,1]/(Z2B[i,0,:,:,0]+Z2B[i,0,:,:,1]))
-            X1 = tf.clip_by_value(X1,0.0,1.0)
-            filename_1 = pre_filename_1 + volun_name + end_filename
-            path_1 = py.join(args.experiment_dir,"out_dicom",'PDFF','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
-            py.mkdir(path_1)
-            image2d_1 = X1.numpy()
-            ds1 = data.gen_ds(n_vol+i, method_prefix)
-            data.write_dicom(ds1, image2d_1, path_1, filename_1, 0, 1)
-            # Write R2s maps
-            X2 = tf.squeeze(Z2B[i,0,:,:,2] )
-            X2 = tf.clip_by_value(X2,0.0,1.0)
-            filename_2 = pre_filename_2 + volun_name + end_filename
-            path_2 = py.join(args.experiment_dir,"out_dicom",'R2s','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
-            py.mkdir(path_2)
-            image2d_2 = X2.numpy()
-            ds2 = data.gen_ds(n_vol+i, method_prefix, R2s=True)
-            data.write_dicom(ds2, image2d_2, path_2, filename_2, 0, 1)
-            # Write multi-echo magnitude images
-            X3 = tf.math.sqrt(tf.reduce_sum(tf.square(Z2B2A[i,...]),axis=-1)) 
-            X3 = tf.squeeze(X3)
-            X3 = tf.clip_by_value(X3,0.0,1.0)
-            filename_3 = pre_filename_3 + volun_name + end_filename
-            path_3 = py.join(args.experiment_dir,"out_dicom",'MultiEcho','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
-            py.mkdir(path_3)
-            ds3 = data.gen_ds(n_vol+i, method_prefix)
-            for j in range(X3.shape[0]):
-                image2d_3 = tf.squeeze(X3[j,...])
-                data.write_dicom(ds3, image2d_3.numpy(), path_3, filename_3, j, X3.shape[0])
-        else:
-            acqs_i = Z2B2A[i,...]
-            out_maps_i = Z2B[i,...]
-            features = {'acqs': data._bytes_feature(tf.io.serialize_tensor(acqs_i)),
-                        'acq_shape': data._int64_feature(list(acqs_i.shape)),
-                        'out_maps': data._bytes_feature(tf.io.serialize_tensor(out_maps_i)),
-                        'out_shape': data._int64_feature(list(out_maps_i.shape))}
+        volun_name = 'v' + str(n_vol+i).zfill(3)
+        # Write PDFF maps
+        X1 = tf.squeeze(Z2B[i,0,:,:,1]/(Z2B[i,0,:,:,0]+Z2B[i,0,:,:,1]))
+        X1 = tf.clip_by_value(X1,0.0,1.0)
+        filename_1 = pre_filename_1 + volun_name + end_filename
+        path_1 = py.join(args.experiment_dir,"out_dicom",'PDFF','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
+        py.mkdir(path_1)
+        image2d_1 = X1.numpy()
+        ds1 = data.gen_ds(n_vol+i, method_prefix)
+        data.write_dicom(ds1, image2d_1, path_1, filename_1, 0, 1)
+        # Write R2s maps
+        X2 = tf.squeeze(Z2B[i,0,:,:,2] )
+        X2 = tf.clip_by_value(X2,0.0,1.0)
+        filename_2 = pre_filename_2 + volun_name + end_filename
+        path_2 = py.join(args.experiment_dir,"out_dicom",'R2s','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
+        py.mkdir(path_2)
+        image2d_2 = X2.numpy()
+        ds2 = data.gen_ds(n_vol+i, method_prefix, R2s=True)
+        data.write_dicom(ds2, image2d_2, path_2, filename_2, 0, 1)
+        # Write multi-echo magnitude images
+        X3 = tf.math.sqrt(tf.reduce_sum(tf.square(Z2B2A[i,...]),axis=-1)) 
+        X3 = tf.squeeze(X3)
+        X3 = tf.clip_by_value(X3,0.0,1.0)
+        filename_3 = pre_filename_3 + volun_name + end_filename
+        path_3 = py.join(args.experiment_dir,"out_dicom",'MultiEcho','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
+        py.mkdir(path_3)
+        ds3 = data.gen_ds(n_vol+i, method_prefix)
+        for j in range(X3.shape[0]):
+            image2d_3 = tf.squeeze(X3[j,...])
+            data.write_dicom(ds3, image2d_3.numpy(), path_3, filename_3, j, X3.shape[0])
+        
+        acqs_i = Z2B2A[i,...]
+        out_maps_i = Z2B[i,...]
+        features = {'acqs': data._bytes_feature(tf.io.serialize_tensor(acqs_i)),
+                    'acq_shape': data._int64_feature(list(acqs_i.shape)),
+                    'out_maps': data._bytes_feature(tf.io.serialize_tensor(out_maps_i)),
+                    'out_shape': data._int64_feature(list(out_maps_i.shape))}
 
-            example = tf.train.Example(features=tf.train.Features(feature=features))
-            writer.write(example.SerializeToString())
+        example = tf.train.Example(features=tf.train.Features(feature=features))
+        writer.write(example.SerializeToString())
     n_vol += Z2B.shape[0]
 
-if not(args.save_dicom):
-    writer.close()
+writer.close()
