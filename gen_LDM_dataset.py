@@ -203,7 +203,7 @@ for k in range(args.n_samples//args.batch_size):
         Z2B, Z2B2A = sample(Z, z_std, inference_timesteps=args.infer_steps, ns=k)
 
     for i in range(Z2B.shape[0]):
-        volun_name = 'v' + str(n_vol+i).zfill(3)
+        volun_name = 'v' + str(n_vol+i).zfill(4)
         # Write PDFF maps
         X1 = tf.squeeze(Z2B[i,0,:,:,1]/(Z2B[i,0,:,:,0]+Z2B[i,0,:,:,1]))
         X1 = tf.clip_by_value(X1,0.0,1.0)
