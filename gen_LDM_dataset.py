@@ -185,8 +185,6 @@ pre_filename_1 = 'PDFF_p00_'
 pre_filename_2 = 'R2s_p00_'
 pre_filename_3 = 'multiecho_p00_'
 end_filename = '_gen'
-save_dir = py.join(args.experiment_dir, 'out_dicom', 'PDFF')
-py.mkdir(save_dir)
 
 ds_dir = 'tfrecord'
 ds_filename = args.ds_filename + '_' + str(args.n_samples)
@@ -208,7 +206,7 @@ for k in range(args.n_samples//args.batch_size):
         X1 = tf.squeeze(Z2B[i,0,:,:,1]/(Z2B[i,0,:,:,0]+Z2B[i,0,:,:,1]))
         X1 = tf.clip_by_value(X1,0.0,1.0)
         filename_1 = pre_filename_1 + volun_name + end_filename
-        path_1 = py.join(args.experiment_dir,"out_dicom",'PDFF','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
+        path_1 = py.join(args.experiment_dir,"out_dicom",'Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:],'PDFF')
         py.mkdir(path_1)
         image2d_1 = X1.numpy()
         ds1 = data.gen_ds(n_vol+i, method_prefix)
@@ -217,7 +215,7 @@ for k in range(args.n_samples//args.batch_size):
         X2 = tf.squeeze(Z2B[i,0,:,:,2] )
         X2 = tf.clip_by_value(X2,0.0,1.0)
         filename_2 = pre_filename_2 + volun_name + end_filename
-        path_2 = py.join(args.experiment_dir,"out_dicom",'R2s','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
+        path_2 = py.join(args.experiment_dir,"out_dicom",'Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:],'R2s')
         py.mkdir(path_2)
         image2d_2 = X2.numpy()
         ds2 = data.gen_ds(n_vol+i, method_prefix, R2s=True)
@@ -227,7 +225,7 @@ for k in range(args.n_samples//args.batch_size):
         X3 = tf.squeeze(X3)
         X3 = tf.clip_by_value(X3,0.0,1.0)
         filename_3 = pre_filename_3 + volun_name + end_filename
-        path_3 = py.join(args.experiment_dir,"out_dicom",'MultiEcho','Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:])
+        path_3 = py.join(args.experiment_dir,"out_dicom",'Volunteer-'+volun_name[1:],'Method-'+method_prefix[1:],'MultiEcho')
         py.mkdir(path_3)
         ds3 = data.gen_ds(n_vol+i, method_prefix)
         for j in range(X3.shape[0]):
