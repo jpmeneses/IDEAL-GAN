@@ -423,7 +423,7 @@ def get_Ps_norm(acqs,param_maps,te=None):
     return L2_norm
 
 
-def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
+def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True, acq_demod=False):
     if MEBCRN:
         n_batch,ne,hgt,wdt,n_ch = acqs.shape
     else:
@@ -497,7 +497,15 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True):
         im_aux = tf.reshape(im_stack,[n_batch,hgt,wdt,2*ns])
         res_rho = re_aux + im_aux
 
-    return res_rho
+    if acq_demod:
+        # Reshape to original acquisition dimensions
+        res_gt = tf.reshape(WmS, [n_batch,ne,hgt,wdt,1])
+        Re_gt = tf.math.real(res_gt)
+        Im_gt = tf.math.imag(res_gt)
+        res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
+        return (res_rho,res_gt)
+    else:
+        return res_rho
 
 
 #@tf.function
