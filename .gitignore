@@ -8,8 +8,9 @@ DiscTest.py
 PM-scaling.ipynb
 metrics-test.ipynb
 submit_*
-test_h5py.py
-TE-idx.ipynb
+test_genMetrics.py
+test_gradients.py
 out_*
 slurm-*
+try_reduced_IDEAL.ipynb
 Untitled.ipynb
