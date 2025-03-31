@@ -21,7 +21,7 @@ For additional information, please refer to the publications below:
 	- ```gen_LDM_dataset.py```: Dataset generation using a previously trained PI-LDM.
 4. Evaluation:
 	- ```ROI-analysis.py```: PDFF bias assessment considering liver ROIs.
-	- ```ROI-realPhantom.py```: PDFF bias assessment considering the Multi-site and multi-vendor fat-water phantom dataset.
+	- ```ROI-realPhantom.py```: PDFF bias assessment considering the [Multi-site and multi-vendor fat-water phantom dataset](https://onlinelibrary.wiley.com/doi/full/10.1002/mrm.26228).
 
 ### Current Jupyter notebooks:
 1. ```bipolar-test-unsup.ipynb```: Try a subject-specific self-supervised model (trained using ```train-IDEAL-single.py```).
