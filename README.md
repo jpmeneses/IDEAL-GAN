@@ -13,6 +13,11 @@ For additional information, please refer to the publications below:
 
 ### Current Jupyter notebooks:
 1. ```bipolar-test-unsup.ipynb```: Try a subject-specific self-supervised model (trained using ```train-IDEAL-single.py```).
+2. ```try-models.ipynb```: Notebook for testing all the developed DL models for my PhD thesis:
+	- U-Net (trained using ```train-sup.ipynb```)
+	- MDWF-Net (trained using ```train-sup.ipynb```)
+	- VET-Net (trained using ```train-IDEAL-TEaug.ipynb```)
+	- AI-DEAL (trained using ```train-IDEAL-unsup.ipynb```)
 
 ### Recommended dependencies:
 - ```tensorflow```: 2.8.1
