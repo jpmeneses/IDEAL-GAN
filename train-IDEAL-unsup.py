@@ -25,7 +25,6 @@ py.arg('--out_vars', default='FM', choices=['R2s','FM','PM'])
 py.arg('--UQ', type=bool, default=False)
 py.arg('--UQ_R2s', type=bool, default=False)
 py.arg('--UQ_calib', type=bool, default=False)
-py.arg('--noiseQ', type=bool, default=True)
 py.arg('--ME_layer', type=bool, default=True)
 py.arg('--k_fold', type=int, default=1)
 py.arg('--n_G_filters', type=int, default=32)
@@ -128,7 +127,6 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                 bayesian=args.UQ,
-                std_out=args.noiseQ,
                 ME_layer=args.ME_layer,
                 filters=args.n_G_filters,
                 self_attention=args.D1_SelfAttention)
@@ -143,10 +141,6 @@ if args.out_vars == 'R2s' or args.out_vars == 'PM':
     G_calib = tf.keras.Sequential()
     G_calib.add(tf.keras.layers.Conv2D(1,1,use_bias=False,kernel_initializer='ones',kernel_constraint=tf.keras.constraints.NonNeg()))
     G_calib.build((None, 1, hgt, wdt, 1))
-
-# To estimate the noise on CSE-MRI
-acqs_sampler = dl.CSE_sample((None,hgt,wdt,n_ch))
-
 
 cycle_loss_fn = tf.losses.MeanSquaredError()
 uncertain_loss = gan.VarMeanSquaredError()
@@ -167,10 +161,7 @@ def train_G(A, B):
     A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        if args.noiseQ:
-            A2B_FM, A_noise = G_A2B(A, training=not(args.noiseQ))
-        else:
-            A2B_FM = G_A2B(A, training=not(args.noiseQ))
+        A2B_FM = G_A2B(A, training=not(args.noiseQ))
         if args.UQ:
             A2B_FM_sigma = A2B_FM.stddev()
         else:
@@ -200,13 +191,6 @@ def train_G(A, B):
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
 
-        if args.noiseQ:
-            A_noise_comp = tf.concat([A_noise,A_noise],axis=1)
-            for ni in range(A.shape[1]-2):
-                A_noise_comp = tf.concat([A_noise_comp,A_noise],axis=1)
-            A_noise_comp = tf.concat([A_noise_comp,A_noise_comp],axis=-1)
-            A2B2A = acqs_sampler([A2B2A,A_noise_comp], training=True)
-
         # Stddev map mask and attach to recon-A
         if args.UQ:
             A2B_FM_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_sigma,0.0)
@@ -215,11 +199,9 @@ def train_G(A, B):
             A2B_PM_var = tf.concat([A2B_FM_sigma,A2B_R2_nu,A2B_R2_sigma], axis=-1)
             A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=(args.out_vars=='FM'))
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
-        elif args.noiseQ:
-            A2B2A_sampled_var = tf.concat([A2B2A, A_noise_comp], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
-        if args.UQ or args.noiseQ:
+        if args.UQ:
             A2B2A_cycle_loss = uncertain_loss(A, A2B2A_sampled_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
@@ -348,10 +330,7 @@ def train_step(A, B):
 @tf.function
 def sample(A, B):
     if args.out_vars == 'FM':
-        if args.noiseQ:
-            A2B_FM, A_noise = G_A2B(A, training=False)
-        else:
-            A2B_FM = G_A2B(A, training=False)
+        A2B_FM = G_A2B(A, training=False)
         if args.UQ:
             A2B_FM_var = A2B_FM.stddev()
             A2B_R2_nu = tf.zeros_like(A2B_FM_var)
@@ -363,13 +342,6 @@ def sample(A, B):
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
         A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF, A2B_PM],axis=1)
-
-        if args.noiseQ:
-            A_noise_comp = tf.concat([A_noise,A_noise],axis=1)
-            for ni in range(A.shape[1]-2):
-                A_noise_comp = tf.concat([A_noise_comp,A_noise],axis=1)
-            A_noise_comp = tf.concat([A_noise_comp,A_noise_comp],axis=-1)
-            A2B2A = acqs_sampler([A2B2A,A_noise_comp], training=False)
 
         # Magnitude of water/fat images
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
@@ -411,10 +383,6 @@ def sample(A, B):
         A2B2A_var = wf.acq_uncertainty(A2B, A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s))
         A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
         A2B2A_abs_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
-    elif args.noiseQ:
-        A2B2A_sampled_var = tf.concat([A2B2A, A_noise_comp], axis=-1) # shape: [nb,ne,hgt,wdt,4]
-        A2B2A_var = A_noise_comp
-        A2B_PM_var = None
     else:
         A2B2A_var = None
         A2B_PM_var = None
@@ -425,7 +393,7 @@ def sample(A, B):
     R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
     FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
-    if args.UQ or args.noiseQ:
+    if args.UQ:
         if args.out_vars == 'FM':
             val_A2B2A_R2_loss = 0
             val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
@@ -449,11 +417,11 @@ def sample(A, B):
                     'R2_loss': R2_loss,
                     'FM_loss': FM_loss}
 
-    return A2B, A2B2A, A2B_PM_var, A2B2A_var, val_FM_dict, val_R2_dict
+    return A2B, A2B_PM_var, A2B2A_var, val_FM_dict, val_R2_dict
 
 def validation_step(A, B):
     A2B, A2B2A, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = sample(A, B)
-    return A2B, A2B2A, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict
+    return A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict
 
 
 # ==============================================================================
@@ -563,8 +531,8 @@ for ep in range(args.epochs):
             A = tf.expand_dims(A,axis=0)
             B = tf.expand_dims(B,axis=0)
             A = A[:,:ne_sel,:,:,:]
-            A2B, A2B2A, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = validation_step(A, B)
-            A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=False))
+            A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=False))
+            A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
