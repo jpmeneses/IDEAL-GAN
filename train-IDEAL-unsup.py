@@ -184,10 +184,7 @@ def train_G(A, B):
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
 
         ############ Cycle-Consistency Losses #############
-        if args.UQ:
-            A2B2A_cycle_loss = uncertain_loss(A, A2B2A_sampled_var)
-        else:
-            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+        A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
         WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
