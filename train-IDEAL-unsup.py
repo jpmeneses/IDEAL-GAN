@@ -420,7 +420,7 @@ def sample(A, B):
     return A2B, A2B_PM_var, A2B2A_var, val_FM_dict, val_R2_dict
 
 def validation_step(A, B):
-    A2B, A2B2A, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = sample(A, B)
+    A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = sample(A, B)
     return A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict
 
 
