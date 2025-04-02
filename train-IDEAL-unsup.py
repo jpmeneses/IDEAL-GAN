@@ -181,6 +181,7 @@ def train_G(A, B):
         else:
             A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
             A2B2A = tf.where(A!=0.0,A2B2A,0.0)
+        A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
 
         ############ Cycle-Consistency Losses #############
