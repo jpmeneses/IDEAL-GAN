@@ -557,20 +557,14 @@ for ep in range(args.epochs):
                 axs[1,1].axis('off')
                 
                 if args.UQ:
-                    r2_aux = np.squeeze(A2B_var[:,0,:,:,1])
-                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,2])*(r2_sc)
+                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,1])*(r2_sc**2)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
-                                            interpolation='none', vmin=0, vmax=20)
+                                            interpolation='none', vmin=0, vmax=100)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
                     axs[1,3].axis('off')
-                    R2_samp_aux = np.squeeze(A2B[:,2,:,:,1])*r2_sc
-                    R2_var_ok2= axs[2,3].imshow(R2_samp_aux, cmap='copper',
-                                            interpolation='none', vmin=0, vmax=r2_sc)
-                    fig.colorbar(R2_var_ok2, ax=axs[2,3])
-                    axs[2,3].axis('off')
-                    FM_var_aux = np.squeeze(A2B_var[:,0,:,:,0])*(fm_sc)
+                    FM_var_aux = np.squeeze(A2B_var[:,0,:,:,0])*(fm_sc**2)
                     FM_var_ok= axs[1,5].imshow(FM_var_aux, cmap='gnuplot2',
-                                            interpolation='none', vmin=0, vmax=5)
+                                            interpolation='none', vmin=0, vmax=40)
                     fig.colorbar(FM_var_ok, ax=axs[1,5])
                     axs[1,5].axis('off')
                     # ech1_var_aux = np.squeeze(A2B2A_var[:,-1,:,:,0])
@@ -578,18 +572,15 @@ for ep in range(args.epochs):
                     #                         interpolation='none', vmin=0, vmax=0.005)
                     # fig.colorbar(ech1_var_ok, ax=axs[2,5])
                 else:
-                    r2_aux = np.squeeze(A2B[:,2,:,:,1])
                     fig.delaxes(axs[1,3])
                     fig.delaxes(axs[1,5])
-                    fig.delaxes(axs[2,3])
-                    fig.delaxes(axs[2,5])
                 
                 field_aux = np.squeeze(A2B[:,2,:,:,0])
                 field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
                                             interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
                 fig.colorbar(field_ok, ax=axs[1,4])
                 axs[1,4].axis('off')
-
+                r2_aux = np.squeeze(A2B[:,2,:,:,1])
                 r2_ok = axs[1,2].imshow(r2_aux*r2_sc, cmap='copper',
                                         interpolation='none', vmin=0, vmax=r2_sc)
                 fig.colorbar(r2_ok, ax=axs[1,2])
@@ -619,6 +610,9 @@ for ep in range(args.epochs):
                                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
                 fig.colorbar(field_unet, ax=axs[2,4])
                 axs[2,4].axis('off')
+
+                fig.delaxes(axs[2,3])
+                fig.delaxes(axs[2,5])
 
                 if args.out_vars == 'R2s':
                     fig.suptitle('A2B Error: '+str(val_R2_dict['WF_loss']), fontsize=16)
