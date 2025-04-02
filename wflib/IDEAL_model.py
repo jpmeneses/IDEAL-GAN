@@ -608,18 +608,18 @@ def acq_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False, only_mag=Fals
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # shape: (nb,ne,nv)
 
-    phi_mean = phi_tfp.mean() * fm_sc
+    # phi_mean = phi_tfp.mean() * fm_sc
     phi_var = phi_tfp.variance() * (fm_sc**2)
 
     if rem_R2:
-        r2s_mean = tf.zeros_like(phi_mean)
+        r2s_mean = tf.zeros_like(phi_var)
         r2s_var = tf.zeros_like(phi_var)
     else:
         r2s_mean = r2s_tfp.mean() * r2_sc
         r2s_var = r2s_tfp.variance() * (r2_sc**2)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
-    xi = tf.complex(phi_mean,r2s_mean/(2*np.pi))
+    xi = tf.complex(phi_tfp,r2s_tfp/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
