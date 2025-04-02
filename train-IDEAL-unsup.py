@@ -158,47 +158,30 @@ if not(args.out_vars == 'FM'):
 
 @tf.function
 def train_G(A, B):
-    A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+    if args.out_vars == 'PM':
+        A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         A2B_FM = G_A2B(A, training=True)
-        if args.UQ:
-            A2B_FM_sigma = A2B_FM.stddev()
-        else:
-            A2B_FM_sigma = tf.zeros_like(A2B_FM)
-        A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
+        # A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         if args.out_vars == 'PM':
             # Compute R2s map from only-mag images
             A2B_R2 = G_A2R2(A_abs, training=False)
-            if args.UQ_R2s:
-                A2B_R2_nu = A2B_R2.mean()
-                A2B_R2_sigma = A2B_R2.stddev()
-            else:
-                A2B_R2_nu = tf.zeros_like(A2B_FM_sigma)
-                A2B_R2_sigma = tf.zeros_like(A2B_FM_sigma)
-            A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
+            # A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
         else:
             A2B_R2 = tf.zeros_like(A2B_FM)
-            if args.UQ:
-                A2B_R2_nu = tf.zeros_like(A2B_FM_sigma)
-                A2B_R2_sigma = tf.zeros_like(A2B_FM_sigma)
-
-        A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
-
-        # Magnitude of water/fat images
-        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
-        A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
-        A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
 
         # Stddev map mask and attach to recon-A
         if args.UQ:
-            A2B_FM_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_sigma,0.0)
-            A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
-            A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
-            A2B_PM_var = tf.concat([A2B_FM_sigma,A2B_R2_nu,A2B_R2_sigma], axis=-1)
-            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=(args.out_vars=='FM'))
+            A2B_WF, A2B2A, A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=(args.out_vars=='FM'))
+            A2B2A = tf.where(A!=0.0,A2B2A,0.0)
+            A2B2A_var = tf.where(A!=0.0,A2B2A_var,0.0)
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
+        else:
+            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+            A2B2A = tf.where(A!=0.0,A2B2A,0.0)
+        A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
@@ -207,8 +190,7 @@ def train_G(A, B):
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
-        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
-        WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
+        WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
         R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
         FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
@@ -223,7 +205,7 @@ def train_G(A, B):
     G_optimizer.apply_gradients(zip(G_grad, G_A2B.trainable_variables))
     
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
-            'WF_loss': WF_abs_loss,
+            'WF_loss': WF_loss,
             'R2_loss': R2_loss,
             'FM_loss': FM_loss,
             'TV_FM': FM_TV,
@@ -331,20 +313,14 @@ def train_step(A, B):
 def sample(A, B):
     if args.out_vars == 'FM':
         A2B_FM = G_A2B(A, training=False)
-        if args.UQ:
-            A2B_FM_var = A2B_FM.stddev()
-            A2B_R2_nu = tf.zeros_like(A2B_FM_var)
-            A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
-        A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         # Build A2B_PM array with zero-valued R2*
         A2B_R2 = tf.zeros_like(A2B_FM)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
         A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF, A2B_PM],axis=1)
-
-        # Magnitude of water/fat images
-        A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
+        A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
+        A2B_PM_var = tf.concat([A2B_FM.variance(),tf.zeros_like(A2B_FM)],axis=-1)
 
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
@@ -369,59 +345,33 @@ def sample(A, B):
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
         A2B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=True))
-    
-    # Variance map mask and attach to recon-A
-    if args.UQ:
-        A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-        if args.UQ_R2s:
-            A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
-            A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
-        else:
-            A2B_R2_nu = tf.zeros_like(A2B_FM_var)
-            A2B_R2_sigma = tf.zeros_like(A2B_FM_var)
-        A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
-        A2B2A_var = wf.acq_uncertainty(A2B, A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s))
-        A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
-        A2B2A_abs_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
-    else:
-        A2B2A_var = None
-        A2B_PM_var = None
 
     ########### Splitted R2s and FM Losses ############
-    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
-    WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
+    WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
     R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
     FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
-    if args.UQ:
-        if args.out_vars == 'FM':
-            val_A2B2A_R2_loss = 0
-            val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
-        else:
-            val_A2B2A_R2_loss = uncertain_loss_R2(A_abs, A2B2A_abs_sampled_var)
-            val_A2B2A_FM_loss = uncertain_loss(A, A2B2A_sampled_var)
+    if args.out_vars == 'FM':
+        val_A2B2A_R2_loss = 0
+        val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
     else:
-        if args.out_vars == 'FM':
-            val_A2B2A_R2_loss = 0
-            val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
-        else:
-            val_A2B2A_R2_loss = cycle_loss_fn(A_abs, A2B2A_abs)
-            val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
+        val_A2B2A_R2_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+        val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
     
     val_FM_dict =  {'A2B2A_cycle_loss': val_A2B2A_FM_loss,
-                    'WF_loss': WF_abs_loss,
+                    'WF_loss': WF_loss,
                     'R2_loss': R2_loss,
                     'FM_loss': FM_loss}
     val_R2_dict =  {'A2B2A_cycle_loss': val_A2B2A_R2_loss,
-                    'WF_loss': WF_abs_loss,
+                    'WF_loss': WF_loss,
                     'R2_loss': R2_loss,
                     'FM_loss': FM_loss}
 
-    return A2B, A2B_PM_var, A2B2A_var, val_FM_dict, val_R2_dict
+    return A2B, A2B_PM_var, val_FM_dict, val_R2_dict
 
 def validation_step(A, B):
-    A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = sample(A, B)
-    return A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict
+    A2B, A2B_var, val_FM_dict, val_R2_dict = sample(A, B)
+    return A2B, A2B_var, val_FM_dict, val_R2_dict
 
 
 # ==============================================================================
@@ -532,7 +482,7 @@ for ep in range(args.epochs):
             B = tf.expand_dims(B,axis=0)
             A = A[:,:ne_sel,:,:,:]
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=False))
-            A2B, A2B_var, A2B2A_var, val_FM_dict, val_R2_dict = validation_step(A, B)
+            A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A, B)
 
             # # summary
             with val_summary_writer.as_default():
@@ -622,19 +572,16 @@ for ep in range(args.epochs):
                                             interpolation='none', vmin=0, vmax=5)
                     fig.colorbar(FM_var_ok, ax=axs[1,5])
                     axs[1,5].axis('off')
-                    ech1_var_aux = np.squeeze(A2B2A_var[:,-1,:,:,0])
-                    ech1_var_ok= axs[2,5].imshow(ech1_var_aux, cmap='gnuplot2',
-                                            interpolation='none', vmin=0, vmax=0.005)
-                    fig.colorbar(ech1_var_ok, ax=axs[2,5])
+                    # ech1_var_aux = np.squeeze(A2B2A_var[:,-1,:,:,0])
+                    # ech1_var_ok= axs[2,5].imshow(ech1_var_aux, cmap='gnuplot2',
+                    #                         interpolation='none', vmin=0, vmax=0.005)
+                    # fig.colorbar(ech1_var_ok, ax=axs[2,5])
                 else:
                     r2_aux = np.squeeze(A2B[:,2,:,:,1])
-                    ech1_var_aux = np.squeeze(A2B2A_var[:,-1,:,:,0])
-                    ech1_var_ok= axs[2,5].imshow(ech1_var_aux, cmap='gnuplot2',
-                                            interpolation='none', vmin=0, vmax=0.05)
-                    fig.colorbar(ech1_var_ok, ax=axs[2,5])
                     fig.delaxes(axs[1,3])
                     fig.delaxes(axs[1,5])
                     fig.delaxes(axs[2,3])
+                    fig.delaxes(axs[2,5])
                 
                 field_aux = np.squeeze(A2B[:,2,:,:,0])
                 field_ok =  axs[1,4].imshow(field_aux*fm_sc, cmap='twilight',
