@@ -600,7 +600,6 @@ def acq_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False, only_mag=Fals
     te_complex = tf.complex(0.0,te)
 
     M, M_pinv = gen_M(te)
-    MM = tf.linalg.matmul(M,M_pinv)
 
     # Generate complex signal
     S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
@@ -655,6 +654,11 @@ def acq_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False, only_mag=Fals
     Smtx_var = Wp_var / (rho_sc**2) * tf.abs(Mp * tf.math.conj(Mp)) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
+    rho_hat = tf.reshape(rho_mtx, [n_batch,ns,hgt,wdt,1]) / rho_sc
+    Re_rho = tf.math.real(rho_hat)
+    Im_rho = tf.math.imag(rho_hat)
+    res_rho = tf.concat([Re_rho,Im_rho],axis=-1)
+
     # Mean recon
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
     if not(only_mag):
