@@ -161,7 +161,7 @@ def train_G(A, B):
     A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        A2B_FM = G_A2B(A, training=not(args.noiseQ))
+        A2B_FM = G_A2B(A, training=True)
         if args.UQ:
             A2B_FM_sigma = A2B_FM.stddev()
         else:
