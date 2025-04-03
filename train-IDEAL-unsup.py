@@ -321,7 +321,7 @@ def sample(A, B):
         A2B = tf.concat([A2B_WF, A2B_PM],axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
         A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM.variance(),0.0) * (fm_sc**2)
-        A2B_PM_var = tf.concat([,tf.zeros_like(A2B_FM)],axis=-1)
+        A2B_PM_var = tf.concat([A2B_FM_var,tf.zeros_like(A2B_FM)],axis=-1)
 
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
