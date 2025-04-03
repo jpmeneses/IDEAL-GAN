@@ -631,7 +631,7 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, rem_R2=False, onl
 
     # Matrix operations (variance)
     MMWmS = tf.linalg.matmul(M,rho_mtx) # shape = (nb,ne,nv)
-    Smtx_var = Wp_var #* (rho_sc**2) * tf.stop_gradient(tf.abs(MMWmS * tf.math.conj(MMWmS))) # (nb,ne,nv)
+    Smtx_var = Wp_var * (rho_sc**2) * tf.abs(MMWmS * tf.math.conj(MMWmS)) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
     res_S_var = tf.expand_dims(tf.reshape(Smtx_var,[n_batch,ne,hgt,wdt]), -1)

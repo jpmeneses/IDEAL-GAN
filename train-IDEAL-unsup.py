@@ -180,7 +180,6 @@ def train_G(A, B):
         # Stddev map mask and attach to recon-A
         if args.UQ:
             A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, rem_R2=(args.out_vars=='FM'))
-            A2B2A_var = tf.where(A!=0.0,A2B2A_var,0.0)
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
