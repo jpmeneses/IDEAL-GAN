@@ -609,14 +609,15 @@ def acq_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False, only_mag=Fals
     Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # shape: (nb,ne,nv)
 
     # phi_mean = phi_tfp.mean() * fm_sc
-    phi_var = phi_tfp.variance() * (fm_sc**2)
+    phi_var = tf.where(acqs[:,:1,:,:,:1]!=0.0,phi_tfp.variance(),1e-8)
+    phi_var = tf.where(phi_var>=1e-8,phi_var,1e-8) * (fm_sc**2)
 
     if rem_R2:
         r2s_mean = tf.zeros_like(phi_var)
         r2s_var = tf.zeros_like(phi_var)
     else:
         r2s_mean = r2s_tfp.mean() * r2_sc
-        r2s_var = r2s_tfp.variance() * (r2_sc**2)
+        r2s_var = tf.where(acqs[:,:1,:,:,:1]!=0.0,r2s_tfp.variance(),1e-8) * (r2_sc**2)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi_tfp,r2s_tfp/(2*np.pi))
@@ -635,7 +636,7 @@ def acq_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False, only_mag=Fals
         Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wp_var = 1 - tf.math.exp(tf.linalg.matmul(-(2*np.pi * te)**2, phi_sigma_rav)) # (nb,ne,nv) NEG
+    Wp_var = tf.math.exp(tf.linalg.matmul((2*np.pi * te)**2, phi_sigma_rav)) # (nb,ne,nv) NEG
     if not(rem_R2):
         r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu_rav))
         r2s_var_aux *= tf.linalg.matmul(te**2, r2s_sigma_rav)
