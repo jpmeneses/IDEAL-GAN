@@ -610,7 +610,6 @@ def acq_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False, only_mag=Fals
 
     # phi_mean = phi_tfp.mean() * fm_sc
     phi_var = tf.where(acqs[:,:1,:,:,:1]!=0.0,phi_tfp.variance(),0.0) * (fm_sc**2)
-    phi_var = tf.where(phi_var>=1e-6,phi_var,1e-6)
 
     if rem_R2:
         r2s_mean = tf.zeros_like(phi_var)
@@ -636,7 +635,7 @@ def acq_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False, only_mag=Fals
         Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav))
 
     # Diagonal matrix with the exponential of fieldmap variance
-    Wp_var = tf.math.exp(tf.linalg.matmul((2*np.pi * te)**2, phi_sigma_rav)) # (nb,ne,nv) NEG
+    Wp_var = tf.math.exp(-tf.linalg.matmul((2*np.pi * te)**2, phi_sigma_rav)) # (nb,ne,nv) NEG
     if not(rem_R2):
         r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu_rav))
         r2s_var_aux *= tf.linalg.matmul(te**2, r2s_sigma_rav)
