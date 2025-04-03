@@ -132,8 +132,9 @@ class VarMeanSquaredError(tf.keras.losses.Loss):
         idx = y_pred.shape[-1]//2
         var_map = y_pred[...,idx:]
         y_pred = y_pred[...,:idx]
+        var_map = tf.where(var_map>=1e-5, var_map, 1e-5)
         std_map = tf.math.sqrt(var_map)
-        log_std = tf.where(std_map!=0.0, tf.math.log(std_map), 0.0)
+        log_std = tf.math.log(std_map)
         msd = tf.square(y_true - y_pred)
         STDw_msd = tf.math.divide_no_nan(msd, std_map)
         return tf.reduce_mean(STDw_msd + log_std)
@@ -157,15 +158,15 @@ class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
 
 class AbsolutePhaseDisparity(tf.keras.losses.Loss):
     def call(self, y_true, y_pred):
-        y_true_real = y_true[:,:1,:,:,:] * tf.math.cos(y_true[:,1:,:,:,:]*np.pi)
-        y_true_imag = y_true[:,:1,:,:,:] * tf.math.sin(y_true[:,1:,:,:,:]*np.pi)
-        y_pred_real = y_pred[:,:1,:,:,:] * tf.math.cos(y_pred[:,1:,:,:,:]*np.pi)
-        y_pred_imag = y_pred[:,:1,:,:,:] * tf.math.sin(y_pred[:,1:,:,:,:]*np.pi)
+        y_true_real = y_true[...,:1] * tf.math.cos(y_true[...,1:]*np.pi)
+        y_true_imag = y_true[...,:1] * tf.math.sin(y_true[...,1:]*np.pi)
+        y_pred_real = y_pred[...,:1] * tf.math.cos(y_pred[...,1:]*np.pi)
+        y_pred_imag = y_pred[...,:1] * tf.math.sin(y_pred[...,1:]*np.pi)
         # Considering: (a + ib) * (c + id) = (ac - bd) + i(ad + bc)
         y_prod_conj_real = (y_true_real*y_pred_real + y_true_imag*y_pred_imag)
         y_prod_conj_imag = (-y_true_real*y_pred_imag + y_true_imag*y_pred_real)
         y_prod_conj_phase = tf.math.atan2(y_prod_conj_imag, y_prod_conj_real)
-        y_APD_num = y_true[:,:1,:,:,:]*tf.abs(y_prod_conj_phase)
-        y_APD_num_sum = tf.reduce_sum(y_APD_num, axis=(2,3,4))
-        y_APD_den_sum = tf.reduce_sum(y_true[:,:1,:,:,:], axis=(2,3,4))
+        y_APD_num = y_true[...,:1]*tf.abs(y_prod_conj_phase)
+        y_APD_num_sum = tf.reduce_sum(y_APD_num, axis=(1,2,3,4))
+        y_APD_den_sum = tf.reduce_sum(y_true[...,:1], axis=(1,2,3,4))
         return tf.math.divide_no_nan(y_APD_num_sum, y_APD_den_sum)
