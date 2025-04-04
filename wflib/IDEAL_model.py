@@ -616,7 +616,7 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, rem_R2=False, onl
         r2s_var = tf.zeros_like(phi_var)
     else:
         r2s_mean = r2s_tfp.mean() * r2_sc
-        r2s_var = tf.where(acqs[:,:1,:,:,:1]!=0.0,r2s_tfp.variance(),0.0) * (r2_sc**2)
+        r2s_var = r2s_tfp.variance() * (r2_sc**2)
 
     r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_mean,[n_batch,-1]),1) # (nb,1,nv)
     r2s_sigma_rav = tf.expand_dims(tf.reshape(r2s_var,[n_batch,-1]),1) # (nb,1,nv)
