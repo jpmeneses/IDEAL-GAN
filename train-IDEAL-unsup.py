@@ -179,7 +179,7 @@ def train_G(A, B):
 
         # Stddev map mask and attach to recon-A
         if args.UQ:
-            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, rem_R2=(args.out_vars=='FM'))
+            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=(args.out_vars=='FM'))
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
@@ -218,39 +218,19 @@ def train_G_R2(A, B):
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
         A2B_R2 = G_A2R2(A_abs, training=not(args.UQ_calib))
-        if args.UQ_R2s:
-            A2B_R2_nu = A2B_R2.mean()
-            if args.UQ_calib:
-                A2B_R2_sigma = G_calib(A2B_R2.stddev(),training=True)
-            else:
-                A2B_R2_sigma = A2B_R2.stddev() 
-        else:
-            A2B_R2_nu = tf.zeros_like(A2B_R2)
-            A2B_R2_sigma = tf.zeros_like(A2B_R2)
-        A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
 
         # Compute FM using complex-valued images and pre-trained model
         A2B_FM = G_A2B(A, training=False)
-        if args.UQ:
-            A2B_FM_var = A2B_FM.stddev()
-        else:
-            A2B_FM_var = tf.zeros_like(A2B_FM)
-        A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
         # Magnitude of water/fat images
         A2B_WF, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, only_mag=True)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
-        A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
+        A2B2A_abs = tf.where(A[...,:1]!=0.0,A2B2A,0.0)
         
         # Variance map mask and attach to recon-A
         if args.UQ:
-            A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM_var,0.0)
-            if args.UQ_R2s:
-                A2B_R2_nu = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_nu,0.0)
-                A2B_R2_sigma = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2_sigma,0.0)
-            A2B_PM_var = tf.concat([A2B_FM_var,A2B_R2_nu,A2B_R2_sigma], axis=-1)
-            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_PM_var, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
+            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
@@ -261,8 +241,7 @@ def train_G_R2(A, B):
             A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
 
         ########### Splitted R2s and FM Losses ############
-        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
-        WF_abs_loss = cycle_loss_fn(B_WF_abs, A2B_WF_abs)
+        WF_abs_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
         R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
         FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
@@ -326,25 +305,16 @@ def sample(A, B):
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
         # Compute FM from complex-valued images
         A2B_FM = G_A2B(A, training=False)
-        if args.UQ:
-            A2B_FM_var = A2B_FM.stddev()
         A2B_R2 = G_A2R2(A_abs, training=False)
-        if args.UQ_R2s:
-            A2B_R2_nu = A2B_R2.mean()
-            if args.UQ_calib:
-                A2B_R2_sigma = G_calib(A2B_R2.stddev(), training=False)
-            else:
-                A2B_R2_sigma = A2B_R2.stddev()
-        
-        A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
-        A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
         # Magnitude of water/fat images
-        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+        A2B_WF, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, only_mag=True)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
-        A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
-        A2B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=True))
+        A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
+
+        A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
+        A2B_PM_var = tf.where(A[:,:1,...]!=0.0,A2B_PM_var,0.0) * (fm_sc**2)
 
     ########### Splitted R2s and FM Losses ############
     WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
