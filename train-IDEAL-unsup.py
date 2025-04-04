@@ -226,7 +226,7 @@ def train_G_R2(A, B):
         # Magnitude of water/fat images
         A2B_WF, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, only_mag=True)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
-        A2B2A_abs = tf.where(A[...,:1]!=0.0,A2B2A,0.0)
+        A2B2A_abs = tf.where(A[...,:1]!=0.0,A2B2A_abs,0.0)
         
         # Variance map mask and attach to recon-A
         if args.UQ:
@@ -309,7 +309,7 @@ def sample(A, B):
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
         # Magnitude of water/fat images
-        A2B_WF, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, only_mag=True)
+        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
 
