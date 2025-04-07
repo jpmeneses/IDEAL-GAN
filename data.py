@@ -271,16 +271,16 @@ def A_from_MEBCRN(A):
     return re_aux_var + im_aux_var
 
 
-def B_from_MEBCRN(B,mode='WF'):
-    if mode == 'WF':
-        B_W = B[:,0,:,:,:]
-        B_F = B[:,1,:,:,:]
-        return tf.concat([B_W,B_F],axis=-1)
-    elif mode == 'PM':
-        B_FM = B[:,2,:,:,:1]
-        B_R2 = B[:,2,:,:,1:]
-        return tf.concat([B_R2,B_FM],axis=-1)
-    elif mode == 'WF-PM':
+def B_from_MEBCRN(B,mag_and_phase=False,c_pha=3):
+    if mag_and_phase:
+        B_W_r = B[:,0,:,:,:1] * tf.math.cos(c_pha*B[:,1,:,:,1:2]*np.pi)
+        B_W_i = B[:,0,:,:,:1] * tf.math.sin(c_pha*B[:,1,:,:,1:2]*np.pi)
+        B_F_r = B[:,0,:,:,1:2]* tf.math.cos(c_pha*B[:,1,:,:,1:2]*np.pi)
+        B_F_i = B[:,0,:,:,1:2]* tf.math.sin(c_pha*B[:,1,:,:,1:2]*np.pi)
+        B_r2 = B[:,0,:,:,2:]
+        B_fm = B[:,0,:,:,2:]
+        B = tf.concat([Z2B_W_r,Z2B_W_i,Z2B_F_r,Z2B_F_i,Z2B_r2,Z2B_fm],axis=-1)
+    else:
         B_W = B[:,0,:,:,:]
         B_F = B[:,1,:,:,:]
         B_PM= B[:,2,:,:,:]
