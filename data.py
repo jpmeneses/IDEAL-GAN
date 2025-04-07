@@ -101,8 +101,8 @@ def load_hdf5(ds_dir,hdf5_file,ech_idx=12,start=0,end=2000,custom_list=None,num_
             out_w_pha = np.where(out_w_mag>0,np.arctan2(out_maps[:,:,:,1:2],out_maps[:,:,:,0:1]),0.0)
             out_f_pha = np.where(out_f_mag>0,np.arctan2(out_maps[:,:,:,3:4],out_maps[:,:,:,2:3]),0.0)
             if unwrap:
-                out_w_pha = unwrap_slices(np.squeeze(out_w_pha,axis=-1))
-                out_f_pha = unwrap_slices(np.squeeze(out_f_pha,axis=-1))
+                #out_w_pha = unwrap_slices(np.squeeze(out_w_pha,axis=-1))
+                #out_f_pha = unwrap_slices(np.squeeze(out_f_pha,axis=-1))
                 k_phase = 3*np.pi
             else:
                 k_phase = np.pi

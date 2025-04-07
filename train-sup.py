@@ -140,7 +140,7 @@ else:
                     custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
                 trainX, trainY, TEs =data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
                                                     acqs_data=True,te_data=True,remove_zeros=False,
-                                                    MEBCRN=True)
+                                                    MEBCRN=True, mag_and_phase=True, unwrap=True)
         else:
             if args.DL_partial_real == 2:
                 end_idx = 62
@@ -150,7 +150,8 @@ else:
                 end_idx = 330
             dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
             trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
-                                            acqs_data=True, te_data=False, MEBCRN=True)
+                                            acqs_data=True, te_data=False, MEBCRN=True,
+                                            mag_and_phase=True, unwrap=True)
         A_B_dataset = tfr_dataset.skip(args.DL_total_samples-end_idx).map(_parse_function)
         A_B_dataset_aux = tf.data.Dataset.from_tensor_slices((trainX,trainY))
         A_B_dataset = A_B_dataset.concatenate(A_B_dataset_aux)
@@ -242,7 +243,7 @@ def train_G(A, B, te=None):
         A = IDEAL_op(B, te=te, training=False)
     if args.G_model!='MEBCRN':
         A = data.A_from_MEBCRN(A)
-        B = data.B_from_MEBCRN(B,mode='WF-PM')
+        B = data.B_from_MEBCRN(B,mag_and_phase=True)
     if args.sigma_noise > 0.0:
         A = tf.keras.layers.GaussianNoise(stddev=args.sigma_noise)(A, training=True)
     B_WF = B[:,:,:,:4]
@@ -379,7 +380,7 @@ def train_step(A, B, te=None):
 def sample(A, B):
     if args.G_model!='MEBCRN':
         A = data.A_from_MEBCRN(A)
-        B = data.B_from_MEBCRN(B,mode='WF-PM')
+        B = data.B_from_MEBCRN(B,mag_and_phase=True)
     B_WF = B[:,:,:,:4]
     B_PM = B[:,:,:,4:]
     B_WF_abs = tf.abs(tf.complex(B_WF[:,:,:,0::2],B_WF[:,:,:,1::2]))
