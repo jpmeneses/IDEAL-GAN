@@ -378,9 +378,6 @@ def train_step(A, B, te=None):
 
 @tf.function
 def sample(A, B):
-    if args.G_model!='MEBCRN':
-        A = data.A_from_MEBCRN(A)
-        B = data.B_from_MEBCRN(B,mag_and_phase=True)
     B_WF = B[:,:,:,:4]
     B_PM = B[:,:,:,4:]
     B_WF_abs = tf.abs(tf.complex(B_WF[:,:,:,0::2],B_WF[:,:,:,1::2]))
