@@ -158,7 +158,7 @@ else:
         A_B_dataset = tfr_dataset.map(_parse_function)
 
     for A, B in A_B_dataset.take(1):
-        hgt,wdt,_ = B.shape
+        _,hgt,wdt,_ = B.shape
     len_dataset = int(args.DL_filename.split('_')[-1])
     if args.DL_partial_real != 0:
         len_dataset += trainX.shape[0]
