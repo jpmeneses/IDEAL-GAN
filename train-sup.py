@@ -19,7 +19,6 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
-py.arg('--DL_total_samples', type=int, default=3330)
 py.arg('--DL_partial_real', type=int, default=0, choices=[0,2,6,10])
 py.arg('--DL_filename', default='LDM_ds')
 py.arg('--sigma_noise', type=float, default=0.0)
@@ -152,7 +151,7 @@ else:
             trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
                                             acqs_data=True, te_data=False, MEBCRN=True,
                                             mag_and_phase=True, unwrap=True)
-        A_B_dataset = tfr_dataset.skip(args.DL_total_samples-end_idx).map(_parse_function)
+        A_B_dataset = tfr_dataset.skip(end_idx).map(_parse_function)
         A_B_dataset_aux = tf.data.Dataset.from_tensor_slices((trainX,trainY))
         A_B_dataset = A_B_dataset.concatenate(A_B_dataset_aux)
     else:
