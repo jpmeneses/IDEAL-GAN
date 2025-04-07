@@ -239,10 +239,10 @@ G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args
 @tf.function
 def train_G(A, B, te=None):
     if (args.TE1 != 0.0013) and (args.dTE != 0.0021):
-        B_aux = data.B_to_MEBCRN(B,mode='All')
         A = IDEAL_op(B_aux, te=te, training=False)
-        if args.G_model!='MEBCRN':
-            A = data.A_from_MEBCRN(A)
+    if args.G_model!='MEBCRN':
+        A = data.A_from_MEBCRN(A)
+        B = data.B_from_MEBCRN(B,mode='WF-PM')
     if args.sigma_noise > 0.0:
         A = tf.keras.layers.GaussianNoise(stddev=args.sigma_noise)(A, training=True)
     B_WF = B[:,:,:,:4]
@@ -377,6 +377,9 @@ def train_step(A, B, te=None):
 
 @tf.function
 def sample(A, B):
+    if args.G_model!='MEBCRN':
+        A = data.A_from_MEBCRN(A)
+        B = data.B_from_MEBCRN(B,mode='WF-PM')
     B_WF = B[:,:,:,:4]
     B_PM = B[:,:,:,4:]
     B_WF_abs = tf.abs(tf.complex(B_WF[:,:,:,0::2],B_WF[:,:,:,1::2]))

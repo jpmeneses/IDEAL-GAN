@@ -284,8 +284,8 @@ def B_from_MEBCRN(B,mode='WF'):
         B_W = B[:,0,:,:,:]
         B_F = B[:,1,:,:,:]
         B_PM= B[:,2,:,:,:]
-        B_R2= B[:,:,:,1]
-        B_FM= B[:,:,:,0]
+        B_R2= B_PM[:,:,:,1:]
+        B_FM= B_PM[:,:,:,:1]
         return tf.concat([B_W,B_F,B_R2,B_FM],axis=-1)
 
 
