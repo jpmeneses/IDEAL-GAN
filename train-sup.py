@@ -19,6 +19,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-sup')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
+py.arg('--DL_total_samples', type=int, default=3330)
 py.arg('--DL_partial_real', type=int, default=0, choices=[0,2,6,10])
 py.arg('--DL_filename', default='LDM_ds')
 py.arg('--sigma_noise', type=float, default=0.0)
@@ -112,13 +113,12 @@ else:
         parsed_ds = tf.io.parse_example(example_proto, feature_description)
         return tf.io.parse_tensor(parsed_ds['acqs'], out_type=tf.float32), tf.io.parse_tensor(parsed_ds['out_maps'], out_type=tf.float32)
 
-    A_B_dataset = tfr_dataset.map(_parse_function)
-
     if args.DL_partial_real != 0:
         if args.TE1 == 0.0014 and args.dTE == 0.0022:
             dataset_hdf5_1 = 'multiTE_' + str(args.data_size) + '_complex_2D.hdf5'
             ini_idxs = [0,84,204,300,396,484,580,680,776,848]#,932,1028, 1100,1142,1190,1232,1286,1334,1388,1460]
             delta_idxs = [21,24,24,24,22,24,25,24,18]#,21,24,18, 21,24,21,18,16,18,24,21]
+            end_idx = np.sum(delta_idxs)
             k_idxs = [(0,1),(2,3)]
             for k in k_idxs:
                 custom_list = [a for a in range(ini_idxs[0]+k[0]*delta_idxs[0],ini_idxs[0]+k[1]*delta_idxs[0])]
@@ -151,8 +151,11 @@ else:
             dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
             trainX, trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
                                             acqs_data=True, te_data=False, MEBCRN=(args.G_model=='MEBCRN'))
-            A_B_dataset_aux = tf.data.Dataset.from_tensor_slices((trainX,trainY))
-            A_B_dataset = A_B_dataset.concatenate(A_B_dataset_aux)
+        A_B_dataset = tfr_dataset.skip(args.DL_total_samples-end_idx).map(_parse_function)
+        A_B_dataset_aux = tf.data.Dataset.from_tensor_slices((trainX,trainY))
+        A_B_dataset = A_B_dataset.concatenate(A_B_dataset_aux)
+    else:
+        A_B_dataset = tfr_dataset.map(_parse_function)
 
     for A, B in A_B_dataset.take(1):
         hgt,wdt,_ = B.shape
