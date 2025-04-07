@@ -279,7 +279,7 @@ def B_from_MEBCRN(B,mag_and_phase=False,c_pha=3):
         B_F_i = B[:,0,:,:,1:2]* tf.math.sin(c_pha*B[:,1,:,:,1:2]*np.pi)
         B_r2 = B[:,0,:,:,2:]
         B_fm = B[:,1,:,:,2:]
-        B = tf.concat([B_W_r,B_W_i,B_F_r,B_F_i,B_r2,B_fm],axis=-1)
+        return tf.concat([B_W_r,B_W_i,B_F_r,B_F_i,B_r2,B_fm],axis=-1)
     else:
         B_W = B[:,0,:,:,:]
         B_F = B[:,1,:,:,:]
