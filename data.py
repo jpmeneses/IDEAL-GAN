@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import h5py
-from skimage.restoration import unwrap_phase
+#from skimage.restoration import unwrap_phase
 
 import pylib as py
 
@@ -41,8 +41,8 @@ class ItemPool:
 
 def unwrap_slices(x):
     y = np.zeros_like(x)
-    for i in range(x.shape[0]):
-        y[i,:,:] = unwrap_phase(x[i,:,:],wrap_around=False)
+    # for i in range(x.shape[0]):
+    #     y[i,:,:] = unwrap_phase(x[i,:,:],wrap_around=False)
     return np.expand_dims(y,axis=-1)
 
 
