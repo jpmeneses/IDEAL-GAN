@@ -2,6 +2,9 @@ import sys
 import numpy as np
 import tensorflow as tf
 
+# OPTIONAL - DISABLE GPU
+tf.config.experimental.set_visible_devices([], 'GPU')
+
 import tf2lib as tl
 import DLlib as dl
 import pylib as py
@@ -20,37 +23,36 @@ from matplotlib.ticker import PercentFormatter
 # =                                   param                                    =
 # ==============================================================================
 
-py.arg('--experiment_dir',default='output/WF-IDEAL')
+py.arg('--experiment_dir',default='WF-IDEAL')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani','Attilio'])
 py.arg('--data_size', type=int, default=384, choices=[192,384])
+py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','VET-Net','AI-DEAL','GraphCuts'])
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
-py.arg('--te_input', type=bool, default=False)
-py.arg('--ME_layer', type=bool, default=False)
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--display', type=bool, default=True)
 test_args = py.args()
-args = py.args_from_yaml(py.join(test_args.experiment_dir, 'settings.yml'))
+args = py.args_from_yaml(py.join('output', test_args.experiment_dir, 'settings.yml'))
 args.__dict__.update(test_args.__dict__)
-
-if not(hasattr(args,'data_size')):
-  py.arg('--data_size', type=int, default=192, choices=[192,384])
-  ds_args = py.args()
-  args.__dict__.update(ds_args.__dict__)
 
 if not(hasattr(args,'field')):
   py.arg('--field', type=float, default=1.5)
   ds_args = py.args()
   args.__dict__.update(ds_args.__dict__)
 
+if not(hasattr(args,'n_echoes')):
+  py.arg('--n_echoes', type=int, default=6)
+  ne_args = py.args()
+  args.__dict__.update(ne_args.__dict__)
+
 # Excel file for saving ROIs values
 if args.dataset == 'multiTE':
-  workbook =xlsxwriter.Workbook(py.join(args.experiment_dir,args.map + '_ROIs_'
+  workbook =xlsxwriter.Workbook(py.join('output',args.experiment_dir,args.map + '_ROIs_'
                                 + str(int(np.round(args.TE1*1e4))) + '_' + str(int(np.round(args.dTE*1e4))) 
                                 + '.xlsx'))
 else:
-  workbook = xlsxwriter.Workbook(py.join(args.experiment_dir,args.map+'_'+args.dataset+'_ROIs.xlsx'))
+  workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,args.map+'_'+args.dataset+'_ROIs.xlsx'))
 ws_ROI_1 = workbook.add_worksheet('RHL')
 ws_ROI_1.write(0,0,'Ground-truth')
 ws_ROI_1.write(0,1,'Model res.')
@@ -130,127 +132,65 @@ A_B_dataset_test.batch(1)
 ################################# LOAD MODEL ####################################
 #################################################################################
 
-# model
-if args.ME_layer:
-  input_shape = (None,hgt,wdt,n_ch)
-else:
-  input_shape = (hgt,wdt,ech_idx)
-if args.G_model == 'multi-decod' or args.G_model == 'encod-decod':
-  if args.out_vars == 'WF-PM':
-    G_A2B = dl.MDWF_Generator(input_shape=input_shape,
-                              te_input=args.te_input,
-                              te_shape=(args.n_echoes,),
-                              filters=args.n_G_filters,
-                              WF_self_attention=args.D1_SelfAttention,
-                              R2_self_attention=args.D2_SelfAttention,
-                              FM_self_attention=args.D3_SelfAttention)
-  else:
-    G_A2B = dl.PM_Generator(input_shape=input_shape,
-                            ME_layer=args.ME_layer,
-                            te_input=args.te_input,
-                            te_shape=(None,),
-                            filters=args.n_G_filters,
-                            R2_self_attention=args.D1_SelfAttention,
-                            FM_self_attention=args.D2_SelfAttention)
-elif args.G_model == 'U-Net' or args.G_model == '':
-  if args.out_vars == 'WF-PM':
-    n_out = 4
-  else:
-    n_out = 2
-  G_A2B = dl.UNet(input_shape=(hgt,wdt,ech_idx),
-                  n_out=n_out,
-                  te_input=args.te_input,
-                  te_shape=(args.n_echoes,),
-                  filters=args.n_G_filters,
+if args.model_sel == 'U-Net':
+  G_A2B = dl.UNet(input_shape=(None,None,2*args.n_echoes), n_out=2, filters=args.n_G_filters,output_activation='relu')
+  checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B), py.join('output', args.experiment_dir, 'checkpoints'))
+elif args.model_sel == 'MDWF-Net':
+  G_A2B = dl.MDWF_Generator(input_shape=(None,None,2*args.n_echoes), filters=args.n_G_filters)
+  checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B), py.join('output', args.experiment_dir, 'checkpoints'))
+elif args.model_sel == 'VET-Net':
+  G_A2B = dl.PM_Generator(input_shape=(None,None,None,2), te_input=True, te_shape=(None,), filters=args.n_G_filters)
+  checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B), py.join('output', args.experiment_dir, 'checkpoints'))
+elif args.model_sel == 'AI-DEAL':
+  G_A2B = dl.UNet(input_shape=(None,None,None,2), bayesian=True, ME_layer=True, filters=args.n_G_filters,
                   self_attention=args.D1_SelfAttention)
-elif args.G_model == 'MEBCRN':
-  if args.out_vars == 'WFc':
-    n_out = 4
-    out_activ = None
-  else:
-    n_out = 2
-    out_activ = 'sigmoid'
-  G_A2B = dl.MEBCRN(input_shape=(args.n_echoes,hgt,wdt,2),
-                    n_outputs=n_out,
-                    output_activation=out_activ,
-                    filters=args.n_G_filters,
-                    self_attention=args.D1_SelfAttention)
+  G_A2R2= dl.UNet(input_shape=(None,None,None,1), bayesian=True, ME_layer=True, filters=args.n_G_filters,
+                  output_activation='sigmoid', self_attention=args.D2_SelfAttention)
+  checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B, G_A2R2=G_A2R2), py.join('output', args.experiment_dir, 'checkpoints'))
 
-# restore
-if len(args.G_model) > 0:
-  tl.Checkpoint(dict(G_A2B=G_A2B), py.join(args.experiment_dir, 'checkpoints')).restore()
+try:  # restore checkpoint including the epoch counter
+    checkpoint.restore().assert_existing_objects_matched()
+except Exception as e:
+    print(e)
 
 @tf.function
 def sample(A, B, TE=None):
-  # Back-up A
-  A_ME = A
-  if not(args.ME_layer):
-    A = data.A_from_MEBCRN(A)
-  # Split B
-  B_WF = B[:,:2,:,:,:]
-  B_PM = B[:,2:,:,:,:]
-  # Magnitude of water/fat images
-  B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
-  # Split B param maps
-  B_R2 = B_PM[:,:,:,:,1:]
-  B_FM = B_PM[:,:,:,:,:1]
-  # Estimate A2B
-  if args.out_vars == 'WF':
-    if args.te_input:
-      if TE is None:
-        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
-      A2B_WF = G_A2B([A,TE], training=True)
+  if args.model_sel == 'U-Net':
+    A_pf = data.A_from_MEBCRN(A) # CHANGE TO NON-MEBCRN FORMAT
+    A2B_WF_abs = G_A2B(A_pf, training=False)
+    A2B_WF_abs = tf.expand_dims(A2B_WF_abs, axis=1)
+    A2B_WF_abs = tf.transpose(A2B_WF_abs, perm=[0,4,2,3,1])
+    A2B_WF = tf.concat([A2B_WF_abs, tf.zeros_like(A2B_WF_abs)], axis=-1)
+    A2B = tf.concat([A2B_WF, tf.zeros_like(A2B_WF[:,:1,...])], axis=1)
+    A2B = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B, 0.0)
+    A2B_var = None
+  elif args.model_sel == 'VET-Net':
+    A2B_PM = G_A2B([A,TE], training=False) #[:,:ech_sel.value,...]
+    A2B_PM = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B_PM, 0.0)
+    A2B_WF = wf.get_rho(A, A2B_PM, te=TE)
+    A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
+    A2B_var = None
+  elif args.model_sel == 'AI-DEAL':
+    A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A), axis=-1, keepdims=True))
+    A2B_FM = G_A2B(A, training=False)
+    A2B_R2 = G_A2R2(A_abs, training=False)
+    A2B_PM = tf.concat([A2B_FM.mean(),A2B_R2.mean()],axis=-1)
+    A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A, A2B_FM, A2B_R2, te=TE, rem_R2=False)
+    A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)],axis=-1)
+    A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
+    A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=1)
+    if A.shape[1] >= A2B_var.shape[1]:
+      A2B_var = tf.where(tf.abs(A[:,:5,...])>=5e-3, A2B_var, 1e-10)
     else:
-      A2B_WF = G_A2B(A, training=True)
-    A2B_WF = data.B_to_MEBCRN(A2B_WF,mode='WF')
-    A2B_WF = tf.where(A_ME[:,:2,:,:,:]!=0.0,A2B_WF,0.0)
-    A2B_PM = tf.zeros_like(B_PM)
-    A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
-  elif args.out_vars == 'WFc':
-    A2B_WF = G_A2B(A, training=False)
-    A2B_WF = tf.where(B[:,:,:,:4]!=0,A2B_WF,0.0)
-    A2B_WF_real = A2B_WF[:,:,:,0::2]
-    A2B_WF_imag = A2B_WF[:,:,:,1::2]
-    A2B_WF_abs = tf.abs(tf.complex(A2B_WF_real,A2B_WF_imag))
-    A2B_PM = tf.zeros_like(B_PM)
-    A2B_abs = tf.concat([A2B_WF_abs,A2B_PM],axis=-1)
-  elif args.out_vars == 'PM':
-    if args.te_input:
-      if TE is None:
-        TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True) # (nb,ne,1)
-      A2B_PM = G_A2B([A,TE], training=True)
-    else:
-      A2B_PM = G_A2B(A, training=True)
-    if not(args.ME_layer):
-      A2B_PM = data.B_to_MEBCRN(A2B_PM,mode='PM')
-    A2B_PM = tf.where(A_ME[:,:1,:,:,:]!=0.0,A2B_PM,0.0)
-    A2B_R2 = A2B_PM[:,:,:,:,1:]
-    A2B_FM = A2B_PM[:,:,:,:,:1]
-    if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-      A2B_FM = (A2B_FM - 0.5) * 2
-      A2B_FM = tf.where(A_ME[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
-      A2B_PM = tf.concat([A2B_FM,A2B_R2],axis=-1)
-    A2B_WF = wf.get_rho(A_ME, A2B_PM, field=args.field, te=TE)
-    A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
-  elif args.out_vars == 'WF-PM':
-    if args.te_input:
-      if TE is None:
-        TE = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True) # (nb,ne,1)
-      A2B_abs = G_A2B([A,TE], training=True)
-    else:
-      A2B_abs = G_A2B(A, training=True)
-    A2B = data.B_to_MEBCRN(A2B_abs,mode='WF-PM')
-    A2B = tf.where(A_ME[:,:3,:,:,:]!=0.0,A2B,0.0)
-    A2B_WF = A2B[:,:2,:,:,:]
-    A2B_PM = A2B[:,2:,:,:,:]
-    A2B_R2 = A2B_PM[:,:,:,:,1:]
-    A2B_FM = A2B_PM[:,:,:,:,:1]
-    if args.G_model=='U-Net' or args.G_model=='MEBCRN':
-      A2B_FM = (A2B_FM - 0.5) * 2
-      A2B_FM = tf.where(A_ME[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
-      A2B_PM = tf.concat([A2B_FM,A2B_R2],axis=-1)
-      A2B = tf.concat([A2B_WF,A2B_PM],axis=1)
-  return A2B
+      A_aux = tf.concat([A,A],axis=1)
+      A2B_var = tf.where(tf.abs(A_aux[:,:5,...])>=5e-3, A2B_var, 1e-10)
+    A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
+    A2B = tf.where(tf.abs(A[:,:3,...])>=5e-3, A2B, 0.0)
+  return A2B, A2B_var
+
+def test(A, TE=None):
+  A2B, A2B_var = sample(A, TE)
+  return A2B, A2B_var
 
 all_test_ans = np.zeros((len_dataset,hgt,wdt,3))
 i = 0
@@ -259,12 +199,12 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   A = tf.expand_dims(A,axis=0)
   B = tf.expand_dims(B,axis=0)
   TE= tf.expand_dims(TE,axis=0)
-  if len(args.G_model) <= 0:
+  if args.model_sel == 'GraphCuts':
     A2B = B
   elif args.dataset == 'JGalgani' or args.dataset == '3ech':
-    A2B = sample(A,B)
+    A2B, _ = test(A,B)
   else:
-    A2B = sample(A,B,TE)
+    A2B, _ = test(A,B,TE)
 
   A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B[:,:2,:,:,:]),axis=-1))
   A2B_WF_abs = tf.transpose(A2B_WF_abs,perm=[0,2,3,1])
