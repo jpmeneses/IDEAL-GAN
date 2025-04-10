@@ -164,7 +164,20 @@ def sample(A, B, TE=None):
     A2B = tf.concat([A2B_WF, tf.zeros_like(A2B_WF[:,:1,...])], axis=1)
     A2B = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B, 0.0)
     A2B_var = None
+  elif model_sel.value == 'MDWF-Net':
+    A_pf = data.A_from_MEBCRN(A) # CHANGE TO NON-MEBCRN FORMAT
+    A2B = G_A2B(A_pf, training=False)
+    A2B = tf.expand_dims(A2B, axis=1)
+    A2B_PM = A2B[...,-1:-3:-1]
+    A2B_WF_abs = A2B[...,:2]
+    A2B_WF_abs = tf.transpose(A2B_WF_abs, perm=[0,4,2,3,1])
+    A2B_WF = tf.concat([A2B_WF_abs, tf.zeros_like(A2B_WF_abs)], axis=-1)
+    A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
+    A2B = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B, 0.0)
+    A2B_var = None
   elif args.model_sel == 'VET-Net':
+    if TE is None:
+      TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True)
     A2B_PM = G_A2B([A,TE], training=False) #[:,:ech_sel.value,...]
     A2B_PM = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B_PM, 0.0)
     A2B_WF = wf.get_rho(A, A2B_PM, te=TE)
@@ -188,8 +201,8 @@ def sample(A, B, TE=None):
     A2B = tf.where(tf.abs(A[:,:3,...])>=5e-3, A2B, 0.0)
   return A2B, A2B_var
 
-def test(A, TE=None):
-  A2B, A2B_var = sample(A, TE)
+def test(A, B, TE=None):
+  A2B, A2B_var = sample(A, B, TE)
   return A2B, A2B_var
 
 all_test_ans = np.zeros((len_dataset,hgt,wdt,3))
