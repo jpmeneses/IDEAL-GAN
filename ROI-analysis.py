@@ -164,7 +164,7 @@ def sample(A, B, TE=None):
     A2B = tf.concat([A2B_WF, tf.zeros_like(A2B_WF[:,:1,...])], axis=1)
     A2B = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B, 0.0)
     A2B_var = None
-  elif model_sel.value == 'MDWF-Net':
+  elif args.model_sel == 'MDWF-Net':
     A_pf = data.A_from_MEBCRN(A) # CHANGE TO NON-MEBCRN FORMAT
     A2B = G_A2B(A_pf, training=False)
     A2B = tf.expand_dims(A2B, axis=1)
