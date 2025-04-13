@@ -136,7 +136,9 @@ if args.model_sel == 'U-Net':
   G_A2B = dl.UNet(input_shape=(None,None,2*args.n_echoes), n_out=2, filters=args.n_G_filters,output_activation='relu')
   checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B), py.join('output', args.experiment_dir, 'checkpoints'))
 elif args.model_sel == 'MDWF-Net':
-  G_A2B = dl.MDWF_Generator(input_shape=(None,None,2*args.n_echoes), filters=args.n_G_filters)
+  G_A2B = dl.MDWF_Generator(input_shape=(None,None,2*args.n_echoes), filters=args.n_G_filters,
+                            WF_self_attention=args.D1_SelfAttention, R2_self_attention=args.D2_SelfAttention,
+                            FM_self_attention=args.D3_SelfAttention)
   checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B), py.join('output', args.experiment_dir, 'checkpoints'))
 elif args.model_sel == 'VET-Net':
   G_A2B = dl.PM_Generator(input_shape=(None,None,None,2), te_input=True, te_shape=(None,), filters=args.n_G_filters)
@@ -162,7 +164,7 @@ def sample(A, B, TE=None):
     A2B_WF_abs = tf.transpose(A2B_WF_abs, perm=[0,4,2,3,1])
     A2B_WF = tf.concat([A2B_WF_abs, tf.zeros_like(A2B_WF_abs)], axis=-1)
     A2B = tf.concat([A2B_WF, tf.zeros_like(A2B_WF[:,:1,...])], axis=1)
-    A2B = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B, 0.0)
+    A2B = tf.where(A[:,:1,...]!=0.0, A2B, 0.0)
     A2B_var = None
   elif args.model_sel == 'MDWF-Net':
     A_pf = data.A_from_MEBCRN(A) # CHANGE TO NON-MEBCRN FORMAT
@@ -173,13 +175,13 @@ def sample(A, B, TE=None):
     A2B_WF_abs = tf.transpose(A2B_WF_abs, perm=[0,4,2,3,1])
     A2B_WF = tf.concat([A2B_WF_abs, tf.zeros_like(A2B_WF_abs)], axis=-1)
     A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
-    A2B = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B, 0.0)
+    A2B = tf.where(A[:,:1,...]!=0.0, A2B, 0.0)
     A2B_var = None
   elif args.model_sel == 'VET-Net':
     if TE is None:
       TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True)
     A2B_PM = G_A2B([A,TE], training=False) #[:,:ech_sel.value,...]
-    A2B_PM = tf.where(tf.abs(A[:,:1,...])>=5e-3, A2B_PM, 0.0)
+    A2B_PM = tf.where(A[:,:1,...]!=0.0, A2B_PM, 0.0)
     A2B_WF = wf.get_rho(A, A2B_PM, te=TE)
     A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
     A2B_var = None
@@ -193,12 +195,12 @@ def sample(A, B, TE=None):
     A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
     A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=1)
     if A.shape[1] >= A2B_var.shape[1]:
-      A2B_var = tf.where(tf.abs(A[:,:5,...])>=5e-3, A2B_var, 1e-10)
+      A2B_var = tf.where(A[:,:5,...]!=0.0, A2B_var, 1e-10)
     else:
       A_aux = tf.concat([A,A],axis=1)
-      A2B_var = tf.where(tf.abs(A_aux[:,:5,...])>=5e-3, A2B_var, 1e-10)
+      A2B_var = tf.where(A_aux[:,:5,...]!=0.0, A2B_var, 1e-10)
     A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
-    A2B = tf.where(tf.abs(A[:,:3,...])>=5e-3, A2B, 0.0)
+    A2B = tf.where(A[:,:3,...]!=0.0, A2B, 0.0)
   return A2B, A2B_var
 
 def test(A, B, TE=None):
