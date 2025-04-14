@@ -31,7 +31,7 @@ For additional information, please refer to the publications below:
 	- VET-Net (trained using ```train-IDEAL-TEaug.py```)
 	- AI-DEAL (trained using ```train-IDEAL-unsup.py```)
 
-### Recommended dependencies:
+### Recommended dependencies - can be installed using ```conda env create -f environment.yml```:
 - ```tensorflow```: 2.8.1
 - ```tensorflow-addons```: 0.16.1
 - ```tensorflow-probability```: 0.16.0
