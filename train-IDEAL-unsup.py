@@ -182,22 +182,22 @@ def train_G(A, B):
         else:
             A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
-        A2B2A = tf.where(A!=0.0,A2B2A,0.0)
+        A2B2A = tf.where(A[:,:A2B2A.shape[1],...]!=0.0,A2B2A,0.0)
 
         # Stddev map mask and attach to recon-A
         if args.UQ:
-            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=(args.out_vars=='FM'))
+            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A2B2A.shape[1], rem_R2=(args.out_vars=='FM'))
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
             if args.remove_ech1:
-                A2B2A_cycle_loss = uncertain_loss(A[:,1:,...], A2B2A_sampled_var[:,1:,...])
+                A2B2A_cycle_loss = uncertain_loss(A[:,1:,...], A2B2A_sampled_var)
             else:
                 A2B2A_cycle_loss = uncertain_loss(A, A2B2A_sampled_var)
         else:
             if args.remove_ech1:
-                A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A[:,1:,...])
+                A2B2A_cycle_loss = cycle_loss_fn(A[:,1:,...], A2B2A)
             else:
                 A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
@@ -317,7 +317,7 @@ def sample(A, B):
             A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF, A2B_PM],axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
-        A2B2A = tf.where(A!=0.0,A2B2A,0.0)
+        A2B2A = tf.where(A[:,:A2B2A.shape[1],...]!=0.0,A2B2A,0.0)
         A2B_FM_var = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM.variance(),0.0) * (fm_sc**2)
         A2B_PM_var = tf.concat([A2B_FM_var,tf.zeros_like(A2B_FM)],axis=-1)
 
@@ -338,7 +338,7 @@ def sample(A, B):
             A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
-        A2B2A = tf.where(A!=0.0,A2B2A,0.0)
+        A2B2A = tf.where(A[:,:A2B2A.shape[1],...]!=0.0,A2B2A,0.0)
         A2B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=True))
 
         A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
