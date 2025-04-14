@@ -177,7 +177,7 @@ def train_G(A, B):
             A2B_R2 = tf.zeros_like(A2B_FM)
 
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
-        if args,remove_ech1:
+        if args.remove_ech1:
             A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM)
         else:
             A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
