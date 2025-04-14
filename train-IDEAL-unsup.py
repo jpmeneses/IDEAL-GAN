@@ -26,6 +26,7 @@ py.arg('--UQ', type=bool, default=False)
 py.arg('--UQ_R2s', type=bool, default=False)
 py.arg('--UQ_calib', type=bool, default=False)
 py.arg('--ME_layer', type=bool, default=True)
+py.arg('--remove_ech1', type=bool, default=False)
 py.arg('--k_fold', type=int, default=1)
 py.arg('--n_G_filters', type=int, default=32)
 py.arg('--batch_size', type=int, default=1)
@@ -35,7 +36,7 @@ py.arg('--epoch_ckpt', type=int, default=5)  # num. of epochs to save a checkpoi
 py.arg('--lr', type=float, default=0.0001)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
-py.arg('--data_aug_p', type=float, default=0.4)
+py.arg('--data_aug_p', type=float, default=0.0)
 py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--R2_L1_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
@@ -162,7 +163,10 @@ def train_G(A, B):
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
-        A2B_FM = G_A2B(A, training=True)
+        if args.remove_ech1:
+            A2B_FM = G_A2B(A[:,1:,...], training=True)
+        else:
+            A2B_FM = G_A2B(A, training=True)
         # A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         if args.out_vars == 'PM':
@@ -173,7 +177,10 @@ def train_G(A, B):
             A2B_R2 = tf.zeros_like(A2B_FM)
 
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
-        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+        if args,remove_ech1:
+            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM)
+        else:
+            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B2A = tf.where(A!=0.0,A2B2A,0.0)
 
@@ -184,9 +191,15 @@ def train_G(A, B):
 
         ############ Cycle-Consistency Losses #############
         if args.UQ:
-            A2B2A_cycle_loss = uncertain_loss(A, A2B2A_sampled_var)
+            if args.remove_ech1:
+                A2B2A_cycle_loss = uncertain_loss(A[:,1:,...], A2B2A_sampled_var[:,1:,...])
+            else:
+                A2B2A_cycle_loss = uncertain_loss(A, A2B2A_sampled_var)
         else:
-            A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
+            if args.remove_ech1:
+                A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A[:,1:,...])
+            else:
+                A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
         WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
@@ -290,12 +303,18 @@ def train_step(A, B):
 @tf.function
 def sample(A, B):
     if args.out_vars == 'FM':
-        A2B_FM = G_A2B(A, training=False)
+        if args.remove_ech1:
+            A2B_FM = G_A2B(A[:,1:,...], training=False)
+        else:
+            A2B_FM = G_A2B(A, training=False)
 
         # Build A2B_PM array with zero-valued R2*
         A2B_R2 = tf.zeros_like(A2B_FM)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
-        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+        if args.remove_ech1:
+            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM)
+        else:
+            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF, A2B_PM],axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
         A2B2A = tf.where(A!=0.0,A2B2A,0.0)
@@ -305,12 +324,18 @@ def sample(A, B):
     elif args.out_vars == 'R2s' or args.out_vars == 'PM':
         A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
         # Compute FM from complex-valued images
-        A2B_FM = G_A2B(A, training=False)
+        if args.remove_ech1:
+            A2B_FM = G_A2B(A[:,1:,...], training=False)
+        else:
+            A2B_FM = G_A2B(A, training=False)
         A2B_R2 = G_A2R2(A_abs, training=False)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
         # Magnitude of water/fat images
-        A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+        if args.remove_ech1:
+            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM)
+        else:
+            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
         A2B2A = tf.where(A!=0.0,A2B2A,0.0)
