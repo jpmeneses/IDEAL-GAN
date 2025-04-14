@@ -23,7 +23,7 @@ from matplotlib.ticker import PercentFormatter
 # =                                   param                                    =
 # ==============================================================================
 
-py.arg('--experiment_dir',default='WF-IDEAL')
+py.arg('--experiment_dir',default='TEaug-300')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani','Attilio'])
 py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','VET-Net','AI-DEAL','GraphCuts'])
@@ -207,7 +207,7 @@ def test(A, B, TE=None):
   A2B, A2B_var = sample(A, B, TE)
   return A2B, A2B_var
 
-all_test_ans = np.zeros((len_dataset,hgt,wdt,3))
+all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
 i = 0
 
 for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
@@ -223,19 +223,23 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
 
   A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B[:,:2,:,:,:]),axis=-1))
   A2B_WF_abs = tf.transpose(A2B_WF_abs,perm=[0,2,3,1])
+  A2B_WFsum_abs = tf.math.sqrt(tf.reduce_sum(tf.square(tf.reduce_sum(A2B[:,:2,:,:,:], axis=1, keepdims=True)),axis=-1))
+  A2B_WFsum_abs = tf.transpose(A2B_WFsum_abs,perm=[0,2,3,1])
   A2B_R2 = A2B[:,2,:,:,1:]
-  A2B = tf.concat([A2B_WF_abs,A2B_R2],axis=-1)
+  A2B = tf.concat([A2B_WF_abs,A2B_WFsum_abs,A2B_R2],axis=-1)
 
   all_test_ans[i,:,:,:] = A2B
   i += 1
 
 w_all_ans = all_test_ans[:,:,:,0]
 f_all_ans = all_test_ans[:,:,:,1]
-r2_all_ans = all_test_ans[:,:,:,2]*r2_sc
+wf_all_ans = all_test_ans[:,:,:,2]
+r2_all_ans = all_test_ans[:,:,:,3]*r2_sc
 
 # Ground truth
 w_all_gt = np.sqrt(np.sum(testY[:,0,:,:,:]**2,axis=-1))
 f_all_gt = np.sqrt(np.sum(testY[:,1,:,:,:]**2,axis=-1))
+wf_all_gt = np.sqrt(np.sum((testY[:,0,...]+testY[:,1,...])**2,axis=-1))
 r2_all_gt = testY[:,2,:,:,1]*r2_sc
 
 
@@ -244,8 +248,8 @@ r2_all_gt = testY[:,2,:,:,1]*r2_sc
 
 if args.map == 'PDFF':
   bool_PDFF = True
-  PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
-  PDFF_all_gt = f_all_gt/(w_all_gt+f_all_gt)
+  PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+  PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
   PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0
