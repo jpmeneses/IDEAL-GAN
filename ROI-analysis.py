@@ -27,6 +27,7 @@ py.arg('--experiment_dir',default='TEaug-300')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani','Attilio'])
 py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','VET-Net','AI-DEAL','GraphCuts'])
+py.arg('--remove_ech1', type=bool, default=False)
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -182,15 +183,24 @@ def sample(A, B, TE=None):
       TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True)
     A2B_PM = G_A2B([A,TE], training=False) #[:,:ech_sel.value,...]
     A2B_PM = tf.where(A[:,:1,...]!=0.0, A2B_PM, 0.0)
-    A2B_WF = wf.get_rho(A, A2B_PM, te=TE)
+    if args.remove_ech1:
+      A2B_WF = wf.get_rho(A[:,1:,...], A2B_PM, te=TE[:,1:,...])
+    else:
+      A2B_WF = wf.get_rho(A, A2B_PM, te=TE)
     A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
     A2B_var = None
   elif args.model_sel == 'AI-DEAL':
     A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A), axis=-1, keepdims=True))
-    A2B_FM = G_A2B(A, training=False)
+    if args.remove_ech1:
+      A2B_FM = G_A2B(A[:,1:,...], training=False)
+    else:
+      A2B_FM = G_A2B(A, training=False)
     A2B_R2 = G_A2R2(A_abs, training=False)
     A2B_PM = tf.concat([A2B_FM.mean(),A2B_R2.mean()],axis=-1)
-    A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A, A2B_FM, A2B_R2, te=TE, rem_R2=False)
+    if args.remove_ech1:
+      A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A[:,1:,...], A2B_FM, A2B_R2, te=TE[:,1:,...], rem_R2=False)
+    else:
+      A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A, A2B_FM, A2B_R2, te=TE, rem_R2=False)
     A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)],axis=-1)
     A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
     A2B_var = tf.concat([A2B_WF_var,A2B_PM_var], axis=1)
