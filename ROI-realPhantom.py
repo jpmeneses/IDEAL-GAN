@@ -27,10 +27,6 @@ args.__dict__.update(test_args.__dict__)
 # Excel file for saving ROIs values
 workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,args.map+'_phantom_ROIs.xlsx'))
 
-if args.n_echoes > 0:
-  ech_idx = args.n_echoes * 2
-else:
-  ech_idx = 12
 r2_sc,fm_sc = 200.0,300.0
 
 ################################################################################
@@ -38,8 +34,8 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 dataset_dir = '../datasets/'
 dataset_hdf5 = args.dataset + '_GC_192_128_complex_2D.hdf5'
-testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
-                                    acqs_data=True, te_data=True, MEBCRN=True)
+testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, acqs_data=True,
+                                    te_data=True, MEBCRN=True)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -49,7 +45,6 @@ testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx,
 len_dataset,n_out,hgt,wdt,n_ch = np.shape(testY)
 
 print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',args.n_echoes)
 print('Output Maps:',n_out)
 
 # Input and output dimensions (testing data)
