@@ -356,11 +356,12 @@ def sample(A, B):
         else:
             val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
     else:
-        val_A2B2A_R2_loss = cycle_loss_fn(A_abs, A2B2A_abs)
         if args.remove_ech1:
             val_A2B2A_FM_loss = cycle_loss_fn(A[:,1:,...], A2B2A)
+            val_A2B2A_R2_loss = cycle_loss_fn(A_abs[:,1:,...], A2B2A_abs)
         else:
             val_A2B2A_FM_loss = cycle_loss_fn(A, A2B2A)
+            val_A2B2A_R2_loss = cycle_loss_fn(A_abs, A2B2A_abs)
     
     val_FM_dict =  {'A2B2A_cycle_loss': val_A2B2A_FM_loss,
                     'WF_loss': WF_loss,
