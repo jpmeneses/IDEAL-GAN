@@ -198,7 +198,10 @@ def sample(A, B, TE=None):
     A2B_R2 = G_A2R2(A_abs, training=False)
     A2B_PM = tf.concat([A2B_FM.mean(),A2B_R2.mean()],axis=-1)
     if args.remove_ech1:
-      A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A[:,1:,...], A2B_FM, A2B_R2, te=TE[:,1:,...], rem_R2=False)
+      if TE is None:
+        A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A[:,1:,...], A2B_FM, A2B_R2, rem_R2=False)
+      else:
+        A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A[:,1:,...], A2B_FM, A2B_R2, te=TE[:,1:,...], rem_R2=False)
     else:
       A2B_WF, A2B_WF_var = wf.PDFF_uncertainty(A, A2B_FM, A2B_R2, te=TE, rem_R2=False)
     A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)],axis=-1)
