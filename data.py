@@ -289,7 +289,7 @@ def B_from_MEBCRN(B,mag_and_phase=False,c_pha=3):
         return tf.concat([B_W,B_F,B_R2,B_FM],axis=-1)
 
 
-def B_to_MEBCRN(B,mode='WF-PM'):
+def B_to_MEBCRN(B,mode='All'):
     if mode == 'WF':
         B_W = tf.expand_dims(B[:,:,:,:1],axis=1)
         B_W = tf.concat([B_W,tf.zeros_like(B_W)],axis=-1)
