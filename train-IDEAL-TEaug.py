@@ -113,7 +113,6 @@ else:
     tfr_dataset = tf.data.TFRecordDataset([recordPath])
     # Create a description of the features.
     feature_description = {
-        'acqs': tf.io.FixedLenFeature([], tf.string),
         'out_maps': tf.io.FixedLenFeature([], tf.string),
         }
 
