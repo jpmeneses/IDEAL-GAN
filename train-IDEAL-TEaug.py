@@ -92,24 +92,19 @@ A_B_dataset_val.batch(1)
 if not(args.DL_gen):
     dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
     out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=False)
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
     dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
     out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=False)
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
     dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
     out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=False)
+                                acqs_data=False, te_data=False, MEBCRN=True)
 
     trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
-
-    if args.G_model == 'MEBCRN':
-        len_dataset,n_out,hgt,wdt,n_ch = np.shape(valY)
-    else:
-        len_dataset,hgt,wdt,n_out = np.shape(valY)
-        n_ch = 2
-
+    len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
+    
     B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
 
 else:
@@ -151,9 +146,9 @@ else:
                     k_idxs = [(0,2)]
                 for k in k_idxs:
                     custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
-                trainX, trainY, TEs =data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
-                                                    acqs_data=True,te_data=True,remove_zeros=False,
-                                                    MEBCRN=True, mag_and_phase=True, unwrap=True)
+                trainY, TEs =data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
+                                            acqs_data=False,te_data=True,remove_zeros=False,
+                                            MEBCRN=True, mag_and_phase=True, unwrap=True)
         else:
             if args.DL_partial_real == 2:
                 end_idx = 62
@@ -163,7 +158,7 @@ else:
                 end_idx = 330
             dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
             trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
-                                    acqs_data=False, te_data=False, MEBCRN=False,
+                                    acqs_data=False, te_data=False, MEBCRN=True,
                                     mag_and_phase=True, unwrap=True)
         B_dataset = tfr_dataset.skip(end_idx).map(_parse_function)
         B_dataset_aux = tf.data.Dataset.from_tensor_slices(trainY)
@@ -172,7 +167,7 @@ else:
         B_dataset = tfr_dataset.map(_parse_function)
 
     for B in B_dataset.take(1):
-        _,hgt,wdt,n_ch = B.shape
+        n_ch,hgt,wdt,n_out = B.shape
     len_dataset = int(args.DL_filename.split('_')[-1])
     if args.DL_partial_real != 0:
         len_dataset += trainY.shape[0]
@@ -227,7 +222,10 @@ else:
                     self_attention=args.D1_SelfAttention)
         
 
-IDEAL_op = wf.IDEAL_Layer(field=args.field)
+if args.DL_gen:
+    IDEAL_op = wf.IDEAL_mag_Layer(field=args.field)
+else:
+    IDEAL_op = wf.IDEAL_Layer(field=args.field)
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
@@ -241,7 +239,6 @@ G_R2_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1
 
 @tf.function
 def train_G(B, te=None):
-    B = data.B_to_MEBCRN(B)
     ##################### B Cycle #####################
     B2A = IDEAL_op(B, te=te, training=False)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
@@ -396,7 +393,6 @@ def train_G(B, te=None):
 
 @tf.function
 def train_G_R2(B, te=None):
-    B = data.B_to_MEBCRN(B)
     ##################### B Cycle #####################
     B2A = IDEAL_op(B, te=te, training=False)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
@@ -599,6 +595,8 @@ for ep in range(args.epochs):
         # ==============================================================================
         p = np.random.rand()
         if p <= 0.4:
+            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
+            
             # Random 90 deg rotations
             B = tf.image.rot90(B,k=np.random.randint(3))
 
@@ -608,13 +606,14 @@ for ep in range(args.epochs):
             # Random vertical reflections
             B = tf.image.random_flip_up_down(B)
 
+            B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+
             # Random off-resonance field-map scaling factor
             if args.FM_aug:
                 B_FM = B[...,-1:] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
                 B = tf.concat([B[...,:-1],B_FM], axis=-1)
 
         if args.bip_grad:
-            # TO BE DEBUGGED FOR non-MEBCRN FORMAT
             B_FM = B[:,2:,:,:,:1]
             x_lim = np.random.uniform(0.1,0.5)
             x_off = np.random.uniform(0.0,0.01)
