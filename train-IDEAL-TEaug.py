@@ -122,44 +122,16 @@ else:
         return tf.io.parse_tensor(parsed_ds['out_maps'], out_type=tf.float32)
 
     if args.DL_partial_real != 0:
-        if args.TE1 == 0.0014 and args.dTE == 0.0022:
-            dataset_hdf5_1 = 'multiTE_' + str(args.data_size) + '_complex_2D.hdf5'
-            ini_idxs = [0,84,204,300,396,484,580,680,776,848]#,932,1028, 1100,1142,1190,1232,1286,1334,1388,1460]
-            delta_idxs = [21,24,24,24,22,24,25,24,18]#,21,24,18, 21,24,21,18,16,18,24,21]
-            end_idx = np.sum(delta_idxs)
-            k_idxs = [(0,1),(2,3)]
-            for k in k_idxs:
-                custom_list = [a for a in range(ini_idxs[0]+k[0]*delta_idxs[0],ini_idxs[0]+k[1]*delta_idxs[0])]
-            # Rest of the patients
-            for i in range(1,len(ini_idxs)):
-                if (i<=11) and args.TE1 == 0.0013 and args.dTE == 0.0022:
-                    k_idxs = [(0,1),(2,3)]
-                elif (i<=11) and args.TE1 == 0.0014 and args.dTE == 0.0022:
-                    k_idxs = [(0,1),(3,4)]
-                elif (i==1) and args.TE1 == 0.0013 and args.dTE == 0.0023:
-                    k_idxs = [(0,1),(4,5)]
-                elif (i==15 or i==16) and args.TE1 == 0.0013 and args.dTE == 0.0023:
-                    k_idxs = [(0,1),(2,3)]
-                elif (i>=17) and args.TE1 == 0.0013 and args.dTE == 0.0024:
-                    k_idxs = [(0,1),(2,3)]
-                else:
-                    k_idxs = [(0,2)]
-                for k in k_idxs:
-                    custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
-                trainY, TEs =data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
-                                            acqs_data=False,te_data=True,remove_zeros=False,
-                                            MEBCRN=True, mag_and_phase=True, unwrap=True)
-        else:
-            if args.DL_partial_real == 2:
-                end_idx = 62
-            elif args.DL_partial_real == 6:
-                end_idx = 200
-            elif args.DL_partial_real == 10:
-                end_idx = 330
-            dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-            trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
-                                    acqs_data=False, te_data=False, MEBCRN=True,
-                                    mag_and_phase=True, unwrap=True)
+        if args.DL_partial_real == 2:
+            end_idx = 62
+        elif args.DL_partial_real == 6:
+            end_idx = 200
+        elif args.DL_partial_real == 10:
+            end_idx = 330
+        dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+        trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
+                                acqs_data=False, te_data=False, MEBCRN=True,
+                                mag_and_phase=True, unwrap=True)
         B_dataset = tfr_dataset.skip(end_idx).map(_parse_function)
         B_dataset_aux = tf.data.Dataset.from_tensor_slices(trainY)
         B_dataset = B_dataset.concatenate(B_dataset_aux)
@@ -168,6 +140,7 @@ else:
 
     for B in B_dataset.take(1):
         n_ch,hgt,wdt,n_out = B.shape
+        print(B.shape)
     len_dataset = int(args.DL_filename.split('_')[-1])
     if args.DL_partial_real != 0:
         len_dataset += trainY.shape[0]
