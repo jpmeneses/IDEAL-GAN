@@ -248,10 +248,11 @@ def train_G(B, te=None):
         B_WF_abs = B[:,:1,:,:,:2]
         B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
         B_PM = B[...,2:]
-        B_PM = tf.reverse(B_PM,axis=[-1])
+        B_PM = tf.reverse(B_PM,axis=[1]) # (bs,2,hg,wd,1)
+        B_PM = tf.transpose(B_PM,perm=[0,4,2,3,1])
     else:
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
-        B_PM = B[:,2:,...]
+        B_PM = B[:,2:,...] # (bs,1,hg,wd,2)
 
     ############## Selective weighting ################
     if args.sel_weight:
@@ -408,7 +409,8 @@ def train_G_R2(B, te=None):
         B_WF_abs = B[:,:1,:,:,:2]
         B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
         B_PM = B[...,2:]
-        B_PM = tf.reverse(B_PM,axis=[-1])
+        B_PM = tf.reverse(B_PM,axis=[1]) # (bs,2,hg,wd,1)
+        B_PM = tf.transpose(B_PM,perm=[0,4,2,3,1])
     else:
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
         B_PM = B[:,2:,...]
@@ -470,7 +472,8 @@ def sample(B, te=None):
         B_WF_abs = B[:,:1,:,:,:2]
         B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
         B_PM = B[...,2:]
-        B_PM = tf.reverse(B_PM,axis=[-1])
+        B_PM = tf.reverse(B_PM,axis=[1]) # (bs,2,hg,wd,1)
+        B_PM = tf.transpose(B_PM,perm=[0,4,2,3,1])
     else:
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
         B_PM = B[:,2:,...]
