@@ -223,10 +223,7 @@ else:
                     self_attention=args.D1_SelfAttention)
         
 
-if args.DL_gen:
-    IDEAL_op = wf.IDEAL_mag_Layer(field=args.field)
-else:
-    IDEAL_op = wf.IDEAL_Layer(field=args.field)
+IDEAL_op = wf.IDEAL_Layer(field=args.field)
 
 sup_loss_fn = tf.losses.MeanAbsoluteError()
 
