@@ -624,7 +624,10 @@ for ep in range(args.epochs):
             # Random vertical reflections
             B = tf.image.random_flip_up_down(B)
 
-            B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+            if args.DL_gen:
+                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+            else:
+                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,4,1,2,3])
 
             # Random off-resonance field-map scaling factor
             if args.FM_aug:
