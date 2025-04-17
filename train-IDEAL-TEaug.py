@@ -597,7 +597,7 @@ for ep in range(args.epochs):
             B = tf.image.random_flip_up_down(B)
 
             if args.DL_gen:
-                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
             else:
                 B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,4,1,2,3])
 
