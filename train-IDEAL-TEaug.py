@@ -582,7 +582,7 @@ val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summarie
 val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(out_maps_1))
+n_div = np.ceil(total_steps/len(valY))
 
 # main loop
 for ep in range(args.epochs):
@@ -599,8 +599,6 @@ for ep in range(args.epochs):
         # ==============================================================================
         p = np.random.rand()
         if p <= 0.4:
-            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
-
             # Random 90 deg rotations
             B = tf.image.rot90(B,k=np.random.randint(3))
 
@@ -610,15 +608,13 @@ for ep in range(args.epochs):
             # Random vertical reflections
             B = tf.image.random_flip_up_down(B)
 
-            B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
-
             # Random off-resonance field-map scaling factor
             if args.FM_aug:
-                B_FM = B[:,2:,:,:,:1] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
-                B_PM = tf.concat([B_FM,B[:,2:,:,:,1:]], axis=-1)
-                B = tf.concat([B[:,:2,:,:,:],B_PM], axis=1)
+                B_FM = B[...,-1:] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
+                B = tf.concat([B[...,:-1],B_FM], axis=-1)
 
         if args.bip_grad:
+            # TO BE DEBUGGED FOR non-MEBCRN FORMAT
             B_FM = B[:,2:,:,:,:1]
             x_lim = np.random.uniform(0.1,0.5)
             x_off = np.random.uniform(0.0,0.01)
