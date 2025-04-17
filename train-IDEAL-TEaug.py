@@ -244,8 +244,14 @@ def train_G(B, te=None):
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A),axis=-1,keepdims=True))
 
-    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
-    B_PM = B[:,2:,:,:,:]
+    if args.DL_gen:
+        B_WF_abs = B[:,:1,:,:,:2]
+        B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
+        B_PM = B[...,2:]
+        B_PM = tf.reverse(B_PM,axis=-1)
+    else:
+        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+        B_PM = B[:,2:,...]
 
     ############## Selective weighting ################
     if args.sel_weight:
@@ -329,7 +335,7 @@ def train_G(B, te=None):
             # Compute water/fat
             B2A2B_WF = wf.get_rho(B2A, B2A2B_PM, field=args.field, te=te)
             
-            # Magnitude of water/fat images
+            # Magnitude and phase of water/fat images
             B2A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A2B_WF),axis=-1,keepdims=True))
             
             # Compute loss
@@ -398,8 +404,14 @@ def train_G_R2(B, te=None):
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A),axis=-1,keepdims=True))
 
-    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
-    B_PM = B[:,2:,:,:,:]
+    if args.DL_gen:
+        B_WF_abs = B[:,:1,:,:,:2]
+        B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
+        B_PM = B[...,2:]
+        B_PM = tf.reverse(B_PM,axis=-1)
+    else:
+        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+        B_PM = B[:,2:,...]
 
     with tf.GradientTape() as t:
         # Compute model's output
@@ -454,8 +466,14 @@ def train_step(B, te=None):
 @tf.function
 def sample(B, te=None):
     # Split B
-    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,:,:,:]),axis=-1,keepdims=True))
-    B_PM = B[:,2:,:,:,:]
+    if args.DL_gen:
+        B_WF_abs = B[:,:1,:,:,:2]
+        B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
+        B_PM = B[...,2:]
+        B_PM = tf.reverse(B_PM,axis=-1)
+    else:
+        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+        B_PM = B[:,2:,...]
 
     # Compute B2A (+ noise) and estimate B2A2B
     B2A = IDEAL_op(B, te=te, training=False)
