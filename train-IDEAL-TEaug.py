@@ -373,8 +373,8 @@ def train_G(B, te=None):
 
         ############### Splited losses ####################
         WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
-        R2_loss = sup_loss_fn(B[:,2,:,:,1:], B2A2B_R2)
-        FM_loss = sup_loss_fn(B[:,2,:,:,:1], B2A2B_FM)
+        R2_loss = sup_loss_fn(B_PM[...,1:], B2A2B_R2)
+        FM_loss = sup_loss_fn(B_PM[...,:1], B2A2B_FM)
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_R2)) * args.R2_TV_weight
@@ -556,8 +556,8 @@ def sample(B, te=None):
 
     ############### Splited losses ####################
     WF_abs_loss = sup_loss_fn(B_WF_abs, B2A2B_WF_abs)
-    R2_loss = sup_loss_fn(B[:,2:,:,:,1:], B2A2B_R2)
-    FM_loss = sup_loss_fn(B[:,2:,:,:,:1], B2A2B_FM)
+    R2_loss = sup_loss_fn(B_PM[...,1:], B2A2B_R2)
+    FM_loss = sup_loss_fn(B_PM[...,:1], B2A2B_FM)
     
     return B2A, B2A2B, {'sup_loss': val_sup_loss,
                         'WF_loss': WF_abs_loss,
