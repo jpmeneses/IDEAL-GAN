@@ -599,7 +599,7 @@ for ep in range(args.epochs):
             if args.DL_gen:
                 B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
             else:
-                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,4,1,2,3])
+                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
 
             # Random off-resonance field-map scaling factor
             if args.FM_aug:
