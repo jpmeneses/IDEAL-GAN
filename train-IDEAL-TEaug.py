@@ -108,6 +108,7 @@ if not(args.DL_gen):
     B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
 
 else:
+    c_pha = 3
     recordPath = py.join('tfrecord', args.DL_filename)
     tfr_dataset = tf.data.TFRecordDataset([recordPath])
     # Create a description of the features.
