@@ -83,11 +83,11 @@ r2_sc,fm_sc = 200.0,300.0
 dataset_dir = '../datasets/'
 
 dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+valY=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
+                    acqs_data=False, te_data=False, MEBCRN=True)
 
-A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
-A_B_dataset_val.batch(1)
+B_dataset_val = tf.data.Dataset.from_tensor_slices(valY)
+B_dataset_val.batch(1)
 
 if not(args.DL_gen):
     dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
@@ -593,7 +593,7 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'validation'))
 
 # sample
-val_iter = cycle(A_B_dataset_val)
+val_iter = cycle(B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
 n_div = np.ceil(total_steps/len(valY))
