@@ -23,7 +23,7 @@ from itertools import cycle
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
 py.arg('--DL_gen', type=bool, default=False)
-py.arg('--DL_partial_real', type=bool, default=False)
+py.arg('--DL_partial_real', type=int, default=0, choices=[0,2,6,10])
 py.arg('--DL_filename', default='LDM_ds')
 py.arg('--sigma_noise', type=float, default=0.0)
 py.arg('--n_echoes', type=int, default=6)
@@ -84,47 +84,105 @@ r2_sc,fm_sc = 200.0,300.0
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
 dataset_dir = '../datasets/'
+
 dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, 
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
                             acqs_data=True, te_data=False, MEBCRN=True)
+
+A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
+A_B_dataset_val.batch(1)
 
 if not(args.DL_gen):
     dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
     out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=True)
+                                acqs_data=False, te_data=False, MEBCRN=False)
 
     dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=True)
+    out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
+                                acqs_data=False, te_data=False, MEBCRN=False)
 
     dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=True)
+    out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
+                                acqs_data=False, te_data=False, MEBCRN=False)
 
-
-################################################################################
-########################### DATASET PARTITIONS #################################
-################################################################################
-
-if args.DL_gen:
-    trainY = np.zeros((args.n_per_epoch,1,1,1,1),dtype=np.float32)
-else:
     trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
 
-# Overall dataset statistics
-len_dataset,_,_,_,_ = np.shape(trainY)
-_,n_out,hgt,wdt,n_ch = np.shape(out_maps_1)
+    if args.G_model == 'MEBCRN':
+        len_dataset,n_out,hgt,wdt,n_ch = np.shape(valY)
+    else:
+        len_dataset,hgt,wdt,n_out = np.shape(valY)
+        n_ch = 2
 
-print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:',echoes)
+    B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
 
-# Input and output dimensions (validations data)
-print('Output shape:',out_maps_1.shape)
+else:
+    recordPath = py.join('tfrecord', args.DL_filename)
+    tfr_dataset = tf.data.TFRecordDataset([recordPath])
+    # Create a description of the features.
+    feature_description = {
+        'acqs': tf.io.FixedLenFeature([], tf.string),
+        'out_maps': tf.io.FixedLenFeature([], tf.string),
+        }
 
-B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
-B_dataset = B_dataset.batch(args.batch_size).shuffle(len(trainY))
-B_dataset_val = tf.data.Dataset.from_tensor_slices(out_maps_1)
-B_dataset_val.batch(1)
+    def _parse_function(example_proto):
+        # Parse the input `tf.train.Example` proto using the dictionary above.
+        parsed_ds = tf.io.parse_example(example_proto, feature_description)
+        return tf.io.parse_tensor(parsed_ds['out_maps'], out_type=tf.float32)
+
+    if args.DL_partial_real != 0:
+        if args.TE1 == 0.0014 and args.dTE == 0.0022:
+            dataset_hdf5_1 = 'multiTE_' + str(args.data_size) + '_complex_2D.hdf5'
+            ini_idxs = [0,84,204,300,396,484,580,680,776,848]#,932,1028, 1100,1142,1190,1232,1286,1334,1388,1460]
+            delta_idxs = [21,24,24,24,22,24,25,24,18]#,21,24,18, 21,24,21,18,16,18,24,21]
+            end_idx = np.sum(delta_idxs)
+            k_idxs = [(0,1),(2,3)]
+            for k in k_idxs:
+                custom_list = [a for a in range(ini_idxs[0]+k[0]*delta_idxs[0],ini_idxs[0]+k[1]*delta_idxs[0])]
+            # Rest of the patients
+            for i in range(1,len(ini_idxs)):
+                if (i<=11) and args.TE1 == 0.0013 and args.dTE == 0.0022:
+                    k_idxs = [(0,1),(2,3)]
+                elif (i<=11) and args.TE1 == 0.0014 and args.dTE == 0.0022:
+                    k_idxs = [(0,1),(3,4)]
+                elif (i==1) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+                    k_idxs = [(0,1),(4,5)]
+                elif (i==15 or i==16) and args.TE1 == 0.0013 and args.dTE == 0.0023:
+                    k_idxs = [(0,1),(2,3)]
+                elif (i>=17) and args.TE1 == 0.0013 and args.dTE == 0.0024:
+                    k_idxs = [(0,1),(2,3)]
+                else:
+                    k_idxs = [(0,2)]
+                for k in k_idxs:
+                    custom_list += [a for a in range(ini_idxs[i]+k[0]*delta_idxs[i],ini_idxs[i]+k[1]*delta_idxs[i])]
+                trainX, trainY, TEs =data.load_hdf5(dataset_dir, dataset_hdf5, ech_idx, custom_list=custom_list,
+                                                    acqs_data=True,te_data=True,remove_zeros=False,
+                                                    MEBCRN=True, mag_and_phase=True, unwrap=True)
+        else:
+            if args.DL_partial_real == 2:
+                end_idx = 62
+            elif args.DL_partial_real == 6:
+                end_idx = 200
+            elif args.DL_partial_real == 10:
+                end_idx = 330
+            dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+            trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
+                                    acqs_data=False, te_data=False, MEBCRN=False,
+                                    mag_and_phase=True, unwrap=True)
+        B_dataset = tfr_dataset.skip(end_idx).map(_parse_function)
+        B_dataset_aux = tf.data.Dataset.from_tensor_slices(trainY)
+        B_dataset = B_dataset.concatenate(B_dataset_aux)
+    else:
+        B_dataset = tfr_dataset.map(_parse_function)
+
+    for B in B_dataset.take(1):
+        _,hgt,wdt,n_ch = B.shape
+    len_dataset = int(args.DL_filename.split('_')[-1])
+    if args.DL_partial_real != 0:
+        len_dataset += trainY.shape[0]
+
+B_dataset = B_dataset.batch(args.batch_size)
+if args.shuffle:
+    B_dataset = B_dataset.shuffle(len_dataset)
 
 # ==============================================================================
 # =                                   models                                   =
@@ -186,6 +244,7 @@ G_R2_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1
 
 @tf.function
 def train_G(B, te=None):
+    B = data.B_to_MEBCRN(B)
     ##################### B Cycle #####################
     B2A = IDEAL_op(B, te=te, training=False)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
@@ -340,6 +399,7 @@ def train_G(B, te=None):
 
 @tf.function
 def train_G_R2(B, te=None):
+    B = data.B_to_MEBCRN(B)
     ##################### B Cycle #####################
     B2A = IDEAL_op(B, te=te, training=False)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
