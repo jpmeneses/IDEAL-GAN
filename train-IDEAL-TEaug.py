@@ -239,20 +239,23 @@ G_R2_optimizer = keras.optimizers.Adam(learning_rate=args.lr, beta_1=args.beta_1
 
 @tf.function
 def train_G(B, te=None):
+    if args.DL_gen:
+        B_W_r = B[:,:1,:,:,:1] * tf.math.cos(c_pha*B[:,1:,:,:,1:2]*np.pi)
+        B_W_i = B[:,:1,:,:,:1] * tf.math.sin(c_pha*B[:,1:,:,:,1:2]*np.pi)
+        B_F_r = B[:,:1,:,:,1:2]* tf.math.cos(c_pha*B[:,1:,:,:,1:2]*np.pi)
+        B_F_i = B[:,:1,:,:,1:2]* tf.math.sin(c_pha*B[:,1:,:,:,1:2]*np.pi)
+        B_r2 = B[:,:1,:,:,2:]
+        B_fm = B[:,1:,:,:,2:]
+        B_r = tf.concat([B_W_r,B_F_r,B_fm],axis=1)
+        B_i = tf.concat([B_W_i,B_F_i,B_r2],axis=1)
+        B = tf.concat([B_r,B_i],axis=-1)
     ##################### B Cycle #####################
     B2A = IDEAL_op(B, te=te, training=False)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A),axis=-1,keepdims=True))
 
-    if args.DL_gen:
-        B_WF_abs = B[:,:1,:,:,:2]
-        B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
-        B_PM = B[...,2:]
-        B_PM = tf.reverse(B_PM,axis=[1]) # (bs,2,hg,wd,1)
-        B_PM = tf.transpose(B_PM,perm=[0,4,2,3,1])
-    else:
-        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
-        B_PM = B[:,2:,...] # (bs,1,hg,wd,2)
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+    B_PM = B[:,2:,...] 
 
     ############## Selective weighting ################
     if args.sel_weight:
@@ -400,20 +403,23 @@ def train_G(B, te=None):
 
 @tf.function
 def train_G_R2(B, te=None):
+    if args.DL_gen:
+        B_W_r = B[:,:1,:,:,:1] * tf.math.cos(c_pha*B[:,1:,:,:,1:2]*np.pi)
+        B_W_i = B[:,:1,:,:,:1] * tf.math.sin(c_pha*B[:,1:,:,:,1:2]*np.pi)
+        B_F_r = B[:,:1,:,:,1:2]* tf.math.cos(c_pha*B[:,1:,:,:,1:2]*np.pi)
+        B_F_i = B[:,:1,:,:,1:2]* tf.math.sin(c_pha*B[:,1:,:,:,1:2]*np.pi)
+        B_r2 = B[:,:1,:,:,2:]
+        B_fm = B[:,1:,:,:,2:]
+        B_r = tf.concat([B_W_r,B_F_r,B_fm],axis=1)
+        B_i = tf.concat([B_W_i,B_F_i,B_r2],axis=1)
+        B = tf.concat([B_r,B_i],axis=-1)
     ##################### B Cycle #####################
     B2A = IDEAL_op(B, te=te, training=False)
     B2A = keras.layers.GaussianNoise(stddev=0.1)(B2A)
     B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B2A),axis=-1,keepdims=True))
 
-    if args.DL_gen:
-        B_WF_abs = B[:,:1,:,:,:2]
-        B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
-        B_PM = B[...,2:]
-        B_PM = tf.reverse(B_PM,axis=[1]) # (bs,2,hg,wd,1)
-        B_PM = tf.transpose(B_PM,perm=[0,4,2,3,1])
-    else:
-        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
-        B_PM = B[:,2:,...]
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+    B_PM = B[:,2:,...]
 
     with tf.GradientTape() as t:
         # Compute model's output
@@ -468,15 +474,8 @@ def train_step(B, te=None):
 @tf.function
 def sample(B, te=None):
     # Split B
-    if args.DL_gen:
-        B_WF_abs = B[:,:1,:,:,:2]
-        B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
-        B_PM = B[...,2:]
-        B_PM = tf.reverse(B_PM,axis=[1]) # (bs,2,hg,wd,1)
-        B_PM = tf.transpose(B_PM,perm=[0,4,2,3,1])
-    else:
-        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
-        B_PM = B[:,2:,...]
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+    B_PM = B[:,2:,...]
 
     # Compute B2A (+ noise) and estimate B2A2B
     B2A = IDEAL_op(B, te=te, training=False)
