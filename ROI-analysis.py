@@ -28,7 +28,7 @@ py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGal
 py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','VET-Net','AI-DEAL','GraphCuts'])
 py.arg('--remove_ech1', type=bool, default=False)
-py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
+py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water','PDFF-var'])
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
 py.arg('--batch_size', type=int, default=1)
@@ -230,9 +230,9 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   if args.model_sel == 'GraphCuts':
     A2B = B
   elif args.dataset == 'JGalgani' or args.dataset == '3ech':
-    A2B, _ = test(A,B)
+    A2B, A2B_var = test(A,B)
   else:
-    A2B, _ = test(A,B,TE)
+    A2B, A2B_var = test(A,B,TE)
 
   A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B[:,:2,:,:,:]),axis=-1))
   A2B_WF_abs = tf.transpose(A2B_WF_abs,perm=[0,2,3,1])
@@ -241,6 +241,20 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   A2B_R2 = A2B[:,2,:,:,1:]
   A2B = tf.concat([A2B_WF_abs,A2B_WFsum_abs,A2B_R2],axis=-1)
 
+  if args.map == 'PDFF-var':
+    W_var = tf.abs(tf.complex(A2B_var[:,0,:,:,:1],A2B_var[:,0,:,:,1:]))
+    WF_var = tf.abs(tf.complex(A2B_var[:,1,:,:,:1],A2B_var[:,1,:,:,1:]))
+    F_var = tf.abs(tf.complex(A2B_var[:,3,:,:,:1],A2B_var[:,3,:,:,1:]))
+    r2s_var = A2B_var[:,-1,:,:,1:]*(r2_sc**2)
+
+    PDFF_var = W_var/(w_m_aux**2 + 1e-8)
+    PDFF_var -= 2 * WF_var / (w_m_aux*wf_m_aux + 1e-8)
+    PDFF_var += (W_var + F_var + 2*WF_var)/(wf_m_aux + 1e-8)
+    PDFF_var *= w_m_aux**2 / (wf_m_aux + 1e-4)**2 #[W_var,WF_var,F_var]
+    PDFF_var[PDFF_var<=0.0] = 1e-2
+
+    A2B = tf.concat([A2B,PDFF_var],axis=-1)
+
   all_test_ans[i,:,:,:] = A2B
   i += 1
 
@@ -248,6 +262,7 @@ w_all_ans = all_test_ans[:,:,:,0]
 f_all_ans = all_test_ans[:,:,:,1]
 wf_all_ans = all_test_ans[:,:,:,2]
 r2_all_ans = all_test_ans[:,:,:,3]*r2_sc
+ffuq_all_ans = all_test_ans[:,:,:,4]
 
 # Ground truth
 w_all_gt = np.sqrt(np.sum(testY[:,0,:,:,:]**2,axis=-1))
@@ -278,6 +293,11 @@ elif args.map == 'Water':
   bool_PDFF = True
   X = np.transpose(w_all_ans,(1,2,0))
   X_gt = np.transpose(w_all_gt,(1,2,0))
+  lims = (0,1)
+elif args.map == 'PDFF-var':
+  bool_PDFF = True
+  X = np.transpose(ffuq_all_ans,(1,2,0))
+  X_gt = np.transpose(PDFF_all_gt,(1,2,0))
   lims = (0,1)
 else:
   raise TypeError('The selected map is not available')
@@ -337,6 +357,13 @@ if args.map != 'Water':
       # Crop B
       XB_res_aux = np.mean(XB_all,axis=(0,1))
       XB_gt_aux = np.mean(XB_all_gt,axis=(0,1))
+    elif args.map == 'PDFF-var':
+      # Crop A
+      XA_res_aux = np.median(XA_all,axis=(0,1))
+      XA_gt_aux = np.quantile(XA_all_gt,0.75) - np.quantile(XA_all_gt,0.25)
+      # Crop B
+      XB_res_aux = np.median(XB_all,axis=(0,1))
+      XB_gt_aux = np.quantile(XB_all_gt,0.75) - np.quantile(XB_all_gt,0.25)
     # Crop A
     XA_res_all.append(XA_res_aux)
     XA_gt_all.append(XA_gt_aux)
