@@ -18,7 +18,7 @@ py.arg('--experiment_dir',default='TEaug-300')
 py.arg('--dataset', type=str, default='phantom_1p5', choices=['phantom_1p5','phantom_3p0'])
 py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','VET-Net','AI-DEAL','GraphCuts'])
 py.arg('--remove_ech1', type=bool, default=False)
-py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water'])
+py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water','PDFF-var'])
 py.arg('--batch_size', type=int, default=1)
 test_args = py.args()
 args = py.args_from_yaml(py.join('output',test_args.experiment_dir, 'settings.yml'))
@@ -146,7 +146,10 @@ def test(A, B, TE=None):
   A2B, A2B_var = sample(A, B, TE)
   return A2B, A2B_var
 
-all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
+if args.map == 'PDFF-var':
+  all_test_ans = np.zeros((len_dataset,hgt,wdt,5))
+else:
+  all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
 i = 0
 
 t1 = process_time()
@@ -164,6 +167,19 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
   A2B_R2 = A2B[:,2,:,:,1:]
   A2B = tf.concat([A2B_WF_abs,A2B_WFsum_abs,A2B_R2],axis=-1)
 
+  if args.map == 'PDFF-var':
+    W_var = tf.abs(tf.complex(A2B_var[:,0,:,:,:1],A2B_var[:,0,:,:,1:]))
+    WF_var = tf.abs(tf.complex(A2B_var[:,1,:,:,:1],A2B_var[:,1,:,:,1:]))
+    F_var = tf.abs(tf.complex(A2B_var[:,3,:,:,:1],A2B_var[:,3,:,:,1:]))
+    r2s_var = A2B_var[:,-1,:,:,1:]*(r2_sc**2)
+
+    PDFF_var = W_var/(A2B_WF_abs[...,:1]**2)
+    PDFF_var -= 2 * WF_var / (A2B_WF_abs[...,:1]*A2B_WFsum_abs)
+    PDFF_var += (W_var + F_var + 2*WF_var)/(A2B_WF_abs[...,:1])
+    PDFF_var *= A2B_WF_abs[...,:1]**2 / (A2B_WFsum_abs)**2 #[W_var,WF_var,F_var]
+
+    A2B = tf.concat([A2B,PDFF_var],axis=-1)
+
   all_test_ans[i,:,:,:] = A2B
   i += 1
 
@@ -175,6 +191,7 @@ w_all_ans = all_test_ans[:,:,:,0]
 f_all_ans = all_test_ans[:,:,:,1]
 wf_all_ans = all_test_ans[:,:,:,2]
 r2_all_ans = all_test_ans[:,:,:,3]*r2_sc
+ffuq_all_ans = all_test_ans[:,:,:,4]
 
 # Ground truth
 w_all_gt = np.sqrt(np.sum(testY[:,0,:,:,:]**2,axis=-1))
@@ -204,6 +221,14 @@ elif args.map == 'Water':
   bool_PDFF = True
   X = np.transpose(w_all_ans,(1,2,0))
   X_gt = np.transpose(w_all_gt,(1,2,0))
+  lims = (0,1)
+elif args.map == 'PDFF-var':
+  bool_PDFF = True
+  ffuq_all_ans[np.isnan(ffuq_all_ans)] = 0.0
+  PDFF_all_gt = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+  PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
+  X = np.transpose(ffuq_all_ans,(1,2,0))
+  X_gt = np.transpose(PDFF_all_gt,(1,2,0))
   lims = (0,1)
 else:
   raise TypeError('The selected map is not available')
@@ -243,14 +268,21 @@ for k in range(len_dataset):
     elif args.map == 'R2s' or args.map == 'Water':
       XA_res_aux = np.mean(XA_all,axis=(0,1))
       XA_gt_aux = np.mean(XA_all_gt,axis=(0,1))
+    elif args.map == 'PDFF-var':
+      XA_res_aux = np.median(XA_all,axis=(0,1))
+      XA_gt_aux = np.quantile(XA_all_gt,0.75) - np.quantile(XA_all_gt,0.25)
     XA_res_all.append(XA_res_aux)
     XA_gt_all.append(XA_gt_aux)
   # Export to Excel file
   if len(idxs)>0:
     ws_ROI_1 = workbook.add_worksheet('Slice_'+str(k))
     ws_ROI_1.write(0,0,'Ground-truth')
-    ws_ROI_1.write(0,1,'GraphCuts')
-    ws_ROI_1.write(0,2,'Model')
+    if args.map == 'PDFF-var':
+      ws_ROI_1.write(0,1,'IQ Range')
+      ws_ROI_1.write(0,2,'PDFF Var')
+    else:
+      ws_ROI_1.write(0,1,'Ground-truth')
+      ws_ROI_1.write(0,2,'Model res.')
     for idx1 in range(len(XA_gt_all)):
       ws_ROI_1.write(idx1+1,0,GT_vals[idx1])
       ws_ROI_1.write(idx1+1,1,XA_gt_all[idx1])

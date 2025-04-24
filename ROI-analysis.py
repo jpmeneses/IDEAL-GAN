@@ -55,11 +55,17 @@ if args.dataset == 'multiTE':
 else:
   workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,args.map+'_'+args.dataset+'_ROIs.xlsx'))
 ws_ROI_1 = workbook.add_worksheet('RHL')
-ws_ROI_1.write(0,0,'Ground-truth')
-ws_ROI_1.write(0,1,'Model res.')
 ws_ROI_2 = workbook.add_worksheet('LHL')
-ws_ROI_2.write(0,0,'Ground-truth')
-ws_ROI_2.write(0,1,'Model res.')
+if args.map == 'PDFF-var':
+  ws_ROI_1.write(0,0,'IQ Range')
+  ws_ROI_1.write(0,1,'PDFF Var')
+  ws_ROI_2.write(0,0,'IQ Range')
+  ws_ROI_2.write(0,1,'PDFF Var')
+else:
+  ws_ROI_1.write(0,0,'Ground-truth')
+  ws_ROI_1.write(0,1,'Model res.')
+  ws_ROI_2.write(0,0,'Ground-truth')
+  ws_ROI_2.write(0,1,'Model res.')
 
 # data
 if args.n_echoes>0:
@@ -220,7 +226,10 @@ def test(A, B, TE=None):
   A2B, A2B_var = sample(A, B, TE)
   return A2B, A2B_var
 
-all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
+if args.map == 'PDFF-var':
+  all_test_ans = np.zeros((len_dataset,hgt,wdt,5))
+else:
+  all_test_ans = np.zeros((len_dataset,hgt,wdt,4))
 i = 0
 
 for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=len_dataset):
@@ -247,11 +256,10 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
     F_var = tf.abs(tf.complex(A2B_var[:,3,:,:,:1],A2B_var[:,3,:,:,1:]))
     r2s_var = A2B_var[:,-1,:,:,1:]*(r2_sc**2)
 
-    PDFF_var = W_var/(w_m_aux**2 + 1e-8)
-    PDFF_var -= 2 * WF_var / (w_m_aux*wf_m_aux + 1e-8)
-    PDFF_var += (W_var + F_var + 2*WF_var)/(wf_m_aux + 1e-8)
-    PDFF_var *= w_m_aux**2 / (wf_m_aux + 1e-4)**2 #[W_var,WF_var,F_var]
-    PDFF_var[PDFF_var<=0.0] = 1e-2
+    PDFF_var = W_var/(A2B_WF_abs[...,:1]**2)
+    PDFF_var -= 2 * WF_var / (A2B_WF_abs[...,:1]*A2B_WFsum_abs)
+    PDFF_var += (W_var + F_var + 2*WF_var)/(A2B_WF_abs[...,:1])
+    PDFF_var *= A2B_WF_abs[...,:1]**2 / (A2B_WFsum_abs)**2 #[W_var,WF_var,F_var]
 
     A2B = tf.concat([A2B,PDFF_var],axis=-1)
 
@@ -296,6 +304,9 @@ elif args.map == 'Water':
   lims = (0,1)
 elif args.map == 'PDFF-var':
   bool_PDFF = True
+  ffuq_all_ans[np.isnan(ffuq_all_ans)] = 0.0
+  PDFF_all_gt = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+  PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
   X = np.transpose(ffuq_all_ans,(1,2,0))
   X_gt = np.transpose(PDFF_all_gt,(1,2,0))
   lims = (0,1)
