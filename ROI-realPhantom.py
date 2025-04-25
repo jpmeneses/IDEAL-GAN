@@ -191,7 +191,8 @@ w_all_ans = all_test_ans[:,:,:,0]
 f_all_ans = all_test_ans[:,:,:,1]
 wf_all_ans = all_test_ans[:,:,:,2]
 r2_all_ans = all_test_ans[:,:,:,3]*r2_sc
-ffuq_all_ans = all_test_ans[:,:,:,4]
+if args.map == 'PDFF-var':
+  ffuq_all_ans = all_test_ans[:,:,:,4]
 
 # Ground truth
 w_all_gt = np.sqrt(np.sum(testY[:,0,:,:,:]**2,axis=-1))
