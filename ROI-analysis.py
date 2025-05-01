@@ -57,10 +57,14 @@ else:
 ws_ROI_1 = workbook.add_worksheet('RHL')
 ws_ROI_2 = workbook.add_worksheet('LHL')
 if args.map == 'PDFF-var':
-  ws_ROI_1.write(0,0,'IQ Range')
-  ws_ROI_1.write(0,1,'PDFF Var')
-  ws_ROI_2.write(0,0,'IQ Range')
-  ws_ROI_2.write(0,1,'PDFF Var')
+  ws_ROI_1.write(0,0,'Q1')
+  ws_ROI_1.write(0,1,'Q2')
+  ws_ROI_1.write(0,2,'Q3')
+  ws_ROI_1.write(0,3,'PDFF Var')
+  ws_ROI_2.write(0,0,'Q1')
+  ws_ROI_2.write(0,1,'Q2')
+  ws_ROI_2.write(0,2,'Q3')
+  ws_ROI_2.write(0,3,'PDFF Var')
 else:
   ws_ROI_1.write(0,0,'Ground-truth')
   ws_ROI_1.write(0,1,'Model res.')
@@ -306,10 +310,13 @@ elif args.map == 'Water':
 elif args.map == 'PDFF-var':
   bool_PDFF = True
   ffuq_all_ans[np.isnan(ffuq_all_ans)] = 0.0
-  PDFF_all_gt = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+  PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+  PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
+  PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
+  PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0
   X = np.transpose(ffuq_all_ans,(1,2,0))
-  X_gt = np.transpose(PDFF_all_gt,(1,2,0))
+  X_gt = np.transpose(np.abs(PDFF_all_ans-PDFF_all_gt),(1,2,0))
   lims = (0,1)
 else:
   raise TypeError('The selected map is not available')
@@ -339,6 +346,13 @@ if args.map != 'Water':
   XA_gt_all = []
   XB_res_all = []
   XB_gt_all = []
+  if args.map == 'PDFF-var':
+    XA_q1_all = []
+    XA_q2_all = []
+    XA_q3_all = []
+    XB_q1_all = []
+    XB_q2_all = []
+    XB_q3_all = []
   for idx in range(len(tracker.frms)):
     k = tracker.frms[idx]
     # Crop A
@@ -371,17 +385,26 @@ if args.map != 'Water':
       XB_gt_aux = np.mean(XB_all_gt,axis=(0,1))
     elif args.map == 'PDFF-var':
       # Crop A
-      XA_res_aux = np.median(XA_all,axis=(0,1))
-      XA_gt_aux = np.quantile(XA_all_gt,0.75) - np.quantile(XA_all_gt,0.25)
+      XA_res_aux = np.mean(XA_all,axis=(0,1))
+      XA_gt_aux = np.median(XA_all_gt)
+      XA_q1_aux = np.quantile(XA_all_gt,0.25)
+      XA_q3_aux = np.quantile(XA_all_gt,0.75)
       # Crop B
-      XB_res_aux = np.median(XB_all,axis=(0,1))
-      XB_gt_aux = np.quantile(XB_all_gt,0.75) - np.quantile(XB_all_gt,0.25)
+      XB_res_aux = np.mean(XB_all,axis=(0,1))
+      XB_gt_aux = np.median(XB_all_gt)
+      XB_q1_aux = np.quantile(XB_all_gt,0.25)
+      XB_q3_aux = np.quantile(XB_all_gt,0.75)
     # Crop A
     XA_res_all.append(XA_res_aux)
     XA_gt_all.append(XA_gt_aux)
     # Crop B
     XB_res_all.append(XB_res_aux)
     XB_gt_all.append(XB_gt_aux)
+    if args.map == 'PDFF-var':
+      XA_q1_all.append(XA_q1_aux)
+      XA_q3_all.append(XA_q3_aux)
+      XB_q1_all.append(XB_q1_aux)
+      XB_q3_all.append(XB_q3_aux)
   print('Max. measurements:\n',
         np.max(np.abs(XA_res_all)),
         np.max(np.abs(XB_res_all))
@@ -459,11 +482,23 @@ if args.map != 'Water':
   #   ax2.set_ylim([-20,20])
   # plt.show()
   # Export to Excel file
-  for idx1 in range(len(XA_gt_all)):
-    ws_ROI_1.write(idx1+1,0,XA_gt_all[idx1])
-    ws_ROI_1.write(idx1+1,1,XA_res_all[idx1])
-  for idx2 in range(len(XB_gt_all)):
-    ws_ROI_2.write(idx2+1,0,XB_gt_all[idx2])
-    ws_ROI_2.write(idx2+1,1,XB_res_all[idx2])
+  if args.map == 'PDFF-var':
+    for idx1 in range(len(XA_gt_all)):
+      ws_ROI_1.write(idx1+1,0,XA_q1_all[idx1])
+      ws_ROI_1.write(idx1+1,1,XA_gt_all[idx1])
+      ws_ROI_1.write(idx1+1,2,XA_q3_all[idx1])
+      ws_ROI_1.write(idx1+1,3,XA_res_all[idx1])
+    for idx2 in range(len(XB_gt_all)):
+      ws_ROI_2.write(idx2+1,0,XB_q1_all[idx1])
+      ws_ROI_2.write(idx2+1,1,XB_gt_all[idx2])
+      ws_ROI_2.write(idx2+1,0,XB_q3_all[idx1])
+      ws_ROI_2.write(idx2+1,3,XB_res_all[idx2])
+  else:
+    for idx1 in range(len(XA_gt_all)):
+      ws_ROI_1.write(idx1+1,0,XA_gt_all[idx1])
+      ws_ROI_1.write(idx1+1,1,XA_res_all[idx1])
+    for idx2 in range(len(XB_gt_all)):
+      ws_ROI_2.write(idx2+1,0,XB_gt_all[idx2])
+      ws_ROI_2.write(idx2+1,1,XB_res_all[idx2])
 
 workbook.close()

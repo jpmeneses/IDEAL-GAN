@@ -226,10 +226,13 @@ elif args.map == 'Water':
 elif args.map == 'PDFF-var':
   bool_PDFF = True
   ffuq_all_ans[np.isnan(ffuq_all_ans)] = 0.0
-  PDFF_all_gt = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+  PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+  PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
+  PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
+  PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0
   X = np.transpose(ffuq_all_ans,(1,2,0))
-  X_gt = np.transpose(PDFF_all_gt,(1,2,0))
+  X_gt = np.transpose(np.abs(PDFF_all_ans-PDFF_all_gt),(1,2,0))
   lims = (0,1)
 else:
   raise TypeError('The selected map is not available')
@@ -256,6 +259,10 @@ for k in range(len_dataset):
   idxs = [i for i,x in enumerate(tracker.frms) if x==k]
   XA_res_all = []
   XA_gt_all = []
+  if args.map == 'PDFF-var':
+    XA_q1_all = []
+    XA_q2_all = []
+    XA_q3_all = []
   for idx in idxs:
     left_x_A = tracker.crops_1[idx][0]
     sup_y_A = tracker.crops_1[idx][1]
@@ -270,23 +277,35 @@ for k in range(len_dataset):
       XA_res_aux = np.mean(XA_all,axis=(0,1))
       XA_gt_aux = np.mean(XA_all_gt,axis=(0,1))
     elif args.map == 'PDFF-var':
-      XA_res_aux = np.median(XA_all,axis=(0,1))
-      XA_gt_aux = np.quantile(XA_all_gt,0.75) - np.quantile(XA_all_gt,0.25)
+      XA_res_aux = np.mean(XA_all,axis=(0,1))
+      XA_gt_aux = np.median(XA_all_gt)
+      XA_q1_aux = np.quantile(XA_all_gt,0.25)
+      XA_q3_aux = np.quantile(XA_all_gt,0.75)
     XA_res_all.append(XA_res_aux)
     XA_gt_all.append(XA_gt_aux)
+    if args.map == 'PDFF-var':
+      XA_q1_all.append(XA_q1_aux)
+      XA_q3_all.append(XA_q3_aux)
   # Export to Excel file
   if len(idxs)>0:
     ws_ROI_1 = workbook.add_worksheet('Slice_'+str(k))
     ws_ROI_1.write(0,0,'Ground-truth')
     if args.map == 'PDFF-var':
-      ws_ROI_1.write(0,1,'IQ Range')
-      ws_ROI_1.write(0,2,'PDFF Var')
+      ws_ROI_1.write(0,0,'Q1')
+      ws_ROI_1.write(0,1,'Q2')
+      ws_ROI_1.write(0,2,'Q3')
+      ws_ROI_1.write(0,3,'PDFF Var')
+      for idx1 in range(len(XA_gt_all)):
+        ws_ROI_1.write(idx1+1,0,XA_q1_all[idx1])
+        ws_ROI_1.write(idx1+1,1,XA_gt_all[idx1])
+        ws_ROI_1.write(idx1+1,2,XA_q3_all[idx1])
+        ws_ROI_1.write(idx1+1,3,XA_res_all[idx1])
     else:
       ws_ROI_1.write(0,1,'Ground-truth')
       ws_ROI_1.write(0,2,'Model res.')
-    for idx1 in range(len(XA_gt_all)):
-      ws_ROI_1.write(idx1+1,0,GT_vals[idx1])
-      ws_ROI_1.write(idx1+1,1,XA_gt_all[idx1])
-      ws_ROI_1.write(idx1+1,2,XA_res_all[idx1])
+      for idx1 in range(len(XA_gt_all)):
+        ws_ROI_1.write(idx1+1,0,GT_vals[idx1])
+        ws_ROI_1.write(idx1+1,1,XA_gt_all[idx1])
+        ws_ROI_1.write(idx1+1,2,XA_res_all[idx1])
 
 workbook.close()
