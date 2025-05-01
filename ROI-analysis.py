@@ -316,7 +316,8 @@ elif args.map == 'PDFF-var':
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0
   X = np.transpose(ffuq_all_ans,(1,2,0))
-  X_gt = np.transpose(np.abs(PDFF_all_ans-PDFF_all_gt),(1,2,0))
+  X_gt = np.transpose(PDFF_all_gt,(1,2,0))
+  X_ans = np.transpose(PDFF_all_ans,(1,2,0))
   lims = (0,1)
 else:
   raise TypeError('The selected map is not available')
@@ -384,16 +385,18 @@ if args.map != 'Water':
       XB_res_aux = np.mean(XB_all,axis=(0,1))
       XB_gt_aux = np.mean(XB_all_gt,axis=(0,1))
     elif args.map == 'PDFF-var':
+      XA_all_ans = X_ans[r1_A:r2_A,c1_A:c2_A,k]
+      XB_all_ans = X_ans[r1_B:r2_B,c1_B:c2_B,k]
       # Crop A
       XA_res_aux = np.mean(XA_all,axis=(0,1))
-      XA_gt_aux = np.median(XA_all_gt)
-      XA_q1_aux = np.quantile(XA_all_gt,0.25)
-      XA_q3_aux = np.quantile(XA_all_gt,0.75)
+      XA_gt_aux = np.median(np.abs(XA_all_ans-np.median(XA_all_gt)))
+      XA_q1_aux = np.quantile(np.abs(XA_all_ans-np.median(XA_all_gt)),0.25)
+      XA_q3_aux = np.quantile(np.abs(XA_all_ans-np.median(XA_all_gt)),0.75)
       # Crop B
       XB_res_aux = np.mean(XB_all,axis=(0,1))
-      XB_gt_aux = np.median(XB_all_gt)
-      XB_q1_aux = np.quantile(XB_all_gt,0.25)
-      XB_q3_aux = np.quantile(XB_all_gt,0.75)
+      XB_gt_aux = np.median(np.abs(XB_all_ans-np.median(XB_all_gt)))
+      XB_q1_aux = np.quantile(np.abs(XB_all_ans-np.median(XB_all_gt)),0.25)
+      XB_q3_aux = np.quantile(np.abs(XB_all_ans-np.median(XB_all_gt)),0.75)
     # Crop A
     XA_res_all.append(XA_res_aux)
     XA_gt_all.append(XA_gt_aux)

@@ -227,12 +227,9 @@ elif args.map == 'PDFF-var':
   bool_PDFF = True
   ffuq_all_ans[np.isnan(ffuq_all_ans)] = 0.0
   PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
-  PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
-  PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
-  PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0
   X = np.transpose(ffuq_all_ans,(1,2,0))
-  X_gt = np.transpose(np.abs(PDFF_all_ans-PDFF_all_gt),(1,2,0))
+  X_gt = np.transpose(PDFF_all_ans,(1,2,0))
   lims = (0,1)
 else:
   raise TypeError('The selected map is not available')
@@ -278,9 +275,9 @@ for k in range(len_dataset):
       XA_gt_aux = np.mean(XA_all_gt,axis=(0,1))
     elif args.map == 'PDFF-var':
       XA_res_aux = np.mean(XA_all,axis=(0,1))
-      XA_gt_aux = np.median(XA_all_gt)
-      XA_q1_aux = np.quantile(XA_all_gt,0.25)
-      XA_q3_aux = np.quantile(XA_all_gt,0.75)
+      XA_gt_aux = np.median(np.abs(XA_all_gt-GT_vals[len(XA_res_all)]))
+      XA_q1_aux = np.quantile(np.abs(XA_all_gt-GT_vals[len(XA_res_all)]),0.25)
+      XA_q3_aux = np.quantile(np.abs(XA_all_gt-GT_vals[len(XA_res_all)]),0.75)
     XA_res_all.append(XA_res_aux)
     XA_gt_all.append(XA_gt_aux)
     if args.map == 'PDFF-var':
