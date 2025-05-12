@@ -1,12 +1,21 @@
 # Deep Learning for MRI Water-Fat Separation
 
-For additional information, please refer to the publications below:
+<p align="center">
+  <a href='https://arxiv.org/abs/2412.08741' style='padding-left: 0.5rem;'>
+    <img src='https://img.shields.io/badge/arXiv-2403.13319-brightgreen' alt='arXiv'>
+  </a>
+  <a href='https://link.springer.com/article/10.1007/s00330-023-09576-2' style='padding-left: 0.5rem;'>
+    <img src='https://img.shields.io/badge/Media.Journal-2025.103503-red' alt='Media Journal'>
+  </a>
+  <a href='https://link.springer.com/10.1007/s00330-024-11164-x' style='padding-left: 0.5rem;'>
+    <img src='https://img.shields.io/badge/Media.Journal-2025.103503-red' alt='Media Journal'>
+  </a>
+</p>
 
-- [Liver PDFF estimation using a multi-decoder water-fat separation neural network with a reduced number of echoes](https://link.springer.com/article/10.1007/s00330-023-09576-2), Juan Pablo Meneses, Cristobal Arrieta, Gabriel della Maggiora, Cecilia Besa, Jesús Urbina, Marco Arrese, Juan Cristóbal Gana, Jose E. Galgani, Cristian Tejos & Sergio Uribe.
+## Intro
+Deep learning shows promise for improving MRI-based fat quantification in terms of processing times, scan time acceleration, and artifact removal (i.e., fat-water swaps, noise-related bias, etc).
 
-- [Unbiased and reproducible liver MRI-PDFF estimation using a scan protocol-informed deep learning method](https://link.springer.com/10.1007/s00330-024-11164-x), Juan P. Meneses, Ayyaz Qadir, Nirusha Surendran, Cristobal Arrieta, Cristian Tejos, Marcelo E. Andia, Zhaolin Chen & Sergio Uribe.
-
-- [A Physics-based Generative Model to Synthesize Training Datasets for MRI-based Fat Quantification](https://arxiv.org/abs/2412.08741), Juan P. Meneses, Yasmeen George, Christoph Hagemeyer, Zhaolin Chen, Sergio Uribe
+In this repository, several deep learning models for MRI water-fat separation, based on different approaches, are proposed.
 
 ### Description of the codes in the main folder
 1. Supervised training:
