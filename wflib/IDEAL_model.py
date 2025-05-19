@@ -46,7 +46,7 @@ def gen_TEvar(n_ech, bs=1, orig=False, TE_ini_min=1.0e-3, TE_ini_d=1.4e-3, d_TE_
 
 
 @tf.function
-def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False):
+def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False, get_H=False):
     ne = te.shape[1] # len(te)
     te = tf.cast(te, tf.complex64)
     field = tf.cast(field, tf.complex64)
@@ -61,12 +61,19 @@ def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False):
     # Pseudo-inverse
     if get_Mpinv:
         M_pinv = tf.linalg.solve(R, tf.transpose(Q, perm=[0,2,1], conjugate=True))
+        if get_H:
+            H = tf.math.real(tf.linalg.matmul(M_pinv,M))
+            Q_h, R_h = tf.linalg.qr(H)
+            H_pinv = tf.linalg.solve(R_h, tf.transpose(Q_h, perm=[0,2,1]))
+            H_pinv = tf.cast(H_pinv,tf.complex64)
 
     if get_P0 and get_Mpinv:
         return M, P0, M_pinv
-    elif get_Mpinv and not(get_P0):
+    elif get_Mpinv and not(get_P0) and not(get_H):
         return M, M_pinv
-    elif not(get_Mpinv) and not(get_P0):
+    elif get_Mpinv and not(get_P0):
+        return M, M_pinv, H_pinv
+    elif not(get_Mpinv) and not(get_P0) and not(get_H):
         return M
 
 
@@ -423,7 +430,7 @@ def get_Ps_norm(acqs,param_maps,te=None):
     return L2_norm
 
 
-def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True, acq_demod=False):
+def get_rho(acqs, param_maps, field=1.5, te=None, phase_constraint=False, MEBCRN=True, acq_demod=False):
     if MEBCRN:
         n_batch,ne,hgt,wdt,n_ch = acqs.shape
     else:
@@ -435,7 +442,10 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True, acq_demod=False):
 
     te_complex = tf.complex(0.0,te) # (nb,ne,1)
 
-    M, M_pinv = gen_M(te, field=field) # M shape: (nb,ne,ns)
+    if phase_constraint:
+        M, M_pinv, H = gen_M(te, field=field, get_H=True) # M shape: (nb,ne,ns)
+    else:
+        M, M_pinv = gen_M(te, field=field) # M shape: (nb,ne,ns)
 
     # Generate complex signal
     if MEBCRN:
@@ -475,12 +485,24 @@ def get_rho(acqs, param_maps, field=1.5, te=None, MEBCRN=True, acq_demod=False):
 
     # Matrix operations
     WmS = Wm * Smtx # (nb,ne,nv)
-    MWmS = tf.linalg.matmul(M_pinv,WmS) # (nb,ns,nv)
 
     # Extract corresponding Water/Fat signals
-    # Reshape to original images dimensions
+    if phase_constraint:
+        MWmS_L = tf.linalg.matmul(M_pinv,WmS) # (nb,ns,nv)
+        HMWmS = tf.linalg.matmul(H,MWmS_L) # (nb,ns,nv)
+        MHMWmS = tf.reduce_sum(MWmS_L * HMWmS,axis=1,keepdims=True) # (nb,1,nv)
+        rho_pha = 0.5*tf.math.angle(MHMWmS) # (nb,1,nv)
+        rho_pha = tf.concat([rho_pha,rho_pha],axis=-2) # (nb,ns,nv) - Replicate for water and fat
+        real_MWmS = tf.math.real(MWmS_L*tf.math.exp(tf.complex(0.0,-rho_pha))) # (nb,ns,nv)
+        rho_mag = tf.linalg.matmul(tf.abs(H),real_MWmS) # (nb,ns,nv)
+        MWmS = tf.complex(rho_mag,0.0)*tf.math.exp(tf.complex(0.0,rho_pha))
+    else:
+        MWmS = tf.linalg.matmul(M_pinv,WmS) # (nb,ns,nv)
+    
     rho_hat = tf.reshape(MWmS, [n_batch,ns,hgt,wdt]) / rho_sc
 
+    
+    # Reshape to original images dimensions
     if MEBCRN:
         rho_hat = tf.expand_dims(rho_hat, -1)
         Re_rho = tf.math.real(rho_hat)
