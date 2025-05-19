@@ -28,6 +28,7 @@ py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGal
 py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','VET-Net','AI-DEAL','GraphCuts'])
 py.arg('--remove_ech1', type=bool, default=False)
+py.arg('--phase_constraint', type=bool, default=False)
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water','PDFF-var'])
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -194,9 +195,9 @@ def sample(A, B, TE=None):
     A2B_PM = G_A2B([A,TE], training=False) #[:,:ech_sel.value,...]
     A2B_PM = tf.where(A[:,:1,...]!=0.0, A2B_PM, 0.0)
     if args.remove_ech1:
-      A2B_WF = wf.get_rho(A[:,1:,...], A2B_PM, te=TE[:,1:,...])
+      A2B_WF = wf.get_rho(A[:,1:,...], A2B_PM, te=TE[:,1:,...], phase_constraint=args.phase_constraint)
     else:
-      A2B_WF = wf.get_rho(A, A2B_PM, te=TE)
+      A2B_WF = wf.get_rho(A, A2B_PM, te=TE, phase_constraint=args.phase_constraint)
     A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
     A2B_var = None
   elif args.model_sel == 'AI-DEAL':
@@ -289,7 +290,10 @@ r2_all_gt = testY[:,2,:,:,1]*r2_sc
 
 if args.map == 'PDFF':
   bool_PDFF = True
-  PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+  if args.phase_constraint:
+    PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
+  else:
+    np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
   PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
   PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
