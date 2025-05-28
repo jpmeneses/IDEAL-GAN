@@ -26,7 +26,10 @@ args = py.args_from_yaml(py.join('output',test_args.experiment_dir, 'settings.ym
 args.__dict__.update(test_args.__dict__)
 
 # Excel file for saving ROIs values
-workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,args.map+'_phantom_ROIs.xlsx'))
+out_filename = args.map+'_phantom_ROIs'
+if args.phase_constraint:
+  out_filename += '_pc'
+workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,out_filename+'.xlsx'))
 
 r2_sc,fm_sc = 200.0,300.0
 

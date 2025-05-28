@@ -50,11 +50,17 @@ if not(hasattr(args,'n_echoes')):
 
 # Excel file for saving ROIs values
 if args.dataset == 'multiTE':
-  workbook =xlsxwriter.Workbook(py.join('output',args.experiment_dir,args.map + '_ROIs_'
-                                + str(int(np.round(args.TE1*1e4))) + '_' + str(int(np.round(args.dTE*1e4))) 
-                                + '.xlsx'))
+  out_filename = args.map + '_ROIs_'
+                  + str(int(np.round(args.TE1*1e4))) + '_' 
+                  + str(int(np.round(args.dTE*1e4)))
+  if args.phase_constraint:
+    out_filename += '_pc'
+  workbook =xlsxwriter.Workbook(py.join('output',args.experiment_dir,out_filename + '.xlsx'))
 else:
-  workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,args.map+'_'+args.dataset+'_ROIs.xlsx'))
+  out_filename = args.map+'_'+args.dataset+'_ROIs'
+  if args.phase_constraint:
+    out_filename += '_pc'
+  workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,'.xlsx'))
 ws_ROI_1 = workbook.add_worksheet('RHL')
 ws_ROI_2 = workbook.add_worksheet('LHL')
 if args.map == 'PDFF-var':
