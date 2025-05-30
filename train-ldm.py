@@ -150,7 +150,7 @@ dec_pha = dl.decoder(encoded_dims=args.encoded_size,
 
 # create our unet model
 if args.conditional:
-    num_classes = int(np.max(al_labels))
+    num_classes = int(np.max(al_labels))+1
 else:
     num_classes = None
 unet =  dl.denoise_Unet(dim=args.n_ldm_filters,
