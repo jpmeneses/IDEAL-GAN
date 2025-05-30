@@ -271,7 +271,7 @@ if args.VQ_encoder:
     z_std.assign_add(10.0)
 elif z_std.numpy() == 0.0:
     for k in range(2):
-        for A in A_dataset:
+        for A, lv, sg in A_dataset:
             A2Z = enc(A, training=False)
             if k == 0:
                 z_mean += tf.reduce_sum(A2Z)
