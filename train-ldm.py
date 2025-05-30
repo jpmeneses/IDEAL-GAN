@@ -84,6 +84,10 @@ else:
 print('Image Dimensions:', hgt, wdt)
 print('Num. Output Maps:',n_out)
 
+xlsx_file_1 = py.join('..','datasets','PDFF-training.xlsx')
+wb = openpyxl.load_workbook(xlsx_file_1, data_only=True)
+sheet_ranges = wb['Sheet1']
+
 sg_labels = list()
 al_labels = list()
 for n, i in enumerate(sheet_ranges['E']):
