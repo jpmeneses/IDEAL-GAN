@@ -157,7 +157,7 @@ unet =  dl.denoise_Unet(dim=args.n_ldm_filters,
                         dim_mults=(1,2,4), 
                         channels=args.encoded_size,
                         num_classes=num_classes,
-                        class_emb_dim=dec_mag.input_shape[1])
+                        in_res=dec_mag.input_shape[1])
 
 IDEAL_op = wf.IDEAL_mag_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
