@@ -186,7 +186,7 @@ hgt_ls = dec_mag.input_shape[1]
 wdt_ls = dec_mag.input_shape[2]
 test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
 test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
-test_label = np.random.randint(3, size=(1,), dtype=np.int32)
+test_label = np.random.randint(3, size=(args.batch_size,), dtype=np.int32)
 k = unet(test_images, test_timestamps, test_label)
 
 loss_fn = tf.losses.MeanSquaredError()
