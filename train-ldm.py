@@ -14,6 +14,7 @@ import data
 # ==============================================================================
 
 py.arg('--experiment_dir', default='output/GAN-100')
+py.arg('--conditional', type=bool, default=False)
 py.arg('--scheduler', default='linear', choices=['linear','cosine'])
 py.arg('--n_timesteps', type=int, default=200)
 py.arg('--beta_start', type=float, default=0.0001)
@@ -83,7 +84,18 @@ else:
 print('Image Dimensions:', hgt, wdt)
 print('Num. Output Maps:',n_out)
 
-A_dataset = tf.data.Dataset.from_tensor_slices(trainX)
+sg_labels = list()
+al_labels = list()
+for n, i in enumerate(sheet_ranges['E']):
+    n_sl = sheet_ranges['F'][n].value
+    if n>0:
+        sg_labels += [i.value]*int(n_sl)
+        al_labels += [0]*(int(n_sl/4)+1)
+        al_labels += [1]*(n_sl-2*int(n_sl/4)-1)
+        al_labels += [2]*(int(n_sl/4))
+sg_labels = np.array(sg_labels)
+al_labels = np.array(al_labels)
+A_dataset = tf.data.Dataset.from_tensor_slices((trainX,al_labels,sg_labels))
 A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 
 # ==============================================================================
@@ -126,7 +138,14 @@ dec_pha = dl.decoder(encoded_dims=args.encoded_size,
                     )
 
 # create our unet model
-unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
+if args.conditional:
+    num_classes = int(np.max(al_labels))
+else:
+    num_classes = None
+unet =  dl.denoise_Unet(dim=args.n_ldm_filters,
+                        dim_mults=(1,2,4), 
+                        channels=args.encoded_size,
+                        num_classes=num_classes)
 
 IDEAL_op = wf.IDEAL_mag_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
@@ -156,14 +175,14 @@ hgt_ls = dec_mag.input_shape[1]
 wdt_ls = dec_mag.input_shape[2]
 test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
 test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
-k = unet(test_images, test_timestamps)
+k = unet(test_images, test_timestamps, [1])
 
 loss_fn = tf.losses.MeanSquaredError()
 
 # create our optimizer, we will use adam with a Learning rate of 1e-4
 opt = tf.keras.optimizers.Adam(learning_rate=args.lr)
 
-def train_step(A, Z_std=1.0):
+def train_step(A, label, Z_std=1.0):
     rng, tsrng = np.random.randint(0, 100000, size=(2,))
     timestep_values = dm.generate_timestamp(tsrng, A.shape[0], args.n_timesteps)
 
@@ -175,7 +194,7 @@ def train_step(A, Z_std=1.0):
     Z_n, noise = dm.forward_noise(rng, A2Z, timestep_values, alpha_bar)
 
     with tf.GradientTape() as t:
-        pred_noise = unet(Z_n, timestep_values)
+        pred_noise = unet(Z_n, timestep_values, label)
         
         loss_value = loss_fn(noise, pred_noise)
     
@@ -184,10 +203,10 @@ def train_step(A, Z_std=1.0):
 
     return {'Loss': loss_value, 'A2Z_std': A2Z_std}
 
-def validation_step(Z, Z_std=1.0):
+def validation_step(Z, label, Z_std=1.0):
     for i in range(args.n_timesteps-1):
         t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
-        pred_noise = unet(Z, t)
+        pred_noise = unet(Z, t, label)
         Z = dm.ddpm(Z, pred_noise, t, alpha, alpha_bar, beta)
 
     if args.VQ_encoder:
@@ -262,7 +281,7 @@ for ep in range(args.epochs_ldm):
     ep_cnt_ldm.assign_add(1)
 
     # train for an epoch
-    for A in A_dataset:
+    for A, lv, sg in A_dataset:
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
@@ -288,9 +307,9 @@ for ep in range(args.epochs_ldm):
         # ==============================================================================
         
         if args.VQ_encoder:
-            loss_dict = train_step(A)
+            loss_dict = train_step(A, lv)
         else:
-            loss_dict = train_step(A, z_std)
+            loss_dict = train_step(A, lv, z_std)
 
         # summary
         with train_summary_writer.as_default():
@@ -302,10 +321,11 @@ for ep in range(args.epochs_ldm):
     # Validation inference
     if (((ep+1) % 20) == 0) or ((ep+1)==args.epochs_ldm):
         Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
+        Lv= np.random.randint(3, size=(1,), dtype=np.int32)
         if args.VQ_encoder:
-            Z2B, Z2B2A = validation_step(Z)
+            Z2B, Z2B2A = validation_step(Z, Lv)
         else:
-            Z2B, Z2B2A = validation_step(Z, z_std)
+            Z2B, Z2B2A = validation_step(Z, Lv, z_std)
 
         fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
@@ -380,6 +400,8 @@ for ep in range(args.epochs_ldm):
                                     interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
         fig.colorbar(field_ok, ax=axs[1,5])
         axs[1,5].axis('off')
+
+        fig.suptitle('Slice Level: '+str(Lv[0]), fontsize=16)
 
         plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
         tl.make_space_above(axs,topmargin=0.8)
