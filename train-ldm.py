@@ -34,10 +34,15 @@ args = py.args_from_yaml(py.join(output_dir, 'settings.yml'))
 args.__dict__.update(ldm_args.__dict__)
 
 if not(hasattr(args,'VQ_num_embed')):
-    py.arg('--VQ_num_embed', type=bool, default=256)
-    py.arg('--VQ_commit_cost', type=int, default=0.5)
+    py.arg('--VQ_num_embed', type=int, default=256)
+    py.arg('--VQ_commit_cost', type=float, default=0.5)
     VQ_args = py.args()
     args.__dict__.update(VQ_args.__dict__)
+
+if not(hasattr(args,'unwrap')):
+    py.arg('--unwrap', type=bool, default=False)
+    UW_args = py.args()
+    args.__dict__.update(UW_args.__dict__)
 
 if hasattr(args,'n_G_filt_list'):
     if len(args.n_G_filt_list) > 0:
