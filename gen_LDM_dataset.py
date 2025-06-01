@@ -20,6 +20,7 @@ py.arg('--infer_steps', type=int, default=10)
 py.arg('--infer_sigma', type=float, default=0.0)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--n_samples', type=int, default=2000)
+py.arg('--num_classes_1', type=int, default=3)
 py.arg('--seed', type=int, default=0)
 ldm_args = py.args()
 
@@ -87,7 +88,11 @@ dec_pha = dl.decoder(encoded_dims=args.encoded_size,
                     )
 
 # create our unet model
-unet = dl.denoise_Unet(dim=args.n_ldm_filters, dim_mults=(1,2,4), channels=args.encoded_size)
+unet =  dl.denoise_Unet(dim=args.n_ldm_filters,
+                        dim_mults=(1,2,4), 
+                        channels=args.encoded_size,
+                        num_classes=args.num_classes_1,
+                        in_res=dec_mag.input_shape[1])
 
 IDEAL_op = wf.IDEAL_mag_Layer()
 
@@ -123,7 +128,7 @@ k = unet(test_images, test_timestamps)
 
 loss_fn = tf.losses.MeanSquaredError()
 
-def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
+def sample(Z, label, Z_std=1.0, inference_timesteps=10, ns=0):
     # Create a range of inference steps that the output should be sampled at
     if args.DDIM:
         its = inference_timesteps
@@ -134,7 +139,7 @@ def sample(Z, Z_std=1.0, inference_timesteps=10, ns=0):
     for index, i in enumerate(reversed(range(its))):
         t = np.expand_dims(inference_range[i], 0)
 
-        pred_noise = unet(Z, t)
+        pred_noise = unet(Z, t, label)
         if args.DDIM:
             Z = dm.ddim(Z, pred_noise, t, args.infer_sigma, alpha, alpha_bar)
         else:
@@ -195,10 +200,11 @@ writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 n_vol = 0
 for k in range(args.n_samples//args.batch_size):
     Z = tf.random.normal((args.batch_size,hgt_ls,wdt_ls,args.encoded_size), seed=args.seed, dtype=tf.float32)
+    Lv= np.random.randint(args.num_classes_1, size=(args.batch_size,), dtype=np.int32)
     if args.VQ_encoder:
-        Z2B, Z2B2A = sample(Z)
+        Z2B, Z2B2A = sample(Z, Lv)
     else:
-        Z2B, Z2B2A = sample(Z, z_std, inference_timesteps=args.infer_steps, ns=k)
+        Z2B, Z2B2A = sample(Z, Lv, z_std, inference_timesteps=args.infer_steps, ns=k)
 
     for i in range(Z2B.shape[0]):
         volun_name = 'v' + str(n_vol+i).zfill(4)
