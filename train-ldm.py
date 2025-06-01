@@ -150,7 +150,7 @@ dec_pha = dl.decoder(encoded_dims=args.encoded_size,
 
 # create our unet model
 if args.conditional:
-    num_classes = int(np.max(al_labels))+1
+    num_classes = int(np.max(sg_labels))+1
 else:
     num_classes = None
 unet =  dl.denoise_Unet(dim=args.n_ldm_filters,
@@ -187,7 +187,7 @@ hgt_ls = dec_mag.input_shape[1]
 wdt_ls = dec_mag.input_shape[2]
 test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
 test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
-test_label = np.random.randint(3, size=(args.batch_size,), dtype=np.int32)
+test_label = np.random.randint(4, size=(args.batch_size,), dtype=np.int32)
 k = unet(test_images, test_timestamps, test_label)
 
 loss_fn = tf.losses.MeanSquaredError()
@@ -320,9 +320,9 @@ for ep in range(args.epochs_ldm):
         # ==============================================================================
         
         if args.VQ_encoder:
-            loss_dict = train_step(A, lv)
+            loss_dict = train_step(A, sg)
         else:
-            loss_dict = train_step(A, lv, z_std)
+            loss_dict = train_step(A, sg, z_std)
 
         # summary
         with train_summary_writer.as_default():
@@ -334,11 +334,11 @@ for ep in range(args.epochs_ldm):
     # Validation inference
     if (((ep+1) % 20) == 0) or ((ep+1)==args.epochs_ldm):
         Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
-        Lv= np.random.randint(3, size=(1,), dtype=np.int32)
+        Sg= np.random.randint(4, size=(1,), dtype=np.int32)
         if args.VQ_encoder:
-            Z2B, Z2B2A = validation_step(Z, Lv)
+            Z2B, Z2B2A = validation_step(Z, Sg)
         else:
-            Z2B, Z2B2A = validation_step(Z, Lv, z_std)
+            Z2B, Z2B2A = validation_step(Z, Sg, z_std)
 
         fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
@@ -414,7 +414,7 @@ for ep in range(args.epochs_ldm):
         fig.colorbar(field_ok, ax=axs[1,5])
         axs[1,5].axis('off')
 
-        fig.suptitle('Slice Level: '+str(Lv[0]), fontsize=16)
+        fig.suptitle('Steatosis grading: '+str(Sg[0]), fontsize=16)
 
         plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
         tl.make_space_above(axs,topmargin=0.8)
