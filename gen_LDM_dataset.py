@@ -21,6 +21,7 @@ py.arg('--infer_sigma', type=float, default=0.0)
 py.arg('--batch_size', type=int, default=1)
 py.arg('--n_samples', type=int, default=2000)
 py.arg('--num_classes_1', type=int, default=3)
+py.arg('--gen_class_1', type=int, default=None)
 py.arg('--seed', type=int, default=0)
 ldm_args = py.args()
 
@@ -201,7 +202,10 @@ writer = tf.io.TFRecordWriter(py.join(ds_dir,ds_filename))
 n_vol = 0
 for k in range(args.n_samples//args.batch_size):
     Z = tf.random.normal((args.batch_size,hgt_ls,wdt_ls,args.encoded_size), seed=args.seed, dtype=tf.float32)
-    Lv= np.random.randint(args.num_classes_1, size=(args.batch_size,), dtype=np.int32)
+    if args.gen_class_1 is None:
+        Lv= np.random.randint(args.num_classes_1, size=(args.batch_size,), dtype=np.int32)
+    else:
+        Lv= np.array([args.gen_class_1]*args.batch_size)
     if args.VQ_encoder:
         Z2B, Z2B2A = sample(Z, Lv)
     else:
