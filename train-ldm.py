@@ -95,18 +95,15 @@ xlsx_file_1 = py.join('..','datasets','PDFF-training.xlsx')
 wb = openpyxl.load_workbook(xlsx_file_1, data_only=True)
 sheet_ranges = wb['Sheet1']
 
-sg_labels = list()
 al_labels = list()
 for n, i in enumerate(sheet_ranges['E']):
     n_sl = sheet_ranges['F'][n].value
     if n>0:
-        sg_labels += [i.value]*int(n_sl)
-        al_labels += [0]*(int(n_sl/4)+1)
-        al_labels += [1]*(n_sl-2*int(n_sl/4)-1)
-        al_labels += [2]*(int(n_sl/4))
-sg_labels = np.array(sg_labels)
+        al_labels += [4]*(int(n_sl/4)+1)
+        al_labels += [i.value]*(n_sl-2*int(n_sl/4)-1)
+        al_labels += [5]*(int(n_sl/4))
 al_labels = np.array(al_labels)
-A_dataset = tf.data.Dataset.from_tensor_slices((trainX,al_labels,sg_labels))
+A_dataset = tf.data.Dataset.from_tensor_slices((trainX,al_labels))
 A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 
 # ==============================================================================
@@ -150,7 +147,7 @@ dec_pha = dl.decoder(encoded_dims=args.encoded_size,
 
 # create our unet model
 if args.conditional:
-    num_classes = int(np.max(sg_labels))+1
+    num_classes = int(np.max(al_labels))+1
 else:
     num_classes = None
 unet =  dl.denoise_Unet(dim=args.n_ldm_filters,
@@ -187,7 +184,10 @@ hgt_ls = dec_mag.input_shape[1]
 wdt_ls = dec_mag.input_shape[2]
 test_images = tf.ones((args.batch_size, hgt_ls, wdt_ls, args.encoded_size), dtype=tf.float32)
 test_timestamps = dm.generate_timestamp(0, 1, args.n_timesteps)
-test_label = np.random.randint(4, size=(args.batch_size,), dtype=np.int32)
+if args.conditional:
+    test_label = np.random.randint(num_classes, size=(args.batch_size,), dtype=np.int32)
+else:
+    test_label = None
 k = unet(test_images, test_timestamps, test_label)
 
 loss_fn = tf.losses.MeanSquaredError()
@@ -195,7 +195,7 @@ loss_fn = tf.losses.MeanSquaredError()
 # create our optimizer, we will use adam with a Learning rate of 1e-4
 opt = tf.keras.optimizers.Adam(learning_rate=args.lr)
 
-def train_step(A, label, Z_std=1.0):
+def train_step(A, label=None, Z_std=1.0):
     rng, tsrng = np.random.randint(0, 100000, size=(2,))
     timestep_values = dm.generate_timestamp(tsrng, A.shape[0], args.n_timesteps)
 
@@ -216,7 +216,7 @@ def train_step(A, label, Z_std=1.0):
 
     return {'Loss': loss_value, 'A2Z_std': A2Z_std}
 
-def validation_step(Z, label, Z_std=1.0):
+def validation_step(Z, label=None, Z_std=1.0):
     for i in range(args.n_timesteps-1):
         t = np.expand_dims(np.array(args.n_timesteps-i-1, np.int32), 0)
         pred_noise = unet(Z, t, label)
@@ -271,7 +271,7 @@ if args.VQ_encoder:
     z_std.assign_add(10.0)
 elif z_std.numpy() == 0.0:
     for k in range(2):
-        for A, lv, sg in A_dataset:
+        for A, lv in A_dataset:
             A2Z = enc(A, training=False)
             if k == 0:
                 z_mean += tf.reduce_sum(A2Z)
@@ -294,7 +294,7 @@ for ep in range(args.epochs_ldm):
     ep_cnt_ldm.assign_add(1)
 
     # train for an epoch
-    for A, lv, sg in A_dataset:
+    for A, lv in A_dataset:
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
@@ -320,9 +320,9 @@ for ep in range(args.epochs_ldm):
         # ==============================================================================
         
         if args.VQ_encoder:
-            loss_dict = train_step(A, sg)
+            loss_dict = train_step(A, lv)
         else:
-            loss_dict = train_step(A, sg, z_std)
+            loss_dict = train_step(A, lv, z_std)
 
         # summary
         with train_summary_writer.as_default():
@@ -334,11 +334,11 @@ for ep in range(args.epochs_ldm):
     # Validation inference
     if (((ep+1) % 20) == 0) or ((ep+1)==args.epochs_ldm):
         Z = tf.random.normal((1,hgt_ls,wdt_ls,args.encoded_size), dtype=tf.float32)
-        Sg= np.random.randint(4, size=(1,), dtype=np.int32)
+        Lv= np.random.randint(num_classes, size=(1,), dtype=np.int32)
         if args.VQ_encoder:
-            Z2B, Z2B2A = validation_step(Z, Sg)
+            Z2B, Z2B2A = validation_step(Z, Lv)
         else:
-            Z2B, Z2B2A = validation_step(Z, Sg, z_std)
+            Z2B, Z2B2A = validation_step(Z, Lv, z_std)
 
         fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
@@ -414,7 +414,7 @@ for ep in range(args.epochs_ldm):
         fig.colorbar(field_ok, ax=axs[1,5])
         axs[1,5].axis('off')
 
-        fig.suptitle('Steatosis grading: '+str(Sg[0]), fontsize=16)
+        fig.suptitle('Steatosis grading: '+str(Lv[0]), fontsize=16)
 
         plt.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0.1,wspace=0)
         tl.make_space_above(axs,topmargin=0.8)
