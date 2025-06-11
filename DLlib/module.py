@@ -158,20 +158,20 @@ def PatchGAN(input_shape,
         h = keras.layers.Lambda(lambda x: tf.reshape(x,[-1,x.shape[2],x.shape[3],x.shape[4]]))(h)
 
     # 1
-    conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(dim, in_kernel, strides=2, padding='same', groups=n_groups, kernel_initializer='he_normal'))
+    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, in_kernel, strides=2, padding='same', groups=n_groups, kernel_initializer='he_normal'))
     h = conv2d(h)
     h = tf.nn.leaky_relu(h, alpha=0.2)
 
     for _ in range(n_downsamplings - 1):
         dim = min(dim * 2, dim_ * 16)
-        conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=2, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
+        conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=2, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
         h = conv2d(h)
         h = Norm()(h)
         h = tf.nn.leaky_relu(h, alpha=0.2)
 
     # 2
     dim = min(dim * 2, dim_ * 16)
-    conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=1, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
+    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(dim, n_kernel, strides=1, padding='same', groups=n_groups, use_bias=False, kernel_initializer='he_normal'))
     h = conv2d(h)
     h = Norm()(h)
     h = tf.nn.leaky_relu(h, alpha=0.2)
@@ -181,7 +181,7 @@ def PatchGAN(input_shape,
         h = SelfAttention(ch=dim)(h)
 
     # 3
-    conv2d = keras.layers.SpectralNormalization(keras.layers.Conv2D(1, n_kernel, strides=1, padding='same', kernel_initializer='glorot_normal'))
+    conv2d = tfa.layers.SpectralNormalization(keras.layers.Conv2D(1, n_kernel, strides=1, padding='same', kernel_initializer='glorot_normal'))
     h = conv2d(h)
 
     if cGAN:
