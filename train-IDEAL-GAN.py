@@ -353,9 +353,9 @@ def sample(A, B):
     if args.VQ_encoder:
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
-    A2Z2B_ff = dec_ff(A2Z, training=False)
-    A2Z2B_mag = dec_mag(A2Z, training=False)
-    A2Z2B_pha = dec_pha(A2Z, training=False)
+    A2Z2B_ff = dec_ff(A2Z[...,:1], training=False)
+    A2Z2B_mag = dec_mag(A2Z[...,1:2], training=False)
+    A2Z2B_pha = dec_pha(A2Z[...,2:], training=False)
     
     A2Z2B_ff = tf.concat([A2Z2B_ff,tf.zeros_like(A2Z2B_ff)],axis=-1) # (NB,1,H,W,NS)
     A2B = tf.concat([A2Z2B_ff,A2Z2B_mag,A2Z2B_pha],axis=1)
