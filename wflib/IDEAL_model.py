@@ -279,22 +279,39 @@ def IDEAL_mag(out_maps, params):
 
     M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
 
-    # Generate complex water/fat signals
-    mag_rho = out_maps[:,0,:,:,:2]
-    rho = tf.complex(mag_rho,0.0) * rho_sc # (nb,hgt,wdt,ns)
-    rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
+    
+    if out_maps.shape[-1] < 3:
+        # Extract PDFF, PD, and R2s
+        ff = out_maps[:,0,:,:,:0] # (nb,hgt,wdt,1)
+        pd = out_maps[:,1,:,:,:0] # (nb,hgt,wdt,1)
+        r2s = out_maps[:,1,:,:,1] * r2_sc # (nb,hgt,wdt)
+
+        # Extract common WF phase and off-res
+        pha_rho = tf.complex(0.0,out_maps[:,2,:,:,:1]) * np.pi * 4 # (nb,hgt,wdt,1)
+        phi = out_maps[:,2,:,:,1] * fm_sc
+
+        rho_w = tf.complex((1.0 - ff) * pd * rho_sc, 0.0)
+        rho_w *= tf.math.exp(pha_rho)
+        rho_f = tf.complex(ff * pd * rho_sc, 0.0)
+        rho_f *= tf.math.exp(pha_rho)
+        rho = tf.concat([rho_w,rho_f],axis=-1) # (nb,hgt,wdt,ns)
+        rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
+    else:
+        # Generate complex water/fat signals
+        mag_rho = out_maps[:,0,:,:,:2]
+        rho = tf.complex(mag_rho,0.0) * rho_sc # (nb,hgt,wdt,ns)
+        rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
+
+        pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:2]) * np.pi * 4
+        pha_rho = tf.transpose(pha_rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
+        rho *= tf.math.exp(pha_rho)
+
+        r2s = out_maps[:,0,:,:,2] * r2_sc
+        phi = out_maps[:,1,:,:,2] * fm_sc
 
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
-
-    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:2]) * np.pi * 4
-    pha_rho = tf.transpose(pha_rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
-    pha_rho_rav = tf.reshape(pha_rho, [n_batch, ns, -1]) # (nb,ns,nv)
-    rho_mtx *= tf.math.exp(pha_rho_rav)
-
-    r2s = out_maps[:,0,:,:,2] * r2_sc
-    phi = out_maps[:,1,:,:,2] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
