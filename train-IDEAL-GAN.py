@@ -268,8 +268,8 @@ def train_G(A, B):
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
-        B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B[:,:2,:,:,:]) # MAG
-        B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,:,:,1:], A2B[:,2:,:,:,1:]) * args.FM_loss_weight # PHASE
+        B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,...], A2B[:,:2,...]) # MAG
+        B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,...], A2B[:,2:,...]) * args.FM_loss_weight # PHASE
         
         A2B2A_f_cycle_loss = msle_loss(A_f, A2B2A_f)
         A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
@@ -283,8 +283,8 @@ def train_G(A, B):
         G_loss += activ_reg + A2B2A_f_cycle_loss * args.Fourier_reg_weight + vq_dict['loss'] * args.ls_reg_weight
         G_loss += A2Z_cov_loss * args.cov_reg_weight
 
-    G_grad = t.gradient(G_loss, enc.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables)
-    G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables))
+    G_grad = t.gradient(G_loss, enc.trainable_variables + dec_ff.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables)
+    G_optimizer.apply_gradients(zip(G_grad, enc.trainable_variables + dec_ff.trainable_variables + dec_mag.trainable_variables + dec_pha.trainable_variables))
 
     return A2B2A,  {'A2B2A_g_loss': A2B2A_g_loss,
                     'A2B2A_cycle_loss': A2B2A_cycle_loss,
@@ -388,8 +388,8 @@ def sample(A, B):
     else:
         val_A2B2A_loss = cycle_loss_fn(A, A2B2A)
     
-    val_B2A2B_loss = cycle_loss_fn(B[:,:1,:,:,:], A2B[:,:1,:,:,:])
-    val_B2A2B_loss += cycle_loss_fn(B[:,1:,:,:,:], A2B[:,1:,:,:,:]) * args.FM_loss_weight
+    val_B2A2B_loss = cycle_loss_fn(B[:,:2,...], A2B[:,:2,...])
+    val_B2A2B_loss += cycle_loss_fn(B[:,2:,...], A2B[:,2:,...]) * args.FM_loss_weight
     
     val_A2B2A_f_loss = msle_loss(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
