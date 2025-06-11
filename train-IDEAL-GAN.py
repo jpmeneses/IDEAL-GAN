@@ -155,7 +155,7 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 )
 dec_ff  = dl.decoder(encoded_dims=args.encoded_size//3,
                     output_shape=(hgt,wdt,n_out-1),
-                    filters=nfd,
+                    filters=nfd2,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation='sigmoid',
