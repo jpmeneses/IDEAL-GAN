@@ -231,9 +231,9 @@ def train_G(A, B):
         else:
             vq_dict =  {'loss': tf.constant(0.0,dtype=tf.float32),
                         'perplexity': tf.constant(0.0,dtype=tf.float32)}
-        A2Z2B_ff = dec_ff(A2Z, training=True)
-        A2Z2B_mag = dec_mag(A2Z, training=True)
-        A2Z2B_pha = dec_pha(A2Z, training=True)
+        A2Z2B_ff = dec_ff(A2Z[...,:1], training=True)
+        A2Z2B_mag = dec_mag(A2Z[...,1:2], training=True)
+        A2Z2B_pha = dec_pha(A2Z[...,2:], training=True)
         
         A2Z2B_ff = tf.concat([A2Z2B_ff,tf.zeros_like(A2Z2B_ff)],axis=-1) # (NB,1,H,W,1+NS)
         A2B = tf.concat([A2Z2B_ff,A2Z2B_mag,A2Z2B_pha],axis=1)
