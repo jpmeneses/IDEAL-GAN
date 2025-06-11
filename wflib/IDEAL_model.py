@@ -282,8 +282,8 @@ def IDEAL_mag(out_maps, params):
     
     if out_maps.shape[-1] < 3:
         # Extract PDFF, PD, and R2s
-        ff = out_maps[:,0,:,:,:0] # (nb,hgt,wdt,1)
-        pd = out_maps[:,1,:,:,:0] # (nb,hgt,wdt,1)
+        ff = out_maps[:,0,:,:,:1] # (nb,hgt,wdt,1)
+        pd = out_maps[:,1,:,:,:1] # (nb,hgt,wdt,1)
         r2s = out_maps[:,1,:,:,1] * r2_sc # (nb,hgt,wdt)
 
         # Extract common WF phase and off-res
