@@ -273,7 +273,7 @@ def train_G(A, B):
         B2A2B_cycle_loss = cycle_loss_fn(B[:,:2,...], A2B[:,:2,...]) # MAG
         B2A2B_cycle_loss += cycle_loss_fn(B[:,2:,...], A2B[:,2:,...]) * args.FM_loss_weight # PHASE
         
-        A2B2A_f_cycle_loss = msle_loss(A_f, A2B2A_f)
+        A2B2A_f_cycle_loss = tf.constant(0.0,dtype=tf.float32) # msle_loss(A_f, A2B2A_f)
         A2Z_cov_loss = cycle_loss_fn(A2Z_cov,tf.eye(A2Z_cov.shape[0]))
 
         ################ Regularizers #####################
@@ -395,7 +395,7 @@ def sample(A, B):
     val_B2A2B_loss = cycle_loss_fn(B[:,:2,...], A2B[:,:2,...])
     val_B2A2B_loss += cycle_loss_fn(B[:,2:,...], A2B[:,2:,...]) * args.FM_loss_weight
     
-    val_A2B2A_f_loss = msle_loss(A_f, A2B2A_f)
+    val_A2B2A_f_loss = tf.constant(0.0,dtype=tf.float32) # msle_loss(A_f, A2B2A_f)
     return A2B, A2B2A, {'A2B2A_g_loss': val_A2B2A_g_loss,
                         'A2B2A_cycle_loss': val_A2B2A_loss,
                         'B2A2B_cycle_loss': val_B2A2B_loss,
