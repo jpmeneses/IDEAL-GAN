@@ -231,9 +231,11 @@ def train_G(A, B):
         else:
             vq_dict =  {'loss': tf.constant(0.0,dtype=tf.float32),
                         'perplexity': tf.constant(0.0,dtype=tf.float32)}
-        A2Z2B_ff = dec_ff(A2Z[...,:1], training=True)
-        A2Z2B_mag = dec_mag(A2Z[...,1:2], training=True)
-        A2Z2B_pha = dec_pha(A2Z[...,2:], training=True)
+        A2Z_split = tf.split(A2Z, num_or_size_splits=3, axis=-1)
+        A2Z_ff, A2Z_mag, A2Z_pha = A2Z_split
+        A2Z2B_ff = dec_ff(A2Z_ff, training=True)
+        A2Z2B_mag = dec_mag(A2Z_mag, training=True)
+        A2Z2B_pha = dec_pha(A2Z_pha, training=True)
         
         A2Z2B_ff = tf.concat([A2Z2B_ff,tf.zeros_like(A2Z2B_ff)],axis=-1) # (NB,1,H,W,1+NS)
         A2B = tf.concat([A2Z2B_ff,A2Z2B_mag,A2Z2B_pha],axis=1)
@@ -353,9 +355,11 @@ def sample(A, B):
     if args.VQ_encoder:
         vq_dict = vq_op(A2Z)
         A2Z = vq_dict['quantize']
-    A2Z2B_ff = dec_ff(A2Z[...,:1], training=False)
-    A2Z2B_mag = dec_mag(A2Z[...,1:2], training=False)
-    A2Z2B_pha = dec_pha(A2Z[...,2:], training=False)
+    A2Z_split = tf.split(A2Z, num_or_size_splits=3, axis=-1)
+    A2Z_ff, A2Z_mag, A2Z_pha = A2Z_split
+    A2Z2B_ff = dec_ff(A2Z_ff, training=False)
+    A2Z2B_mag = dec_mag(A2Z_mag, training=False)
+    A2Z2B_pha = dec_pha(A2Z_pha, training=False)
     
     A2Z2B_ff = tf.concat([A2Z2B_ff,tf.zeros_like(A2Z2B_ff)],axis=-1) # (NB,1,H,W,NS)
     A2B = tf.concat([A2Z2B_ff,A2Z2B_mag,A2Z2B_pha],axis=1)
