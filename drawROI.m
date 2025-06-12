@@ -4,8 +4,9 @@ close all, clearvars, clc
 [file,location] = uigetfile;
 load([location,file])
 %% SECOND BLOCK: DISPLAY SELECTED SLICE AND DRAW ROI
-num_slice = 8; % YOU CAN CHANGE THIS
+num_slice = 17; % YOU CAN CHANGE THIS
 PDFF_slice = F(:,:,num_slice);
+figure(1)
 imshow(PDFF_slice,[0,100])
 roi =drawcircle('InteractionsAllowed','translate','LineWidth',1,...
                 'Center',[132,232],'Radius',sqrt(200/pi));
@@ -21,3 +22,7 @@ AREA = pi*roi.Radius^2 *1e-2; % considering that voxel size = 1mm x 1mm
 fprintf('  METRICS:\n')
 fprintf('    PDFF = %3.1f\n',ROI_PDFF)
 fprintf('    ROI area [cm^2] = %3.1f\n',AREA)
+%% FOURTH BLOCK: SHOW ALL SLICES
+figure(2)
+imshow3D(F)
+
