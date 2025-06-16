@@ -63,15 +63,15 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 dataset_dir = '../datasets/'
 dataset_hdf5_1 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_1, out_maps_1 = data.load_hdf5(dataset_dir,dataset_hdf5_1, MEBCRN=True,
-                                    mag_and_phase=args.only_mag, unwrap=args.unwrap)
+                                    mag_and_phase=True, unwrap=args.unwrap)
 
 dataset_hdf5_2 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, MEBCRN=True,
-                                    mag_and_phase=args.only_mag, unwrap=args.unwrap)
+                                    mag_and_phase=True, unwrap=args.unwrap)
 
 dataset_hdf5_3 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3, MEBCRN=True,
-                                    mag_and_phase=args.only_mag, unwrap=args.unwrap)
+                                    mag_and_phase=True, unwrap=args.unwrap)
 
 ################################################################################
 ########################### DATASET PARTITIONS #################################
@@ -82,10 +82,7 @@ trainY  = np.concatenate((out_maps_1,out_maps_2,out_maps_3),axis=0)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
-if args.only_mag:
-    _,_,_,_,n_out = np.shape(trainY)
-else:
-    _,n_out,_,_,_ = np.shape(trainY)
+_,_,_,_,n_out = np.shape(trainY)
 
 print('Num. Training slices:', len_dataset)
 print('Image Dimensions:', hgt, wdt)
