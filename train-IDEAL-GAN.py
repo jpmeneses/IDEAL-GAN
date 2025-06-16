@@ -414,6 +414,7 @@ ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
 checkpoint = tl.Checkpoint(dict(enc=enc,
+                                dec_ff=dec_ff,
                                 dec_mag=dec_mag,
                                 dec_pha=dec_pha,
                                 D_A=D_A,
