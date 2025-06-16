@@ -99,9 +99,9 @@ al_labels = list()
 for n, i in enumerate(sheet_ranges['E']):
     n_sl = sheet_ranges['F'][n].value
     if n>0:
-        al_labels += [4]*(int(n_sl/4)+1)
-        al_labels += [i.value]*(n_sl-2*int(n_sl/4)-1)
-        al_labels += [5]*(int(n_sl/4))
+        al_labels += [0]*(int(n_sl/4)+1)
+        al_labels += [1]*(n_sl-2*int(n_sl/4)-1)
+        al_labels += [2]*(int(n_sl/4))
 al_labels = np.array(al_labels)
 A_dataset = tf.data.Dataset.from_tensor_slices((trainX,al_labels))
 A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
@@ -128,20 +128,30 @@ enc= dl.encoder(input_shape=(None,hgt,wdt,n_ch),
                 ls_mean_activ=None,
                 NL_self_attention=args.NL_SelfAttention
                 )
-dec_mag = dl.decoder(encoded_dims=args.encoded_size,
+dec_ff  = dl.decoder(encoded_dims=args.encoded_size//3,
+                    output_shape=(hgt,wdt,n_out-1),
+                    filters=nfd2,
+                    num_layers=args.n_downsamplings,
+                    num_res_blocks=args.n_res_blocks,
+                    output_activation='sigmoid',
+                    output_initializer='he_normal',
+                    NL_self_attention=args.NL_SelfAttention
+                    )
+dec_mag = dl.decoder(encoded_dims=args.encoded_size//3,
                     output_shape=(hgt,wdt,n_out),
                     filters=nfd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
                     output_activation='relu',
+                    output_initializer='he_normal',
                     NL_self_attention=args.NL_SelfAttention
                     )
-dec_pha = dl.decoder(encoded_dims=args.encoded_size,
-                    output_shape=(hgt,wdt,n_out-1),
-                    filters=nfd2,
+dec_pha = dl.decoder(encoded_dims=args.encoded_size//3,
+                    output_shape=(hgt,wdt,n_out),
+                    filters=nfd,
                     num_layers=args.n_downsamplings,
                     num_res_blocks=args.n_res_blocks,
-                    output_activation='tanh',
+                    output_activation=None,
                     NL_self_attention=args.NL_SelfAttention
                     )
 
@@ -159,7 +169,7 @@ unet =  dl.denoise_Unet(dim=args.n_ldm_filters,
 IDEAL_op = wf.IDEAL_mag_Layer()
 vq_op = dl.VectorQuantizer(args.encoded_size, args.VQ_num_embed, args.VQ_commit_cost)
 
-tl.Checkpoint(dict(enc=enc,dec_mag=dec_mag,dec_pha=dec_pha,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
+tl.Checkpoint(dict(enc=enc,dec_ff=dec_ff,dec_mag=dec_mag,dec_pha=dec_pha,vq_op=vq_op), py.join(args.experiment_dir, 'checkpoints')).restore()
 
 ################################################################################
 ########################### DIFFUSION TIMESTEPS ################################
@@ -226,10 +236,14 @@ def validation_step(Z, label=None, Z_std=1.0):
         vq_dict = vq_op(Z)
         Z = vq_dict['quantize']
     Z = tf.math.multiply_no_nan(Z,Z_std)
-    Z2B_mag = dec_mag(Z, training=False)
-    Z2B_pha = dec_pha(Z, training=False)
-    Z2B_pha = tf.concat([Z2B_pha[:,:,:,:,:1],Z2B_pha],axis=-1)
-    Z2B = tf.concat([Z2B_mag,Z2B_pha],axis=1)
+    Z_split = tf.split(Z, num_or_size_splits=3, axis=-1)
+    Z_ff, Z_mag, Z_pha = Z_split
+    Z2B_ff = dec_ff(Z_ff, training=True)
+    Z2B_mag = dec_mag(Z_mag, training=True)
+    Z2B_pha = dec_pha(Z_pha, training=True)
+    
+    Z2B_ff = tf.concat([Z2B_ff,tf.zeros_like(Z2B_ff)],axis=-1) # (NB,1,H,W,1+NS)
+    Z2B = tf.concat([Z2B_ff,Z2B_mag,Z2B_pha],axis=1)
     Z2B2A = IDEAL_op(Z2B, training=False)
 
     return Z2B, Z2B2A
@@ -377,12 +391,12 @@ for ep in range(args.epochs_ldm):
         axs[0,5].axis('off')
 
         # A2B maps in the second row
-        w_m_aux = np.squeeze(Z2B[:,0,:,:,0])
-        w_p_aux = np.squeeze(Z2B[:,1,:,:,0])
-        f_m_aux = np.squeeze(Z2B[:,0,:,:,1])
-        f_p_aux = np.squeeze(Z2B[:,1,:,:,1])
-        r2_aux = np.squeeze(Z2B[:,0,:,:,2])
-        field_aux = np.squeeze(Z2B[:,1,:,:,2])
+        w_m_aux = np.squeeze((1.0-Z2B[:,0,:,:,0])*Z2B[:,1,:,:,0])
+        w_p_aux = np.squeeze(Z2B[:,2,:,:,0])
+        f_m_aux = np.squeeze(Z2B[:,0,:,:,0]*Z2B[:,1,:,:,0])
+        f_p_aux = np.squeeze(Z2B[:,2,:,:,0])
+        r2_aux = np.squeeze(Z2B[:,1,:,:,1])
+        field_aux = np.squeeze(Z2B[:,2,:,:,1])
         
         W_ok =  axs[1,0].imshow(w_m_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
