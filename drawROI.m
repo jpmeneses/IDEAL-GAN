@@ -4,25 +4,42 @@ close all, clearvars, clc
 [file,location] = uigetfile;
 load([location,file])
 %% SECOND BLOCK: DISPLAY SELECTED SLICE AND DRAW ROI
-num_slice = 17; % YOU CAN CHANGE THIS
-PDFF_slice = F(:,:,num_slice);
+sel_map = 'ECH-2'; % OPTIONS: PDFF, R2s, ECH-1, ECH-2 - YOU CAN CHANGE THIS
+num_slice = 14; % YOU CAN CHANGE THIS
+if strcmp(sel_map,'PDFF')
+    outmap = F;
+    val_range = [0,100];
+elseif strcmp(sel_map,'R2s')
+    outmap = R2;
+    val_range = [0,200];
+elseif strcmp(sel_map,'ECH-1')
+    outmap = abs(imDataParams.images(:,:,:,1,1));
+    val_range = [0,max(outmap,[],'all')];
+elseif strcmp(sel_map,'ECH-2')
+    outmap = abs(imDataParams.images(:,:,:,1,2));
+    val_range = [0,max(outmap,[],'all')];
+end
+im_slice = outmap(:,:,num_slice);
 figure(1)
-imshow(PDFF_slice,[0,100])
+imshow(im_slice,val_range)
 roi =drawcircle('InteractionsAllowed','translate','LineWidth',1,...
                 'Center',[132,232],'Radius',sqrt(200/pi));
 %% THIRD BLOCK: RUN TO REPEAT ROI MEASUREMENTS
 clc
 mask = createMask(roi);
-ROI_PDFF = median(PDFF_slice(mask)); % You can change 'mean' by 'median'
-roi.Label = num2str(round(ROI_PDFF,1));
+if strcmp(sel_map,'PDFF')
+    ROI_val = median(im_slice(mask));
+else
+    ROI_val = mean(im_slice(mask));
+end
+roi.Label = num2str(round(ROI_val,1));
 roi.LabelAlpha = 0;
 roi.LabelVisible = "hover";
 roi.LabelTextColor = "white";
 AREA = pi*roi.Radius^2 *1e-2; % considering that voxel size = 1mm x 1mm
 fprintf('  METRICS:\n')
-fprintf('    PDFF = %3.1f\n',ROI_PDFF)
+fprintf('    ROI val = %3.1f\n',ROI_val)
 fprintf('    ROI area [cm^2] = %3.1f\n',AREA)
 %% FOURTH BLOCK: SHOW ALL SLICES
 figure(2)
-imshow3D(F)
-
+imshow3D(outmap)
