@@ -717,6 +717,8 @@ def acq_mag_demod(acqs_abs, out_maps, te=None):
 
 def recon_demod_abs(out_maps, te=None):
     n_batch,_,hgt,wdt,_ = out_maps.shape
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
 
     if te is None:
         te = gen_TEvar(6, bs=n_batch, orig=True) # (nb,ne,1)
@@ -730,10 +732,6 @@ def recon_demod_abs(out_maps, te=None):
     r2s_tfp = out_maps[:,0,:,:,0] # (nb,hgt,wdt)
     r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_tfp,[n_batch,-1]),1) # (nb,1,nv)
     
-    voxel_shape = tf.convert_to_tensor((hgt,wdt))
-    num_voxel = tf.math.reduce_prod(voxel_shape)
-    rho_mtx = tf.reshape(abs_rho, [n_batch, ns, num_voxel]) # (nb,1,nv)
-
     W = tf.math.exp(tf.linalg.matmul(te, xi_rav)) # (nb,ne,nv)
     Smtx = rho_mtx * W # (nb,ne,nv)
 
