@@ -732,7 +732,7 @@ def recon_demod_abs(out_maps, te=None):
     
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
-    rho_mtx = tf.reshape(abs_rho_complex, [n_batch, ns, num_voxel]) # (nb,1,nv)
+    rho_mtx = tf.reshape(abs_rho, [n_batch, ns, num_voxel]) # (nb,1,nv)
 
     W = tf.math.exp(tf.linalg.matmul(te, xi_rav)) # (nb,ne,nv)
     Smtx = rho_mtx * W # (nb,ne,nv)
