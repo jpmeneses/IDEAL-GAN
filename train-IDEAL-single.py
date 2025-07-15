@@ -60,10 +60,10 @@ if args.grad_mode == 'bipolar':
         dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
     else:
         dataset_hdf5_1 = 'Bip12_NRef_384_complex_2D.hdf5'
-    bip_pha_out = 1
+    bip_pha_out = 0
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
-    bip_pha_out = 0
+    bip_pha_out = 1
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=args.data_idx, end=args.data_idx+3, te_data=True, MEBCRN=True,
                         mag_and_phase=True, unwrap=False)
@@ -95,14 +95,13 @@ G_mag = dl.UNet(input_shape=(ne,hgt,wdt,1),
                 self_attention=args.D1_SelfAttention)
 
 G_pha = dl.UNet(input_shape=(ne,hgt,wdt,1),
-                n_out=n_out+bip_pha_out,
+                n_out=n_out-bip_pha_out,
                 ME_layer=True,
                 filters=args.n_G_filters,
                 output_activation='linear',
                 self_attention=args.D2_SelfAttention)
 
-IDEAL_op = wf.IDEAL_mag_Layer()
-APD_loss_fn = gan.AbsolutePhaseDisparity()
+IDEAL_op = wf.IDEAL_mag_Layer(sep_phase=True)
 
 if args.main_loss == 'MSE':
     loss_fn = tf.losses.MeanSquaredError()
@@ -131,8 +130,8 @@ def train_G(A, B, te=None):
 
         A2B_mag = tf.where(B[:,:1,...]!=0.0,A2B_mag,0.0)
 
-        if args.grad_mode == 'bipolar':
-            A2B_mag = tf.concat([A2B_mag,tf.zeros_like(A2B_mag[...,:1])],axis=-1)
+        if args.grad_mode != 'bipolar':
+            A2B_pha = tf.concat([A2B_pha,tf.zeros_like(A2B_pha[...,:1])],axis=-1)
 
         A2B = tf.concat([A2B_mag,A2B_pha],axis=1)
 

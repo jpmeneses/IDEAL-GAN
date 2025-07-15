@@ -269,48 +269,33 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
-#@tf.custom_gradient
 def IDEAL_mag(out_maps, params):
     n_batch,_,hgt,wdt,_ = out_maps.shape
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
 
     te = params[1] # (nb,ne,1)
     te_complex = tf.complex(0.0,te)
     ne = te.shape[1]
 
     M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
-
     
-    if out_maps.shape[-1] < 3:
-        # Extract PDFF, PD, and R2s
-        ff = out_maps[:,0,:,:,:1] # (nb,hgt,wdt,1)
-        pd = out_maps[:,1,:,:,:1] # (nb,hgt,wdt,1)
-        r2s = out_maps[:,1,:,:,1] * r2_sc # (nb,hgt,wdt)
+    # Extract PDFF, PD, and R2s
+    ff = out_maps[:,0,:,:,:1] # (nb,hgt,wdt,1)
+    pd = out_maps[:,1,:,:,:1] # (nb,hgt,wdt,1)
+    r2s = out_maps[:,1,:,:,1] * r2_sc # (nb,hgt,wdt)
 
-        # Extract common WF phase and off-res
-        pha_rho = tf.complex(0.0,out_maps[:,2,:,:,:1]) * np.pi * 4 # (nb,hgt,wdt,1)
-        phi = out_maps[:,2,:,:,1] * fm_sc
+    # Extract common WF phase and off-res
+    pha_rho = tf.complex(0.0,out_maps[:,2,:,:,:1]) * np.pi * 4 # (nb,hgt,wdt,1)
+    phi = out_maps[:,2,:,:,1] * fm_sc
 
-        rho_w = tf.complex((1.0 - ff) * pd * rho_sc, 0.0)
-        rho_w *= tf.math.exp(pha_rho)
-        rho_f = tf.complex(ff * pd * rho_sc, 0.0)
-        rho_f *= tf.math.exp(pha_rho)
-        rho = tf.concat([rho_w,rho_f],axis=-1) # (nb,hgt,wdt,ns)
-        rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
-    else:
-        # Generate complex water/fat signals
-        mag_rho = out_maps[:,0,:,:,:2]
-        rho = tf.complex(mag_rho,0.0) * rho_sc # (nb,hgt,wdt,ns)
-        rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
+    rho_w = tf.complex((1.0 - ff) * pd * rho_sc, 0.0)
+    rho_w *= tf.math.exp(pha_rho)
+    rho_f = tf.complex(ff * pd * rho_sc, 0.0)
+    rho_f *= tf.math.exp(pha_rho)
+    rho = tf.concat([rho_w,rho_f],axis=-1) # (nb,hgt,wdt,ns)
+    rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
 
-        pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:2]) * np.pi * 4
-        pha_rho = tf.transpose(pha_rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
-        rho *= tf.math.exp(pha_rho)
-
-        r2s = out_maps[:,0,:,:,2] * r2_sc
-        phi = out_maps[:,1,:,:,2] * fm_sc
-
-    voxel_shape = tf.convert_to_tensor((hgt,wdt))
-    num_voxel = tf.math.reduce_prod(voxel_shape)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
@@ -318,16 +303,62 @@ def IDEAL_mag(out_maps, params):
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
-    if out_maps.shape[-1] > 3:
-        pha_bip = tf.complex(out_maps[:,1,:,:,3:],0.0) * np.pi
-        pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
-        pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
-        pha_tog = tf.range(1,ne+1,dtype=tf.float32)
-        bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
-        bip_cnst = tf.complex(0.0,bip_cnst)
-        exp_ph = tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
-    else:
-        exp_ph = tf.constant(0.0,dtype=tf.complex64)
+    Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav)) # (nb,ne,nv)
+
+    # Matrix operations
+    Mp = tf.linalg.matmul(M, rho_mtx) # (nb,ne,nv)
+    Smtx = Wp * Mp # (nb,ne,nv)
+
+    # Reshape to original acquisition dimensions
+    S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
+    S_hat = tf.expand_dims(S_hat, -1)
+
+    # Split into real and imaginary channels
+    Re_gt = tf.math.real(S_hat)
+    Im_gt = tf.math.imag(S_hat)
+    res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
+
+    return res_gt
+
+
+def IDEAL_mag_phase(out_maps, params):
+    n_batch,_,hgt,wdt,_ = out_maps.shape
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
+    
+    te = params[1] # (nb,ne,1)
+    te_complex = tf.complex(0.0,te)
+    ne = te.shape[1]
+
+    M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
+    
+    # Generate complex water/fat signals
+    mag_rho = out_maps[:,0,:,:,:2]
+    rho = tf.complex(mag_rho,0.0) * rho_sc # (nb,hgt,wdt,ns)
+    rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
+
+    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:1]) * np.pi
+    pha_rho = tf.repeat(pha_rho,ns,axis=-1)
+    pha_rho = tf.transpose(pha_rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
+    
+    rho *= tf.math.exp(pha_rho)
+    rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
+
+    r2s = out_maps[:,0,:,:,2] * r2_sc
+    phi = out_maps[:,1,:,:,1] * fm_sc
+
+    # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
+    xi = tf.complex(phi,r2s/(2*np.pi))
+    xi_rav = tf.reshape(xi,[n_batch,-1])
+    xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
+
+    pha_bip = tf.complex(out_maps[:,1,:,:,2:],0.0) * np.pi
+    pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
+    pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
+    pha_tog = tf.range(1,ne+1,dtype=tf.float32)
+    bip_cnst = tf.pow(-tf.ones([n_batch,ne,1],dtype=tf.float32),tf.expand_dims(pha_tog,axis=-1))
+    bip_cnst = tf.complex(0.0,bip_cnst)
+    exp_ph = tf.linalg.matmul(bip_cnst, pha_bip_rav) # (nb,ne,nv)
 
     Wp = tf.math.exp(tf.linalg.matmul(+2*np.pi * te_complex, xi_rav) + exp_ph) # (nb,ne,nv)
 
@@ -344,52 +375,22 @@ def IDEAL_mag(out_maps, params):
     Im_gt = tf.math.imag(S_hat)
     res_gt = tf.concat([Re_gt,Im_gt], axis=-1)
 
-    # def grad(upstream, variables=params): # Must be same shape as out_maps
-    #     # Re-format upstream
-    #     upstream = tf.complex(0.5*upstream[:,:,:,:,0],-0.5*upstream[:,:,:,:,1]) # (nb,ne,hgt,wdt)
-    #     upstream = tf.transpose(tf.reshape(upstream, [n_batch,ne,num_voxel]), perm=[0,2,1]) # (nb,nv,ne)
-
-    #     # Water/fat gradient
-    #     Wp_d = tf.linalg.diag(tf.transpose(Wp,perm=[2,0,1])) # (nv,nb,ne,ne)
-    #     ds_dp = tf.transpose(tf.linalg.matmul(Wp_d,M),perm=[1,0,3,2]) * rho_sc ## (nb,nv,ns,ne) I1
-    #     grad_res_rho = +2*tf.math.real(tf.linalg.matvec(ds_dp, upstream)) # (nb,nv,ns)
-
-    #     # Xi gradient
-    #     dxi = tf.linalg.diag(2*np.pi*tf.squeeze(te_complex,-1)) # (nb,ne,1) --> (nb,ne,ne)
-    #     ds_dxi = tf.linalg.matmul(dxi,Smtx) # (nb,ne,nv)
-    #     ds_dxi = tf.complex(tf.math.real(ds_dxi)*fm_sc,tf.math.imag(ds_dxi)*r2_sc/(2*np.pi))
-    #     ds_dxi = tf.expand_dims(tf.transpose(ds_dxi,perm=[0,2,1]),axis=-2) ## (nb,nv,1,ne) I2
-    #     grad_res_xi = tf.linalg.matvec(ds_dxi, upstream) # (nb,nv,1)
-    #     grad_res_r2 = tf.math.imag(grad_res_xi)
-    #     grad_res_fm = tf.math.real(grad_res_xi)
-
-    #     # Phi gradient
-    #     dphi = tf.linalg.diag(tf.math.exp(tf.complex(0.0,tf.ones([n_batch,ne],dtype=tf.float32)))) # (nb,ne,ne)
-    #     ds_dphi = tf.linalg.matmul(dphi,Smtx) * 3*np.pi # (nb,ne,nv)
-    #     ds_dphi = tf.expand_dims(tf.transpose(ds_dphi,perm=[0,2,1]),axis=-2) ## (nb,nv,1,ne) I3
-    #     grad_res_phi = tf.math.real(tf.linalg.matvec(ds_dphi, upstream)) # (nb,nv,1)
-
-    #     # Concatenate d_s/d_param gradients
-    #     grad_res_mag = tf.concat([grad_res_rho,grad_res_r2],axis=-1) # (nb,nv,ns+1)
-    #     grad_res_pha = tf.concat([tf.zeros_like(grad_res_phi),grad_res_phi,grad_res_fm],axis=-1)
-    #     grad_res_mag = tf.expand_dims(tf.reshape(grad_res_mag,[n_batch,hgt,wdt,ns+1]),axis=1) # (nb,1,hgt,wdt,ns+1)
-    #     grad_res_pha = tf.expand_dims(tf.reshape(grad_res_pha,[n_batch,hgt,wdt,ns+1]),axis=1)
-    #     grad_res = tf.concat([grad_res_mag,grad_res_pha],axis=1) # (nb,2,hgt,wdt,ns+1)
-
-    #     return (grad_res, [tf.constant([1.0],dtype=tf.float32), tf.ones((n_batch,ne,1),dtype=tf.float32)])
-
-    return res_gt#, grad
+    return res_gt
 
 
 class IDEAL_mag_Layer(tf.keras.layers.Layer):
-    def __init__(self, field=1.5):
+    def __init__(self, field=1.5, sep_phase=False,):
         super(IDEAL_mag_Layer, self).__init__()
         self.field = field
+        self.sep_phase = sep_phase
 
     def call(self,out_maps,te=None,ne=6,training=None):
         if te is None:
             te = gen_TEvar(ne, out_maps.shape[0], orig=True)
-        return IDEAL_mag(out_maps, [self.field, te])
+        if self.sep_phase:
+            return IDEAL_mag_phase(out_maps, [self.field, te])
+        else:
+            return IDEAL_mag(out_maps, [self.field, te])
 
 
 @tf.function
