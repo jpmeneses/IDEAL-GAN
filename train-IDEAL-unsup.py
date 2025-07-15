@@ -321,14 +321,14 @@ def sample(A, B):
         else:
             A2B_FM = G_A2B(A, training=False)
         A2B_EM = G_A2R2(A_abs, training=False)
-        A2B_PM = tf.concat([A2B_FM,A2B_EM[...,:1]], axis=-1)
+        A2B_PM = tf.concat([A2B_FM,A2B_EM], axis=-1)
 
         # Magnitude of water/fat images
         if args.remove_ech1:
             A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM)
         else:
             A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
-        A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
+        A2B = tf.concat([A2B_WF,A2B_PM[...,:2]], axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
         A2B2A = tf.where(A[:,:A2B2A.shape[1],...]!=0.0,A2B2A,0.0)
         A2B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=True))
@@ -338,7 +338,7 @@ def sample(A, B):
 
     ########### Splitted R2s and FM Losses ############
     WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
-    R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_EM[...,:1])
+    R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_PM[...,1:2])
     FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
     if args.out_vars == 'FM':
