@@ -732,7 +732,7 @@ def recon_demod_abs(out_maps, te=None):
     r2s_tfp = out_maps[:,0,:,:,0] # (nb,hgt,wdt)
     r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_tfp,[n_batch,-1]),1) # (nb,1,nv)
     
-    W = tf.math.exp(tf.linalg.matmul(te, xi_rav)) # (nb,ne,nv)
+    W = tf.math.exp(tf.linalg.matmul(te, r2s_mu_rav)) # (nb,ne,nv)
     Smtx = rho_mtx * W # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
