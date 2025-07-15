@@ -69,7 +69,7 @@ X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(X)
-_,_,_,_,n_out = np.shape(Y)
+n_out = np.shape(Y)[1]
 
 print('Acquisition Dimensions:', hgt,wdt)
 print('Echoes:',ne)
@@ -136,9 +136,6 @@ def train_G(A, B, te=None):
 
         A2B = tf.concat([A2B_mag,A2B_pha],axis=1)
 
-        A2B_WF = A2B[...,:2]
-        A2B_PM = A2B[...,2:]
-
         A2B2A = IDEAL_op(A2B, te, training=False)
 
         G_loss = A2B2A_cycle_loss = loss_fn(A, A2B2A)
@@ -156,17 +153,17 @@ def train_G(A, B, te=None):
     G_grad = t.gradient(G_loss, G_mag.trainable_variables + G_pha.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables + G_pha.trainable_variables))
 
-    return A2B_WF, A2B_PM, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
-                            'WF_loss': WF_abs_loss,
-                            'R2_loss': R2_loss,
-                            'FM_loss': FM_loss,
-                            'TV_FM': FM_TV,
-                            'L1_FM': FM_L1}
+    return A2B,{'A2B2A_cycle_loss': A2B2A_cycle_loss,
+                'WF_loss': WF_abs_loss,
+                'R2_loss': R2_loss,
+                'FM_loss': FM_loss,
+                'TV_FM': FM_TV,
+                'L1_FM': FM_L1}
 
 
 def train_step(A, B, te=None):
-    A2B_WF, A2B_PM, G_loss_dict = train_G(A, B, te)
-    return A2B_WF, A2B_PM, G_loss_dict
+    A2B, G_loss_dict = train_G(A, B, te)
+    return A2B, G_loss_dict
 
 # ==============================================================================
 # =                                    run                                     =
@@ -223,7 +220,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    A2B_WF, A2B_PM, G_loss_dict = train_step(A, B, te=TE)
+    A2B, G_loss_dict = train_step(A, B, te=TE)
 
     # # summary
     with train_summary_writer.as_default():
@@ -274,37 +271,37 @@ for ep in range(args.epochs):
             fig.delaxes(axs[0,5])
 
         # A2B maps in the second row
-        w_aux = np.squeeze(A2B_WF[:1,0,:,:,0])
+        w_aux = np.squeeze(A2B[0,0,:,:,0])
         W_ok =  axs[1,0].imshow(w_aux, cmap='bone',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(W_ok, ax=axs[1,0])
         axs[1,0].axis('off')
 
-        wp_aux = np.squeeze(A2B_WF[:1,1,:,:,0])
+        wp_aux = np.squeeze(A2B[0,1,:,:,0])
         Wp_ok =  axs[1,1].imshow(wp_aux, cmap='twilight',
                                 interpolation='none')#, vmin=-1, vmax=1)
         fig.colorbar(Wp_ok, ax=axs[1,1])
         axs[1,1].axis('off')
 
-        f_aux = np.squeeze(A2B_WF[:1,0,:,:,1])
+        f_aux = np.squeeze(A2B[0,0,:,:,1])
         F_ok =  axs[1,2].imshow(f_aux, cmap='pink',
                                 interpolation='none', vmin=0, vmax=1)
         fig.colorbar(F_ok, ax=axs[1,2])
         axs[1,2].axis('off')
 
-        fp_aux = np.squeeze(A2B_WF[:1,1,:,:,1])
+        fp_aux = np.squeeze(A2B[0,1,:,:,2])
         Fp_ok =  axs[1,3].imshow(fp_aux, cmap='twilight',
                                 interpolation='none')#, vmin=-1, vmax=1)
         fig.colorbar(Fp_ok, ax=axs[1,3])
         axs[1,3].axis('off')
 
-        r2_aux = np.squeeze(A2B_PM[:1,0,:,:,0])
+        r2_aux = np.squeeze(A2B[0,0,:,:,2])
         r2_ok = axs[1,4].imshow(r2_aux*r2_sc, cmap='copper',
                                 interpolation='none', vmin=0, vmax=r2_sc)
         fig.colorbar(r2_ok, ax=axs[1,4])
         axs[1,4].axis('off')
 
-        field_aux = np.squeeze(A2B_PM[:1,1,:,:,0])
+        field_aux = np.squeeze(A2B[0,1,:,:,1])
         field_ok =  axs[1,5].imshow(field_aux*fm_sc, cmap='twilight',
                                     interpolation='none', vmin=-fm_sc, vmax=fm_sc)
         fig.colorbar(field_ok, ax=axs[1,5])
@@ -332,15 +329,7 @@ for ep in range(args.epochs):
         axs[2,4].axis('off')
 
         fig.delaxes(axs[2,0])
-
-        if args.grad_mode == 'bipolar':
-            bp_aux = np.squeeze(A2B_PM[:1,1,:,:,1])
-            bp_ok =  axs[2,5].imshow(bp_aux, cmap='twilight',
-                                    interpolation='none')#, vmin=-1, vmax=1)
-            fig.colorbar(bp_ok, ax=axs[2,5])
-            axs[2,5].axis('off')
-        else:
-            fig.delaxes(axs[2,5])
+        fig.delaxes(axs[2,5])
 
         fig.suptitle('TE1/dTE: '+str([TE[0,0,0].numpy(),np.mean(np.diff(TE[:1,...],axis=1))]), fontsize=16)
 
