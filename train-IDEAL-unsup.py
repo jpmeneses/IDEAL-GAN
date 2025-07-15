@@ -133,6 +133,7 @@ G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                 self_attention=args.D1_SelfAttention)
 if args.out_vars == 'R2s' or args.out_vars == 'PM':
     G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
+                    n_out=2,
                     bayesian=args.UQ_R2s,
                     ME_layer=args.ME_layer,
                     filters=args.n_G_filters,
@@ -227,23 +228,27 @@ def train_G(A, B):
 @tf.function
 def train_G_R2(A, B):
     A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+    # Compute FM using complex-valued images and pre-trained model
+    A2B_FM = G_A2B(A, training=False)
+    A2B_R2 = tf.zeros_like(A2B_FM)
+    A2B_PM = tf.concat([A2B_FM.mean(),tf.zeros_like(A2B_FM)], axis=-1)
+    A2B_WF = wf.get_rho(A,A2B_PM,phase_contraint=True)
+    A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
+    A2B_WF_abs = tf.repeat(A2B_WF_abs,A_abs.shape[1],axis=1)
+    A_abs = tf.math.divide_no_nan(A_abs,A2B_WF_abs)
+    A_abs = wf.acq_mag_demod(A_abs,A2B_WF_abs)
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
         # Compute R2s map from only-mag images
-        A2B_R2 = G_A2R2(A_abs, training=not(args.UQ_calib))
-
-        # Compute FM using complex-valued images and pre-trained model
-        A2B_FM = G_A2B(A, training=False)
-        A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
+        A2B_EM = G_A2R2(A_abs, training=not(args.UQ_calib))
 
         # Magnitude of water/fat images
-        A2B_WF, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, only_mag=True)
-        A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
+        A2B2A_abs = wf.recon_demod_abs(A2B_EM)
         A2B2A_abs = tf.where(A[...,:1]!=0.0,A2B2A_abs,0.0)
         
         # Variance map mask and attach to recon-A
         if args.UQ:
-            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
+            A2B2A_var = wf.acq_uncertainty(A2B_WF, A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
@@ -252,11 +257,6 @@ def train_G_R2(A, B):
             A2B2A_cycle_loss = uncertain_loss_R2(A_abs, A2B2A_sampled_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
-
-        ########### Splitted R2s and FM Losses ############
-        WF_abs_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
-        R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
-        FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2[:,0,:,:,:]))
@@ -273,9 +273,6 @@ def train_G_R2(A, B):
         G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
-            'WF_loss': WF_abs_loss,
-            'R2_loss': R2_loss,
-            'FM_loss': FM_loss,
             'TV_R2': R2_TV,
             'L1_R2': R2_L1}
 
@@ -292,9 +289,6 @@ def train_step(A, B):
     else:
         G_loss_dict = train_G(A, B)
         G_R2_loss_dict={'A2B2A_cycle_loss': tf.constant(0.0),
-                        'WF_loss': tf.constant(0.0),
-                        'R2_loss': tf.constant(0.0),
-                        'FM_loss': tf.constant(0.0),
                         'TV_R2': tf.constant(0.0),
                         'L1_R2': tf.constant(0.0)}
     return G_loss_dict, G_R2_loss_dict
@@ -329,7 +323,7 @@ def sample(A, B):
         else:
             A2B_FM = G_A2B(A, training=False)
         A2B_R2 = G_A2R2(A_abs, training=False)
-        A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
+        A2B_PM = tf.concat([A2B_FM,A2B_R2[...,:1]], axis=-1)
 
         # Magnitude of water/fat images
         if args.remove_ech1:

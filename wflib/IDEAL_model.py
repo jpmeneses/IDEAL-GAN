@@ -654,8 +654,10 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, rem_R2=False, onl
         r2s_mean = tf.zeros_like(phi_var)
         r2s_var = tf.zeros_like(phi_var)
     else:
-        r2s_mean = r2s_tfp.mean() * r2_sc
-        r2s_var = r2s_tfp.variance() * (r2_sc**2)
+        r2s_mean = r2s_tfp.mean() 
+        r2s_mean = r2s_mean[...,:1] * r2_sc
+        r2s_var = r2s_tfp.variance() 
+        r2s_var = r2s_var[...,:1] * (r2_sc**2)
 
     r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_mean,[n_batch,-1]),1) # (nb,1,nv)
     r2s_sigma_rav = tf.expand_dims(tf.reshape(r2s_var,[n_batch,-1]),1) # (nb,1,nv)
@@ -664,7 +666,7 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, rem_R2=False, onl
     # Diagonal matrix with the exponential of fieldmap variance
     Wp_var = 1 - tf.math.exp(tf.linalg.matmul(-(2*np.pi * te)**2, phi_sigma_rav)) # (nb,ne,nv) NEG
     if not(rem_R2):
-        # r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu_rav))
+        r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu_rav))
         r2s_var_aux = tf.linalg.matmul(te**2, r2s_sigma_rav) #*
         Wp_var += r2s_var_aux # (nb,ne,nv) NEG
 
@@ -678,3 +680,62 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, rem_R2=False, onl
         res_S_var = tf.concat([res_S_var,res_S_var], axis=-1) # Same variance for real/imag
 
     return res_S_var
+
+
+def acq_mag_demod(acqs_abs, out_maps, te=None):
+    n_batch,_,hgt,wdt,_ = out_maps.shape
+
+    if te is None:
+        te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
+
+    M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
+
+    # Generate complex water/fat signals
+    abs_rho = out_maps[:,:2,:,:,0] # (nb,ns,hgt,wdt)
+    sum_rho = tf.reduce_sum(abs_rho, axis=1, keepdims=True)
+    sum_rho = tf.concat([sum_rho,sum_rho],axis=1)
+    abs_rho = tf.math.divide_no_nan(abs_rho,sum_rho)
+    abs_rho_complex = tf.complex(abs_rho,0.0)
+
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
+    Smtx = tf.reshape(tf.squeeze(acqs_abs,axis=-1), [n_batch, ne, num_voxel]) # (nb,ne,nv)
+    rho_mtx = tf.reshape(abs_rho_complex, [n_batch, ns, num_voxel]) # (nb,ns,nv)
+
+    # Matrix operations
+    Mp = tf.abs(tf.linalg.matmul(M, rho_mtx)) # (nb,ne,nv)
+    Smtx = tf.math.divide_no_nan(S_abs,Mp) # (nb,ne,nv)
+
+    # Reshape to original acquisition dimensions
+    S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
+    res_gt = tf.expand_dims(S_hat, -1)
+
+    return res_gt 
+
+
+def recon_demod_abs(out_maps, te):
+    n_batch,_,hgt,wdt,_ = out_maps.shape
+
+    if te is None:
+        te = gen_TEvar(6, bs=n_batch, orig=True) # (nb,ne,1)
+
+    # Generate complex water/fat signals
+    abs_rho = out_maps[:,1,:,:,1] # (nb,hgt,wdt)
+    rho_rav = tf.expand_dims(tf.reshape(abs_rho,[n_batch,-1]),1) # (nb,1,nv)
+    rho_mtx = tf.repeat(rho_rav,te.shape[2],axis=1) # (nb,ne,nv)
+    
+    r2s_tfp = out_maps[:,1,:,:,0] # (nb,hgt,wdt)
+    r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_tfp,[n_batch,-1]),1) # (nb,1,nv)
+    
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
+    rho_mtx = tf.reshape(abs_rho_complex, [n_batch, ns, num_voxel]) # (nb,1,nv)
+
+    W = tf.math.exp(tf.linalg.matmul(te, xi_rav)) # (nb,ne,nv)
+    Smtx = rho_mtx * W # (nb,ne,nv)
+
+    # Reshape to original acquisition dimensions
+    S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
+    res_gt = tf.expand_dims(S_hat, -1)
+
+    return res_gt
