@@ -723,11 +723,11 @@ def recon_demod_abs(out_maps, te=None):
     ne = te.shape[1]
 
     # Generate complex water/fat signals
-    abs_rho = out_maps[:,1,:,:,1] # (nb,hgt,wdt)
+    abs_rho = out_maps[:,0,:,:,1] # (nb,hgt,wdt)
     rho_rav = tf.expand_dims(tf.reshape(abs_rho,[n_batch,-1]),1) # (nb,1,nv)
     rho_mtx = tf.repeat(rho_rav,ne,axis=1) # (nb,ne,nv)
     
-    r2s_tfp = out_maps[:,1,:,:,0] # (nb,hgt,wdt)
+    r2s_tfp = out_maps[:,0,:,:,0] # (nb,hgt,wdt)
     r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_tfp,[n_batch,-1]),1) # (nb,1,nv)
     
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
