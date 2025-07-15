@@ -291,7 +291,7 @@ def train_step(A, B):
     return G_loss_dict, G_R2_loss_dict
 
 
-@tf.function
+#@tf.function
 def sample(A, B):
     if args.out_vars == 'FM':
         if args.remove_ech1:
@@ -333,7 +333,7 @@ def sample(A, B):
         A2B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=True))
 
         A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
-        A2B_PM_var = tf.where(A[:,:1,...]!=0.0,A2B_PM_var,0.0) * (fm_sc**2)
+        A2B_PM_var = tf.where(A[:,:1,...]!=0.0,A2B_PM_var,0.0)
 
     ########### Splitted R2s and FM Losses ############
     WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
