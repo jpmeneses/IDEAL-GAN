@@ -206,7 +206,7 @@ if A.shape[1] >= 6:
     im_ech6 = np.squeeze(np.abs(tf.complex(A[:1,5,:,:,0],A[:1,5,:,:,1])))
 
 # Ground-truth arrays
-wfn_aux = np.sum(np.square(B),axis=-1,keepdims=False)
+wfn_aux = np.sqrt(np.sum(np.square(B),axis=-1,keepdims=False))
 wn_aux = np.squeeze(wfn_aux[0,0,...])
 fn_aux = np.squeeze(wfn_aux[0,1,...])
 r2n_aux = np.squeeze(B[0,2,:,:,1])
