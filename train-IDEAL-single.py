@@ -124,12 +124,13 @@ def train_G(A, B, te=None):
     A_pha = tf.math.atan2(A[...,1:],A[...,:1]) / np.pi
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
+    B_mag_msk = tf.concat([B_WF_abs,B_WF_abs[...,:1]],axis=-1)
     with tf.GradientTape() as t:
         # Compute model's output
         A2B_mag = G_mag(A_mag, training=True)
         A2B_pha = G_pha(A_pha, training=True)
 
-        A2B_mag = tf.where(B[:,:1,...]!=0.0,A2B_mag,0.0)
+        A2B_mag = tf.where(B_mag_msk!=0.0,A2B_mag,0.0)
 
         if args.grad_mode != 'bipolar':
             A2B_pha = tf.concat([A2B_pha,tf.zeros_like(A2B_pha[...,:1])],axis=-1)
