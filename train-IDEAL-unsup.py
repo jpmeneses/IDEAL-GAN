@@ -232,7 +232,7 @@ def train_G_R2(A, B):
     A2B_FM = G_A2B(A, training=False)
     A2B_R2 = tf.zeros_like(A2B_FM)
     A2B_PM = tf.concat([A2B_FM.mean(),tf.zeros_like(A2B_FM)], axis=-1)
-    A2B_WF = wf.get_rho(A,A2B_PM,phase_contraint=True)
+    A2B_WF = wf.get_rho(A,A2B_PM,phase_constraint=True)
     A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
     A2B_WF_abs = tf.repeat(A2B_WF_abs,A_abs.shape[1],axis=1)
     A_abs = tf.math.divide_no_nan(A_abs,A2B_WF_abs)
