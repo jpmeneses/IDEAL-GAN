@@ -689,7 +689,7 @@ def acq_mag_demod(acqs_abs, out_maps, te=None):
     if te is None:
         te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
 
-    M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
+    M = gen_M(te, get_Mpinv=False) # (nb,ne,ns)
 
     # Generate complex water/fat signals
     abs_rho = out_maps[:,:2,:,:,0] # (nb,ns,hgt,wdt)
