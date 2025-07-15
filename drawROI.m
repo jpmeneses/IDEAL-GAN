@@ -6,7 +6,6 @@ addpath(genpath([pwd '/matlab']));
 %% SECOND BLOCK: DISPLAY SELECTED SLICE AND DRAW ROI
 num_slice = 14; % YOU CAN CHANGE THIS
 sel_map = 'ECH-1'; % OPTIONS: PDFF, R2s, ECH-1, ECH-2 - YOU CAN CHANGE THIS
-hgt_ds = 384; wdt_ds = 384; % DESIRED DIMS - YOU CAN CHANGE THIS
 if strcmp(sel_map,'PDFF')
     load([location,file])
     outmap = F;
@@ -21,7 +20,9 @@ elseif strcmp(sel_map,'ECH-1')
     outmap = abs(S(:,:,:,1,1));
     val_range = [0,max(outmap,[],'all')];
 elseif strcmp(sel_map,'ECH-2')
-    outmap = abs(imDataParams.images(:,:,:,1,2));
+    [im,filename,pathname] = open_dicom2(location, file);
+    S = cse_dicom_processing(im,filename,pathname);
+    outmap = abs(S(:,:,:,1,1));
     val_range = [0,max(outmap,[],'all')];
 end
 im_slice = outmap(:,:,num_slice);
