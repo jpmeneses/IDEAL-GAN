@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
-import tensorflow.keras as keras
 import tf2lib as tl
 import tf2gan as gan
 import DLlib as dl
@@ -66,7 +65,7 @@ else:
     bip_pha_out = 1
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=args.data_idx, end=args.data_idx+3, te_data=True, MEBCRN=True,
-                        mag_and_phase=True, unwrap=False)
+                        mag_and_phase=False, unwrap=False)
 
 # Overall dataset statistics
 len_dataset,ne,hgt,wdt,n_ch = np.shape(X)
@@ -113,7 +112,7 @@ else:
     raise(NameError('Unrecognized Main Loss Function'))
 
 G_lr_scheduler = dl.LinearDecay(args.lr, args.epochs, args.epoch_decay)
-G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
 # ==============================================================================
 # =                                 train step                                 =
@@ -123,6 +122,8 @@ G_optimizer = keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.be
 def train_G(A, B, te=None):
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     A_pha = tf.math.atan2(A[...,1:],A[...,:1]) / np.pi
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+    B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
     with tf.GradientTape() as t:
         # Compute model's output
         A2B_mag = G_mag(A_mag, training=True)
@@ -143,9 +144,9 @@ def train_G(A, B, te=None):
         G_loss = A2B2A_cycle_loss = loss_fn(A, A2B2A)
 
         ############### Splited losses ####################
-        WF_abs_loss = loss_fn(B[:,:1,:,:,:2], A2B[:,:1,:,:,:2])
-        R2_loss = loss_fn(B[:,:1,:,:,2:], A2B[:,:1,:,:,2:])
-        FM_loss = loss_fn(B[:,1:,:,:,2:], A2B[:,1:,:,:,2:])
+        WF_abs_loss = loss_fn(B_WF_abs, A2B[:,:1,:,:,:2])
+        R2_loss = loss_fn(B[:,2:,:,:,1:], A2B[:,:1,:,:,2:])
+        FM_loss = loss_fn(B[:,2:,:,:,:1], A2B[:,1:,:,:,2:])
 
         ################ Regularizers #####################
         FM_TV = tf.reduce_sum(tf.image.total_variation(A2B[:,1,:,:,2:]))
@@ -207,10 +208,11 @@ if A.shape[1] >= 6:
     im_ech6 = np.squeeze(np.abs(tf.complex(A[:1,5,:,:,0],A[:1,5,:,:,1])))
 
 # Ground-truth arrays
-wn_aux = np.squeeze(B[:1,:1,:,:,0])
-fn_aux = np.squeeze(B[:1,:1,:,:,1])
-r2n_aux = np.squeeze(B[:1,:1,:,:,2])
-fieldn_aux = np.squeeze(B[:1,1:,:,:,2])
+wfn_aux = np.sum(np.square(B),axis=-1,keepdims=False)
+wn_aux = np.squeeze(wfn_aux[0,0,...])
+fn_aux = np.squeeze(wfn_aux[0,1,...])
+r2n_aux = np.squeeze(B[0,2,:,:,1])
+fieldn_aux = np.squeeze(B[0,2,:,:,0])
 
 # main loop
 for ep in range(args.epochs):
