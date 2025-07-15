@@ -684,6 +684,7 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, rem_R2=False, onl
 
 def acq_mag_demod(acqs_abs, out_maps, te=None):
     n_batch,_,hgt,wdt,_ = out_maps.shape
+    ne = acqs_abs.shape[1]
 
     if te is None:
         te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
@@ -718,11 +719,12 @@ def recon_demod_abs(out_maps, te):
 
     if te is None:
         te = gen_TEvar(6, bs=n_batch, orig=True) # (nb,ne,1)
+    ne = te.shape[1]
 
     # Generate complex water/fat signals
     abs_rho = out_maps[:,1,:,:,1] # (nb,hgt,wdt)
     rho_rav = tf.expand_dims(tf.reshape(abs_rho,[n_batch,-1]),1) # (nb,1,nv)
-    rho_mtx = tf.repeat(rho_rav,te.shape[2],axis=1) # (nb,ne,nv)
+    rho_mtx = tf.repeat(rho_rav,ne,axis=1) # (nb,ne,nv)
     
     r2s_tfp = out_maps[:,1,:,:,0] # (nb,hgt,wdt)
     r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_tfp,[n_batch,-1]),1) # (nb,1,nv)
