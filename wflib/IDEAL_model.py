@@ -654,10 +654,11 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, rem_R2=False, onl
         r2s_mean = tf.zeros_like(phi_var)
         r2s_var = tf.zeros_like(phi_var)
     else:
-        r2s_mean = r2s_tfp.mean() 
-        r2s_mean = r2s_mean[...,:1] * r2_sc
-        r2s_var = r2s_tfp.variance() 
-        r2s_var = r2s_var[...,:1] * (r2_sc**2)
+        r2s_mean = r2s_tfp.mean() * r2_sc
+        r2s_var = r2s_tfp.variance() * (r2_sc**2)
+        if r2s_mean.shape[-1] > 1:
+            r2s_mean = r2s_mean[...,:1]
+            r2s_var = r2s_var[...,:1] 
 
     r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_mean,[n_batch,-1]),1) # (nb,1,nv)
     r2s_sigma_rav = tf.expand_dims(tf.reshape(r2s_var,[n_batch,-1]),1) # (nb,1,nv)
@@ -705,16 +706,16 @@ def acq_mag_demod(acqs_abs, out_maps, te=None):
 
     # Matrix operations
     Mp = tf.abs(tf.linalg.matmul(M, rho_mtx)) # (nb,ne,nv)
-    Smtx = tf.math.divide_no_nan(S_abs,Mp) # (nb,ne,nv)
+    Smtx_demod = tf.math.divide_no_nan(Smtx,Mp) # (nb,ne,nv)
 
     # Reshape to original acquisition dimensions
-    S_hat = tf.reshape(Smtx,[n_batch,ne,hgt,wdt])
+    S_hat = tf.reshape(Smtx_demod,[n_batch,ne,hgt,wdt])
     res_gt = tf.expand_dims(S_hat, -1)
 
     return res_gt 
 
 
-def recon_demod_abs(out_maps, te):
+def recon_demod_abs(out_maps, te=None):
     n_batch,_,hgt,wdt,_ = out_maps.shape
 
     if te is None:

@@ -230,7 +230,6 @@ def train_G_R2(A, B):
     A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     # Compute FM using complex-valued images and pre-trained model
     A2B_FM = G_A2B(A, training=False)
-    A2B_R2 = tf.zeros_like(A2B_FM)
     A2B_PM = tf.concat([A2B_FM.mean(),tf.zeros_like(A2B_FM)], axis=-1)
     A2B_WF = wf.get_rho(A,A2B_PM,phase_constraint=True)
     A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
@@ -247,7 +246,7 @@ def train_G_R2(A, B):
         
         # Variance map mask and attach to recon-A
         if args.UQ:
-            A2B2A_var = wf.acq_uncertainty(A2B_WF, A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
+            A2B2A_var = wf.acq_uncertainty(A2B_WF, A2B_FM, A2B_EM, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
