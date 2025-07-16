@@ -732,7 +732,7 @@ def recon_demod_abs(ech1_abs, out_maps, te=None):
     rho_rav = tf.expand_dims(tf.reshape(abs_rho,[n_batch,-1]),1) # (nb,1,nv)
     rho_mtx = tf.repeat(rho_rav,ne,axis=1) # (nb,ne,nv)
     
-    r2s_tfp = out_maps[:,0,:,:,0] # (nb,hgt,wdt)
+    r2s_tfp = out_maps[:,0,:,:,0] * r2_sc # (nb,hgt,wdt)
     r2s_mu_rav = tf.expand_dims(tf.reshape(r2s_tfp,[n_batch,-1]),1) # (nb,1,nv)
     
     W = tf.math.exp(tf.linalg.matmul(te, -r2s_mu_rav)) # (nb,ne,nv)
