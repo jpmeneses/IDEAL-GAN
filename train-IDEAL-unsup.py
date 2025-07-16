@@ -232,7 +232,6 @@ def train_G_R2(A, B):
     A2B_PM = tf.concat([A2B_FM.mean(),tf.zeros_like(A2B_FM)], axis=-1)
     A2B_WF = wf.get_rho(A,A2B_PM,phase_constraint=True)
     A2B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WF),axis=-1,keepdims=True))
-    A2B_WF_abs = tf.repeat(A2B_WF_abs,A_abs.shape[1],axis=1)
     A_abs = wf.acq_mag_demod(A_abs,A2B_WF_abs)
     with tf.GradientTape() as t:
         ##################### A Cycle #####################
@@ -319,6 +318,10 @@ def sample(A, B):
             A2B_FM = G_A2B(A[:,1:,...], training=False)
         else:
             A2B_FM = G_A2B(A, training=False)
+        A2B_PMa = tf.concat([A2B_FM.mean(),tf.zeros_like(A2B_FM)], axis=-1)
+        A2B_WFa = wf.get_rho(A,A2B_PMa,phase_constraint=True)
+        A2B_WFa_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WFa),axis=-1,keepdims=True))
+        A_abs = wf.acq_mag_demod(A_abs,A2B_WFa_abs)
         A2B_R2 = G_A2R2(A_abs, training=False)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
@@ -560,12 +563,12 @@ for ep in range(args.epochs):
                 if args.UQ:
                     R2_var_aux = np.squeeze(A2B_var[:,0,:,:,1])*(r2_sc**2)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
-                                            interpolation='none', vmin=0, vmax=0.1*(r2_sc**2))
+                                            interpolation='none', vmin=0, vmax=10)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
                     axs[1,3].axis('off')
                     FM_var_aux = np.squeeze(A2B_var[:,0,:,:,0])*(fm_sc**2)
                     FM_var_ok= axs[1,5].imshow(FM_var_aux, cmap='gnuplot2',
-                                            interpolation='none', vmin=0, vmax=0.1*(fm_sc**2))
+                                            interpolation='none', vmin=0, vmax=10)
                     fig.colorbar(FM_var_ok, ax=axs[1,5])
                     axs[1,5].axis('off')
                     # ech1_var_aux = np.squeeze(A2B2A_var[:,-1,:,:,0])
