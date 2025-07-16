@@ -244,13 +244,13 @@ def train_G_R2(A, B):
         A2B2A_abs = tf.where(A_abs[:,1:,...]!=0.0,A2B2A_abs,0.0)
         
         # Variance map mask and attach to recon-A
-        if args.UQ:
-            A2B2A_var = wf.acq_uncertainty(A2B_WF, A2B_FM, A2B_R2, ne=A.shape[1]-1, rem_R2=not(args.UQ_R2s), only_mag=True)
-            A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
+        if args.UQ_R2s:
+            A2B2A_var = wf.acq_uncertainty(A2B_WF, A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
+            A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var[:,1:,...]], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
         # CHECK
-        if args.UQ:
+        if args.UQ_R2s:
             A2B2A_cycle_loss = uncertain_loss_R2(A_abs[:,1:,...], A2B2A_sampled_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A_abs[:,1:,...], A2B2A_abs)
