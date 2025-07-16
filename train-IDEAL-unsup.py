@@ -332,8 +332,14 @@ def sample(A, B):
         A2B2A = tf.where(A[:,:A2B2A.shape[1],...]!=0.0,A2B2A,0.0)
         A2B2A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B2A),axis=-1,keepdims=True))
 
-        A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
-        A2B_PM_var = tf.where(A[:,:1,...]!=0.0,A2B_PM_var,0.0)
+        if args.UQ:
+            if args.UQ_R2s:
+                A2B_PM_var = tf.concat([A2B_FM.variance(),A2B_R2.variance()],axis=-1)
+            else:
+                A2B_PM_var = tf.concat([A2B_FM.variance(),1e-5*tf.ones_like(A2B_FM)],axis=-1)
+            A2B_PM_var = tf.where(A[:,:1,...]!=0.0,A2B_PM_var,0.0)
+        else:
+            A2B_PM_var = tf.zeros_like(A2B_PM)
 
     ########### Splitted R2s and FM Losses ############
     WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
