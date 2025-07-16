@@ -2,7 +2,7 @@
 % FIRST BLOCK: LOAD MAT FILE
 close all, clearvars, clc
 addpath(genpath([pwd '/matlab']));
-[file,location] = uigetfile;
+[file,location] = uigetfile('.');
 %% SECOND BLOCK: DISPLAY SELECTED SLICE AND DRAW ROI
 num_slice = 14; % YOU CAN CHANGE THIS
 sel_map = 'ECH-1'; % OPTIONS: PDFF, R2s, ECH-1, ECH-2 - YOU CAN CHANGE THIS
