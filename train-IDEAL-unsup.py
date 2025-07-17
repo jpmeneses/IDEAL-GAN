@@ -167,12 +167,10 @@ def train_G(A, B):
             A2B_FM = G_A2B(A[:,1:,...], training=True)
         else:
             A2B_FM = G_A2B(A, training=True)
-        # A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
         if args.out_vars == 'PM':
             # Compute R2s map from only-mag images
             A2B_R2 = G_A2R2(A_abs, training=False)
-            # A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
         else:
             A2B_R2 = tf.zeros_like(A2B_FM)
 
@@ -238,12 +236,11 @@ def train_G_R2(A, B):
 
         # Magnitude of water/fat images
         A2B_WF, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, only_mag=True)
-        A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B2A_abs = tf.where(A[...,:1]!=0.0,A2B2A_abs,0.0)
         
         # Variance map mask and attach to recon-A
         if args.UQ:
-            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B), A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
+            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
@@ -281,24 +278,22 @@ def train_G_R2(A, B):
 
 
 def train_step(A, B):
-    if args.out_vars != 'R2s':
-        G_loss_dict = train_G(A, B)
-        if args.out_vars == 'FM':
-            G_R2_loss_dict={'A2B2A_cycle_loss': tf.constant(0.0),
-                            'WF_loss': tf.constant(0.0),
-                            'R2_loss': tf.constant(0.0),
-                            'FM_loss': tf.constant(0.0),
-                            'TV_R2': tf.constant(0.0),
-                            'L1_R2': tf.constant(0.0)}
-    if args.out_vars != 'FM':
-        if args.out_vars == 'R2s':
-            G_loss_dict  = {'A2B2A_cycle_loss': tf.constant(0.0),
-                            'WF_loss': tf.constant(0.0),
-                            'R2_loss': tf.constant(0.0),
-                            'FM_loss': tf.constant(0.0),
-                            'TV_FM': tf.constant(0.0),
-                            'L1_FM': tf.constant(0.0)}
+    if args.out_vars == 'R2s':
+        G_loss_dict  = {'A2B2A_cycle_loss': tf.constant(0.0),
+                        'WF_loss': tf.constant(0.0),
+                        'R2_loss': tf.constant(0.0),
+                        'FM_loss': tf.constant(0.0),
+                        'TV_FM': tf.constant(0.0),
+                        'L1_FM': tf.constant(0.0)}
         G_R2_loss_dict = train_G_R2(A, B)
+    else:
+        G_loss_dict = train_G(A, B)
+        G_R2_loss_dict={'A2B2A_cycle_loss': tf.constant(0.0),
+                        'WF_loss': tf.constant(0.0),
+                        'R2_loss': tf.constant(0.0),
+                        'FM_loss': tf.constant(0.0),
+                        'TV_R2': tf.constant(0.0),
+                        'L1_R2': tf.constant(0.0)}
     return G_loss_dict, G_R2_loss_dict
 
 
