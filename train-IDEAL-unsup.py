@@ -167,14 +167,15 @@ def train_G(A, B):
             A2B_FM = G_A2B(A[:,1:,...], training=True)
         else:
             A2B_FM = G_A2B(A, training=True)
-        # A2B_FM = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_FM,0.0)
 
-        if args.out_vars == 'PM':
-            # Compute R2s map from only-mag images
-            A2B_R2 = G_A2R2(A_abs, training=False)
-            # A2B_R2 = tf.where(A[:,:1,:,:,:1]!=0.0,A2B_R2,0.0)
-        else:
+        if args.out_vars == 'FM':
             A2B_R2 = tf.zeros_like(A2B_FM)
+        else:
+            A2B_PMa = tf.concat([A2B_FM.mean(),tf.zeros_like(A2B_FM)], axis=-1)
+            A2B_WFa = wf.get_rho(A,A2B_PMa,phase_constraint=True)
+            A2B_WFa_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WFa),axis=-1,keepdims=True))
+            A_abs_demod = wf.acq_mag_demod(A_abs,A2B_WF_abs)
+            A2B_R2 = G_A2R2(A_abs_demod, training=False)
 
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
         if args.remove_ech1:
@@ -274,19 +275,21 @@ def train_G_R2(A, B):
 
 
 def train_step(A, B):
-    if args.out_vars == 'R2s':
-        G_loss_dict  = {'A2B2A_cycle_loss': tf.constant(0.0),
-                        'WF_loss': tf.constant(0.0),
-                        'R2_loss': tf.constant(0.0),
-                        'FM_loss': tf.constant(0.0),
-                        'TV_FM': tf.constant(0.0),
-                        'L1_FM': tf.constant(0.0)}
-        G_R2_loss_dict = train_G_R2(A, B)
-    else:
+    if args.out_vars == 'FM' or args.out_vars == 'PM':
         G_loss_dict = train_G(A, B)
-        G_R2_loss_dict={'A2B2A_cycle_loss': tf.constant(0.0),
-                        'TV_R2': tf.constant(0.0),
-                        'L1_R2': tf.constant(0.0)}
+        if args.out_vars == 'FM':
+            G_R2_loss_dict={'A2B2A_cycle_loss': tf.constant(0.0),
+                            'TV_R2': tf.constant(0.0),
+                            'L1_R2': tf.constant(0.0)}
+    if args.out_vars == 'R2s' or args.out_vars == 'PM':
+        G_R2_loss_dict = train_G_R2(A, B)
+        if args.out_vars == 'R2s':
+            G_loss_dict  = {'A2B2A_cycle_loss': tf.constant(0.0),
+                            'WF_loss': tf.constant(0.0),
+                            'R2_loss': tf.constant(0.0),
+                            'FM_loss': tf.constant(0.0),
+                            'TV_FM': tf.constant(0.0),
+                            'L1_FM': tf.constant(0.0)}
     return G_loss_dict, G_R2_loss_dict
 
 
