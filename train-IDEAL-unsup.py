@@ -321,9 +321,9 @@ def sample(A, B):
         A2B_PMa = tf.concat([A2B_FM.mean(),tf.zeros_like(A2B_FM)], axis=-1)
         A2B_WFa = wf.get_rho(A,A2B_PMa,phase_constraint=True)
         A2B_WFa_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A2B_WFa),axis=-1,keepdims=True))
-        A_abs = wf.acq_mag_demod(A_abs,A2B_WFa_abs)
-        A2B_R2 = G_A2R2(A_abs, training=False)
-        A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
+        A_abs_demod = wf.acq_mag_demod(A_abs,A2B_WFa_abs)
+        A2B_R2 = G_A2R2(A_abs_demod, training=False)
+        A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)    
 
         # Magnitude of water/fat images
         if args.remove_ech1:
