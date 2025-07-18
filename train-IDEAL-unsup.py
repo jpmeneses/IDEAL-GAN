@@ -400,7 +400,7 @@ if not(args.out_vars == 'FM'):
                                py.join(output_dir, 'checkpoints'),
                                max_to_keep=5)
 try:  # restore checkpoint including the epoch counter
-    if args.out_vars == 'PM' or (args.out_vars=='R2s' and args.UQ_calib):
+    if args.out_vars == 'PM' or args.out_vars=='R2s':
         checkpoint_2.restore().assert_existing_objects_matched()
     else:
         checkpoint.restore().assert_existing_objects_matched()
