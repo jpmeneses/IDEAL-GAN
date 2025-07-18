@@ -2,22 +2,27 @@
 % FIRST BLOCK: LOAD MAT FILE
 close all, clearvars, clc
 addpath(genpath([pwd '/matlab']));
+
+sel_map = 'ECH-1'; % OPTIONS: PDFF, R2s, ECH-1, ECH-2 - YOU CAN CHANGE THIS
 location = uigetdir();
-location = [location,'\'];
+location = [location,'/'];
 curFolder = cd;
 cd(location)
-filenames = dir('IM_*');
+if strcmp(sel_map,'ECH-1') || strcmp(sel_map,'ECH-2')
+    filenames = dir('IM_*');
+else
+    filenames = dir('results_MP_GC/IM*');
+end
 file = filenames.name;
 cd(curFolder)
 %% SECOND BLOCK: DISPLAY SELECTED SLICE AND DRAW ROI
 num_slice = 14; % YOU CAN CHANGE THIS
-sel_map = 'ECH-1'; % OPTIONS: PDFF, R2s, ECH-1, ECH-2 - YOU CAN CHANGE THIS
 if strcmp(sel_map,'PDFF')
-    load([location,file])
+    load([location,'results_MP_GC/',file])
     outmap = F;
     val_range = [0,100];
 elseif strcmp(sel_map,'R2s')
-    load([location,file])
+    load([location,'results_MP_GC/',file])
     outmap = R2;
     val_range = [0,200];
 elseif strcmp(sel_map,'ECH-1')
