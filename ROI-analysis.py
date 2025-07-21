@@ -29,6 +29,7 @@ py.arg('--data_size', type=int, default=384, choices=[192,384])
 py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','VET-Net','AI-DEAL','GraphCuts'])
 py.arg('--remove_ech1', type=bool, default=False)
 py.arg('--phase_constraint', type=bool, default=False)
+py.arg('--magnitude_disc', type=bool, default=False)
 py.arg('--map',default='PDFF',choices=['PDFF','R2s','Water','PDFF-var'])
 py.arg('--TE1', type=float, default=0.0013)
 py.arg('--dTE', type=float, default=0.0021)
@@ -50,9 +51,7 @@ if not(hasattr(args,'n_echoes')):
 
 # Excel file for saving ROIs values
 if args.dataset == 'multiTE':
-  out_filename = args.map + '_ROIs_'
-                  + str(int(np.round(args.TE1*1e4))) + '_' 
-                  + str(int(np.round(args.dTE*1e4)))
+  out_filename = args.map + '_ROIs_' + str(int(np.round(args.TE1*1e4))) + '_' + str(int(np.round(args.dTE*1e4)))
   if args.phase_constraint:
     out_filename += '_pc'
   workbook =xlsxwriter.Workbook(py.join('output',args.experiment_dir,out_filename + '.xlsx'))
@@ -296,10 +295,10 @@ r2_all_gt = testY[:,2,:,:,1]*r2_sc
 
 if args.map == 'PDFF':
   bool_PDFF = True
-  if args.phase_constraint:
-    PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
+  if args.magnitude_disc:
+    PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
   else:
-    np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+    PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
   PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
   PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
