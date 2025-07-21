@@ -59,7 +59,7 @@ else:
   out_filename = args.map+'_'+args.dataset+'_ROIs'
   if args.phase_constraint:
     out_filename += '_pc'
-  workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,'.xlsx'))
+  workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,out_filename + '.xlsx'))
 ws_ROI_1 = workbook.add_worksheet('RHL')
 ws_ROI_2 = workbook.add_worksheet('LHL')
 if args.map == 'PDFF-var':
