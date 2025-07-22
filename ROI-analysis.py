@@ -52,14 +52,13 @@ if not(hasattr(args,'n_echoes')):
 # Excel file for saving ROIs values
 if args.dataset == 'multiTE':
   out_filename = args.map + '_ROIs_' + str(int(np.round(args.TE1*1e4))) + '_' + str(int(np.round(args.dTE*1e4)))
-  if args.phase_constraint:
-    out_filename += '_pc'
-  workbook =xlsxwriter.Workbook(py.join('output',args.experiment_dir,out_filename + '.xlsx'))
 else:
   out_filename = args.map+'_'+args.dataset+'_ROIs'
-  if args.phase_constraint:
-    out_filename += '_pc'
-  workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,out_filename + '.xlsx'))
+if args.phase_constraint:
+  out_filename += '_pc'
+if args.magnitude_disc:
+  out_filename += '_md'
+workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,out_filename + '.xlsx'))
 ws_ROI_1 = workbook.add_worksheet('RHL')
 ws_ROI_2 = workbook.add_worksheet('LHL')
 if args.map == 'PDFF-var':
@@ -297,9 +296,10 @@ if args.map == 'PDFF':
   bool_PDFF = True
   if args.magnitude_disc:
     PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+    PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
   else:
     PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
-  PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
+    PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
   PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0
@@ -319,8 +319,12 @@ elif args.map == 'Water':
 elif args.map == 'PDFF-var':
   bool_PDFF = True
   ffuq_all_ans[np.isnan(ffuq_all_ans)] = 0.0
-  PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
-  PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
+  if args.magnitude_disc:
+    PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+    PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
+  else:
+    PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
+    PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
   PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0

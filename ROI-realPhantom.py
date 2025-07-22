@@ -212,9 +212,10 @@ if args.map == 'PDFF':
   bool_PDFF = True
   if args.magnitude_disc:
     PDFF_all_ans = np.where(f_all_ans>=w_all_ans,f_all_ans/wf_all_ans,1-w_all_ans/wf_all_ans)
+    PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
   else:
-    PDFF_all_ans = f_all_ans/(w_all_ans+f_all_ans)
-  PDFF_all_gt = np.where(f_all_gt>=w_all_gt,f_all_gt/wf_all_gt,1-w_all_gt/wf_all_gt)
+    PDFF_all_ans = f_all_ans/wf_all_ans
+    PDFF_all_gt = f_all_gt/wf_all_gt
   PDFF_all_ans[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_gt[np.isnan(PDFF_all_gt)] = 0.0
   PDFF_all_ans[np.isnan(PDFF_all_ans)] = 0.0
