@@ -19,6 +19,7 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
+py.arg('--is_phantom', type=bool, default=False)
 py.arg('--grad_mode', default='bipolar', choices=['unipolar','bipolar'])
 py.arg('--n_echoes', type=int, default=6, choices=[6, 12])
 py.arg('--data_idx', type=int, default=3)
@@ -55,10 +56,13 @@ r2_sc = 200.0
 ################################################################################
 dataset_dir = '../datasets/'
 if args.grad_mode == 'bipolar':
-    if args.n_echoes == 6:
-        dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
+    if args.is_phantom:
+        dataset_hdf5_1 = 'phantom_3p0_RF_192_128_complex_2D.hdf5'
     else:
-        dataset_hdf5_1 = 'Bip12_NRef_384_complex_2D.hdf5'
+        if args.n_echoes == 6:
+            dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
+        else:
+            dataset_hdf5_1 = 'Bip12_NRef_384_complex_2D.hdf5'
     bip_pha_out = 1
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
@@ -100,7 +104,10 @@ G_pha = dl.UNet(input_shape=(ne,hgt,wdt,1),
                 output_activation='linear',
                 self_attention=args.D2_SelfAttention)
 
-IDEAL_op = wf.IDEAL_mag_Layer(sep_phase=True)
+if args.is_phantom:
+    IDEAL_op = wf.IDEAL_mag_Layer(field=3.0,sep_phase=True)
+else:
+    IDEAL_op = wf.IDEAL_mag_Layer(sep_phase=True)
 
 if args.main_loss == 'MSE':
     loss_fn = tf.losses.MeanSquaredError()
