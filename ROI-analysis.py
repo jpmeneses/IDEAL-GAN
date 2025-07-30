@@ -507,7 +507,7 @@ if args.map != 'Water':
     for idx2 in range(len(XB_gt_all)):
       ws_ROI_2.write(idx2+1,0,XB_q1_all[idx1])
       ws_ROI_2.write(idx2+1,1,XB_gt_all[idx2])
-      ws_ROI_2.write(idx2+1,0,XB_q3_all[idx1])
+      ws_ROI_2.write(idx2+1,2,XB_q3_all[idx1])
       ws_ROI_2.write(idx2+1,3,XB_res_all[idx2])
   else:
     for idx1 in range(len(XA_gt_all)):
