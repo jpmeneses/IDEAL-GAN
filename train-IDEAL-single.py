@@ -24,7 +24,7 @@ py.arg('--n_echoes', type=int, default=6, choices=[6, 12])
 py.arg('--data_idx', type=int, default=3)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--epochs', type=int, default=7000)
-py.arg('--epoch_decay', type=int, default=7000)  # epoch to start decaying learning rate
+py.arg('--epoch_decay', type=int, default=24000)  # epoch to start decaying learning rate
 py.arg('--epoch_ckpt', type=int, default=500)  # num. of epochs to save a checkpoint
 py.arg('--lr', type=float, default=0.0008)
 py.arg('--beta_1', type=float, default=0.9)
@@ -59,10 +59,10 @@ if args.grad_mode == 'bipolar':
         dataset_hdf5_1 = 'Bip_NRef_384_complex_2D.hdf5'
     else:
         dataset_hdf5_1 = 'Bip12_NRef_384_complex_2D.hdf5'
-    bip_pha_out = 0
+    bip_pha_out = 1
 else:
     dataset_hdf5_1 = 'multiTE_GC_384_complex_2D.hdf5'
-    bip_pha_out = 1
+    bip_pha_out = 0
 X, Y, te=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx=24,
                         start=args.data_idx, end=args.data_idx+3, te_data=True, MEBCRN=True,
                         mag_and_phase=False, unwrap=False)
@@ -94,7 +94,7 @@ G_mag = dl.UNet(input_shape=(ne,hgt,wdt,1),
                 self_attention=args.D1_SelfAttention)
 
 G_pha = dl.UNet(input_shape=(ne,hgt,wdt,1),
-                n_out=n_out-bip_pha_out,
+                n_out=n_out+bip_pha_out,
                 ME_layer=True,
                 filters=args.n_G_filters,
                 output_activation='linear',
@@ -132,8 +132,8 @@ def train_G(A, B, te=None):
 
         A2B_mag = tf.where(B_mag_msk!=0.0,A2B_mag,0.0)
 
-        if args.grad_mode != 'bipolar':
-            A2B_pha = tf.concat([A2B_pha,tf.zeros_like(A2B_pha[...,:1])],axis=-1)
+        if args.grad_mode == 'bipolar':
+            A2B_mag = tf.concat([A2B_mag,tf.zeros_like(A2B_mag[...,:1])],axis=-1)
 
         A2B = tf.concat([A2B_mag,A2B_pha],axis=1)
 

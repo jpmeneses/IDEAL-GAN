@@ -337,22 +337,21 @@ def IDEAL_mag_phase(out_maps, params):
     rho = tf.complex(mag_rho,0.0) * rho_sc # (nb,hgt,wdt,ns)
     rho = tf.transpose(rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
 
-    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:1]) * np.pi
-    pha_rho = tf.repeat(pha_rho,ns,axis=-1)
+    pha_rho = tf.complex(0.0,out_maps[:,1,:,:,:2]) * np.pi
     pha_rho = tf.transpose(pha_rho,perm=[0,3,1,2]) # (nb,ns,hgt,wdt)
     
     rho *= tf.math.exp(pha_rho)
     rho_mtx = tf.reshape(rho, [n_batch, ns, num_voxel]) # (nb,ns,nv)
 
     r2s = out_maps[:,0,:,:,2] * r2_sc
-    phi = out_maps[:,1,:,:,1] * fm_sc
+    phi = out_maps[:,1,:,:,2] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi = tf.complex(phi,r2s/(2*np.pi))
     xi_rav = tf.reshape(xi,[n_batch,-1])
     xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
 
-    pha_bip = tf.complex(out_maps[:,1,:,:,2:],0.0) * np.pi
+    pha_bip = tf.complex(out_maps[:,1,:,:,3:],0.0) * np.pi
     pha_bip_rav = tf.reshape(pha_bip, [n_batch, -1])
     pha_bip_rav = tf.expand_dims(pha_bip_rav,1)
     pha_tog = tf.range(1,ne+1,dtype=tf.float32)
