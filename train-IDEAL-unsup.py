@@ -131,17 +131,16 @@ G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                 ME_layer=args.ME_layer,
                 filters=args.n_G_filters,
                 self_attention=args.D1_SelfAttention)
-if args.out_vars == 'R2s' or args.out_vars == 'PM':
-    G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
-                    bayesian=args.UQ_R2s,
-                    ME_layer=args.ME_layer,
-                    filters=args.n_G_filters,
-                    output_activation='sigmoid',
-                    output_initializer='he_uniform',
-                    self_attention=args.D2_SelfAttention)
-    G_calib = tf.keras.Sequential()
-    G_calib.add(tf.keras.layers.Conv2D(1,1,use_bias=False,kernel_initializer='ones',kernel_constraint=tf.keras.constraints.NonNeg()))
-    G_calib.build((None, 1, hgt, wdt, 1))
+G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
+                bayesian=args.UQ_R2s,
+                ME_layer=args.ME_layer,
+                filters=args.n_G_filters,
+                output_activation='sigmoid',
+                output_initializer='he_uniform',
+                self_attention=args.D2_SelfAttention)
+G_calib = tf.keras.Sequential()
+G_calib.add(tf.keras.layers.Conv2D(1,1,use_bias=False,kernel_initializer='ones',kernel_constraint=tf.keras.constraints.NonNeg()))
+G_calib.build((None, 1, hgt, wdt, 1))
 
 cycle_loss_fn = tf.losses.MeanSquaredError()
 uncertain_loss = gan.VarMeanSquaredError()
@@ -149,9 +148,9 @@ uncertain_loss_R2 = gan.VarMeanSquaredErrorR2()
 
 G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_steps / args.epochs)
 G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
-if not(args.out_vars == 'FM'):
-    G_R2_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
-    G_calib_optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr)
+
+G_R2_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+G_calib_optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr)
 
 # ==============================================================================
 # =                                 train step                                 =
@@ -385,25 +384,16 @@ ep_cnt = tf.Variable(initial_value=0, trainable=False, dtype=tf.int64)
 
 # checkpoint
 checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B,
+                                G_A2R2=G_A2R2,
+                                G_calib=G_calib,
                                 G_optimizer=G_optimizer,
+                                G_R2_optimizer=G_R2_optimizer,
+                                G_calib_optimizer=G_calib_optimizer,
                                 ep_cnt=ep_cnt),
-                           py.join(output_dir, 'checkpoints'),
-                           max_to_keep=5)
-if not(args.out_vars == 'FM'):
-    checkpoint_2=tl.Checkpoint(dict(G_A2B=G_A2B,
-                                    G_A2R2=G_A2R2,
-                                    G_calib=G_calib,
-                                    G_optimizer=G_optimizer,
-                                    G_R2_optimizer=G_R2_optimizer,
-                                    G_calib_optimizer=G_calib_optimizer,
-                                    ep_cnt=ep_cnt),
-                               py.join(output_dir, 'checkpoints'),
-                               max_to_keep=5)
+                            py.join(output_dir, 'checkpoints'),
+                            max_to_keep=5)
 try:  # restore checkpoint including the epoch counter
-    if args.out_vars == 'PM' or args.out_vars=='R2s':
-        checkpoint_2.restore().assert_existing_objects_matched()
-    else:
-        checkpoint.restore().assert_existing_objects_matched()
+    checkpoint.restore().assert_existing_objects_matched()
 except Exception as e:
     print(e)
 
