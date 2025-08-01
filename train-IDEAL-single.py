@@ -145,6 +145,7 @@ def train_G(A, B, te=None):
         A2B = tf.concat([A2B_mag,A2B_pha],axis=1)
 
         A2B2A = IDEAL_op(A2B, te, training=False)
+        A2B2A = tf.where(A!=0.0,A2B2A,0.0)
 
         G_loss = A2B2A_cycle_loss = loss_fn(A, A2B2A)
 
