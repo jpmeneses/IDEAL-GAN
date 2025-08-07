@@ -346,7 +346,7 @@ for ep in range(args.epochs):
 
         fig.delaxes(axs[2,0])
         if args.grad_mode == 'bipolar':
-            bp_aux = np.squeeze(A2B_PM[:1,1,:,:,-1])
+            bp_aux = np.squeeze(A2B[:1,1,:,:,-1])
             bp_ok =  axs[2,5].imshow(bp_aux, cmap='twilight',
                                     interpolation='none', vmin=-1, vmax=1)
             fig.colorbar(bp_ok, ax=axs[2,5])
