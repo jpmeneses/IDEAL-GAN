@@ -173,7 +173,8 @@ def train_G(A, B, te=None):
                 'R2_loss': R2_loss,
                 'FM_loss': FM_loss,
                 'TV_FM': FM_TV,
-                'L1_FM': FM_L1}
+                'L1_FM': FM_L1,
+                'BP_GR': BP_GR}
 
 
 def train_step(A, B, te=None):
