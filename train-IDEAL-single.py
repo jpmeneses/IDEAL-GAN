@@ -305,7 +305,7 @@ for ep in range(args.epochs):
         fig.colorbar(F_ok, ax=axs[1,2])
         axs[1,2].axis('off')
 
-        fp_aux = np.squeeze(A2B[0,1,:,:,3])
+        fp_aux = np.squeeze(A2B[0,1,:,:,1])
         Fp_ok =  axs[1,3].imshow(fp_aux, cmap='twilight',
                                 interpolation='none', vmin=-1, vmax=1)
         fig.colorbar(Fp_ok, ax=axs[1,3])
@@ -346,7 +346,7 @@ for ep in range(args.epochs):
 
         fig.delaxes(axs[2,0])
         if args.grad_mode == 'bipolar':
-            bp_aux = np.squeeze(A2B_PM[:1,1,:,:,-1:])
+            bp_aux = np.squeeze(A2B_PM[:1,1,:,:,-1])
             bp_ok =  axs[2,5].imshow(bp_aux, cmap='twilight',
                                     interpolation='none', vmin=-1, vmax=1)
             fig.colorbar(bp_ok, ax=axs[2,5])
