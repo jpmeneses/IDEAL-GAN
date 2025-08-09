@@ -161,8 +161,8 @@ def train_G(A, B, te=None):
         FM_loss = loss_fn(B[:,2:,:,:,:1], A2B[:,1:,:,:,2:])
 
         ################ Regularizers #####################
-        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B[:,1,:,:,2:]))
-        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B[:,1:,:,:,2:]),axis=(1,2,3,4)))
+        FM_TV = tf.reduce_sum(tf.image.total_variation(A2B[:,1,:,:,2:3]))
+        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(A2B[:,1:,:,:,2:3]),axis=(1,2,3,4)))
         G_loss += FM_TV * args.FM_TV_weight + FM_L1 * args.FM_L1_weight
 
         BP_dy, BP_dx = tf.image.image_gradients(A2B[:,1,:,:,-1:])
