@@ -158,7 +158,7 @@ def train_G(A, B, te=None):
         ############### Splited losses ####################
         WF_abs_loss = loss_fn(B_WF_abs, A2B[:,:1,:,:,:2])
         R2_loss = loss_fn(B[:,2:,:,:,1:], A2B[:,:1,:,:,2:])
-        FM_loss = loss_fn(B[:,2:,:,:,:1], A2B[:,1:,:,:,2:])
+        FM_loss = loss_fn(B[:,2:,:,:,:1], A2B[:,1:,:,:,2:3])
 
         ################ Regularizers #####################
         FM_TV = tf.reduce_sum(tf.image.total_variation(A2B[:,1,:,:,2:3]))
