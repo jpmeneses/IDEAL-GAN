@@ -167,8 +167,7 @@ def train_G(A, B, te=None):
 
         BP_dy, BP_dx = tf.image.image_gradients(A2B[:,1,:,:,-1:])
         BP_dx_sign = tf.math.sign(BP_dx)
-        BP_dxdy, BP_ddx = tf.image.image_gradients(BP_dx_sign)
-        BP_GR = tf.reduce_sum(tf.abs(BP_ddx) + tf.abs(BP_dy))
+        BP_GR = tf.reduce_sum(tf.abs(BP_dy) - BP_dx_sign)
         G_loss += BP_GR * args.BP_GR_weight 
 
     G_grad = t.gradient(G_loss, G_mag.trainable_variables + G_pha.trainable_variables)
