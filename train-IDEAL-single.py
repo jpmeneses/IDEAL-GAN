@@ -133,12 +133,17 @@ def train_G(A, B, te=None):
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     B_WF_abs = tf.transpose(B_WF_abs,perm=[0,4,2,3,1])
     B_mag_msk = tf.concat([B_WF_abs,B_WF_abs[...,:1]],axis=-1)
+    if args.grad_mode == 'bipolar':
+        B_pha_msk = tf.concat([B_mag_msk,B_WF_abs[...,:1]],axis=-1)
+    else:
+        B_pha_msk = B_mag_msk
     with tf.GradientTape() as t:
         # Compute model's output
         A2B_mag = G_mag(A_mag, training=True)
         A2B_pha = G_pha(A_pha, training=True)
 
         A2B_mag = tf.where(B_mag_msk!=0.0,A2B_mag,0.0)
+        A2B_pha = tf.where(B_pha_msk!=0.0,A2B_pha,0.0)
 
         if args.grad_mode == 'bipolar':
             A2B_mag = tf.concat([A2B_mag,tf.zeros_like(A2B_mag[...,:1])],axis=-1)
@@ -161,8 +166,9 @@ def train_G(A, B, te=None):
         G_loss += FM_TV * args.FM_TV_weight + FM_L1 * args.FM_L1_weight
 
         BP_dy, BP_dx = tf.image.image_gradients(A2B[:,1,:,:,-1:])
-        BP_dxdy, BP_ddx = tf.image.image_gradients(BP_dx)
-        BP_GR = tf.reduce_sum(tf.abs(BP_ddx))
+        BP_dx_sign = tf.math.sign(BP_dx)
+        BP_dxdy, BP_ddx = tf.image.image_gradients(BP_dx_sign)
+        BP_GR = tf.reduce_sum(tf.abs(BP_ddx) + tf.abs(BP_dy))
         G_loss += BP_GR * args.BP_GR_weight 
 
     G_grad = t.gradient(G_loss, G_mag.trainable_variables + G_pha.trainable_variables)
