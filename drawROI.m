@@ -3,14 +3,17 @@
 close all, clearvars, clc
 addpath(genpath([pwd '/matlab']));
 
-sel_map = 'R2s-var'; % OPTIONS: PDFF,PDFF-var,R2s,R2s-var,ECH-1,ECH-2 - YOU CAN CHANGE THIS
+sel_map = 'AI-FM'; % OPTIONS: PDFF,AI-PDFF,AI-PDFF-var,R2s,AI-R2s,
+                % AI-R2s-var,AI-FM,ECH-1,ECH-2 - YOU CAN CHANGE THIS
 location = uigetdir();
 location = [location,'/'];
 curFolder = cd;
 cd(location)
 if strcmp(sel_map,'ECH-1') || strcmp(sel_map,'ECH-2')
     filenames = dir('IM_*');
-elseif strcmp(sel_map,'PDFF-var') || strcmp(sel_map,'R2s-var')
+elseif strcmp(sel_map,'AI-PDFF') || strcmp(sel_map,'AI-PDFF-var') ...
+        || strcmp(sel_map,'AI-R2s') || strcmp(sel_map,'AI-R2s-var') ...
+        || strcmp(sel_map,'AI-FM')
     prefold = dir('2D_NSA1_*');
     filenames = dir([prefold.name,'/res_*']);
 else
@@ -24,7 +27,11 @@ if strcmp(sel_map,'PDFF')
     load([location,'results_MP_GC/',file])
     outmap = F;
     val_range = [0,100];
-elseif strcmp(sel_map,'PDFF-var')
+elseif strcmp(sel_map,'AI-PDFF')
+    load([location,prefold.name,'/',file])
+    outmap = F;
+    val_range = [0,100]; %RANGE OF VALUES TO BE PLOTTED - YOU CAN CHANGE THIS
+elseif strcmp(sel_map,'AI-PDFF-var')
     load([location,prefold.name,'/',file])
     outmap = F_var;
     val_range = [0,2e4]; %RANGE OF VALUES TO BE PLOTTED - YOU CAN CHANGE THIS
@@ -32,10 +39,18 @@ elseif strcmp(sel_map,'R2s')
     load([location,'results_MP_GC/',file])
     outmap = R2;
     val_range = [0,200];
-elseif strcmp(sel_map,'R2s-var')
+elseif strcmp(sel_map,'AI-R2s')
+    load([location,prefold.name,'/',file])
+    outmap = R2;
+    val_range = [0,200];
+elseif strcmp(sel_map,'AI-R2s-var')
     load([location,prefold.name,'/',file])
     outmap = R2_var;
     val_range = [0,3e2]; %RANGE OF VALUES TO BE PLOTTED - YOU CAN CHANGE THIS
+elseif strcmp(sel_map,'AI-FM')
+    load([location,prefold.name,'/',file])
+    outmap = P;
+    val_range = [0,200]; %RANGE OF VALUES TO BE PLOTTED - YOU CAN CHANGE THIS
 elseif strcmp(sel_map,'ECH-1')
     [im,filename,pathname] = open_dicom2(location, file);
     S = cse_dicom_processing(im,filename,pathname);
