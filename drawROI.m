@@ -3,7 +3,7 @@
 close all, clearvars, clc
 addpath(genpath([pwd '/matlab']));
 
-sel_map = 'AI-FM'; % OPTIONS: PDFF,AI-PDFF,AI-PDFF-var,R2s,AI-R2s,
+sel_map = 'PDFF'; % OPTIONS: PDFF,AI-PDFF,AI-PDFF-var,R2s,AI-R2s,
                 % AI-R2s-var,AI-FM,ECH-1,ECH-2 - YOU CAN CHANGE THIS
 location = uigetdir();
 location = [location,'/'];
@@ -67,10 +67,11 @@ figure(1)
 imshow(im_slice,val_range)
 roi =drawcircle('InteractionsAllowed','translate','LineWidth',1,...
                 'Center',[132,232],'Radius',sqrt(200/pi));
+% roi-Center
 %% THIRD BLOCK: RUN TO REPEAT ROI MEASUREMENTS
 clc
 mask = createMask(roi);
-if strcmp(sel_map,'PDFF')
+if strcmp(sel_map,'PDFF') || strcmp(sel_map,'AI-PDFF')
     ROI_val = median(im_slice(mask));
 else
     ROI_val = mean(im_slice(mask));
@@ -81,10 +82,31 @@ roi.LabelAlpha = 0;
 roi.LabelVisible = "hover";
 roi.LabelTextColor = "white";
 AREA = pi*roi.Radius^2 *1e-2; % considering that voxel size = 1mm x 1mm
-fprintf('  METRICS:\n')
-fprintf('    ROI val = %3.1f\n',ROI_val)
-fprintf('    ROI sd  = %3.1f\n',ROI_std)
-fprintf('    ROI area [cm^2] = %3.1f\n',AREA)
+fprintf('  ROI METRICS:\n')
+fprintf('    Val = %3.1f\n',ROI_val)
+fprintf('    SD  = %3.1f\n',ROI_std)
+fprintf('    Area [cm^2] = %3.1f\n',AREA)
+if contains(sel_map,'AI')
+    PDFF_slice = F(:,:,num_slice); PDFF = median(PDFF_slice(mask));
+    PDFFv_slice= F_var(:,:,num_slice); PDFFv = mean(PDFFv_slice(mask));
+    R2_slice = R2(:,:,num_slice); R2 = mean(R2_slice(mask));
+    R2v_slice = R2_var(:,:,num_slice); R2v = mean(R2v_slice(mask));
+    FM_slice = P(:,:,num_slice); FM = mean(FM_slice(mask));
+    fprintf('  Q-Maps at ROI:\n')
+    fprintf('    PDFF = %3.1f\n',PDFF)
+    fprintf('    PDFF var = %3.1f\n',PDFFv)
+    fprintf('    R2* = %3.1f\n',R2)
+    fprintf('    R2* var = %3.1f\n',R2v)
+    fprintf('    FM = %3.1f\n',FM)
+elseif not(contains(sel_map,'ECH'))
+    PDFF_slice = F(:,:,num_slice); PDFF = median(PDFF_slice(mask));
+    R2_slice = R2(:,:,num_slice); R2 = mean(R2_slice(mask));
+    FM_slice = P(:,:,num_slice); FM = mean(FM_slice(mask));
+    fprintf('  Q-Maps at ROI:\n')
+    fprintf('    PDFF = %3.1f\n',PDFF)
+    fprintf('    R2* = %3.1f\n',R2)
+    fprintf('    FM = %3.1f\n',FM)
+end
 %% FOURTH BLOCK: SHOW ALL SLICES
 figure(2)
 imshow3D(outmap,val_range)
