@@ -67,7 +67,7 @@ figure(1)
 imshow(im_slice,val_range)
 roi =drawcircle('InteractionsAllowed','translate','LineWidth',1,...
                 'Center',[132,232],'Radius',sqrt(200/pi));
-% roi-Center
+% roi.Center
 %% THIRD BLOCK: RUN TO REPEAT ROI MEASUREMENTS
 clc
 mask = createMask(roi);
@@ -92,12 +92,14 @@ if contains(sel_map,'AI')
     R2_slice = R2(:,:,num_slice); R2 = mean(R2_slice(mask));
     R2v_slice = R2_var(:,:,num_slice); R2v = mean(R2v_slice(mask));
     FM_slice = P(:,:,num_slice); FM = mean(FM_slice(mask));
+    FMv_slice = P_var(:,:,num_slice); FMv = mean(FMv_slice(mask));
     fprintf('  Q-Maps at ROI:\n')
     fprintf('    PDFF = %3.1f\n',PDFF)
     fprintf('    PDFF var = %3.1f\n',PDFFv)
     fprintf('    R2* = %3.1f\n',R2)
     fprintf('    R2* var = %3.1f\n',R2v)
     fprintf('    FM = %3.1f\n',FM)
+    fprintf('    FM var = %3.1f\n',FMv)
 elseif not(contains(sel_map,'ECH'))
     PDFF_slice = F(:,:,num_slice); PDFF = median(PDFF_slice(mask));
     R2_slice = R2(:,:,num_slice); R2 = mean(R2_slice(mask));
