@@ -602,10 +602,10 @@ def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
 
     # Matrix operations (variance)
     WpP0Wm = Wp * tf.linalg.matmul(P0, Wm) # (nb,ne,nv)
-    s_var = tf.reduce_mean(tf.abs(tf.math.conj(WpP0Wm) * WpP0Wm),axis=1,keepdims=True) # (nb,1,nv)
+    s_var = tf.abs(tf.math.conj(WpP0Wm) * WpP0Wm) # (nb,ne,nv)
     y_Sigma = Wm_var * s_var 
-    y_Sigma += Wm_var * tf.reduce_sum(tf.abs(tf.math.conj(Smtx) * Smtx),axis=1,keepdims=True)
-    y_Sigma += tf.abs(tf.math.conj(Wm) * Wm) * s_var
+    y_Sigma += Wm_var * tf.abs(tf.math.conj(Smtx) * Smtx)
+    # y_Sigma += tf.abs(tf.math.conj(Wm) * Wm) * s_var
     y_Sigma_inv = tf.math.divide_no_nan(tf.ones_like(y_Sigma),y_Sigma) # (nb,ne,nv)
     y_Sigma_inv = tf.linalg.diag(tf.transpose(y_Sigma_inv,perm=[2,0,1])) # (nv,nb,ne,ne)
     SigM = tf.linalg.matmul(tf.complex(y_Sigma_inv,0.0),M) # (nv,nb,ne,ns)
