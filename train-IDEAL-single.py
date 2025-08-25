@@ -166,7 +166,7 @@ def train_G(A, B, te=None):
         G_loss += FM_TV * args.FM_TV_weight + FM_L1 * args.FM_L1_weight
 
         BP_dy, BP_dx = tf.image.image_gradients(A2B[:,1,:,:,-1:])
-        BP_dx_sign = tf.math.sign(BP_dx)
+        BP_dx_sign = tf.where(tf.abs(BP_dx) <= 5e-3, tf.math.sign(BP_dx), -1e8)
         BP_GR = tf.reduce_sum(tf.abs(BP_dy) - BP_dx_sign)
         BP_GR += tf.reduce_sum(tf.abs(A2B[:,1,:,(wdt//4):(wdt//2),-1:] + A2B[:,1,:,-(wdt//4+1):-(wdt//2+1):-1,-1:]))
         G_loss += BP_GR * args.BP_GR_weight 
