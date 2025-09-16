@@ -24,6 +24,7 @@ py.arg('--dataset', default='WF-IDEAL')
 py.arg('--train_data', default='HDF5', choices=['HDF5','DICOM'])
 py.arg('--dataset_dir', default='../datasets/')
 py.arg('--rand_ne', type=bool, default=False)
+py.arg('--field', type=float, default=1.5)
 py.arg('--out_vars', default='FM', choices=['R2s','FM','PM'])
 py.arg('--UQ', type=bool, default=False)
 py.arg('--UQ_R2s', type=bool, default=False)
@@ -199,15 +200,16 @@ def train_G(A, B):
 
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
         if args.remove_ech1:
-            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM)
+            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM, field=args.field)
         else:
-            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM, field=args.field)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B2A = tf.where(A[:,:A2B2A.shape[1],...]!=0.0,A2B2A,0.0)
 
         # Stddev map mask and attach to recon-A
         if args.UQ:
-            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A2B2A.shape[1], rem_R2=(args.out_vars=='FM'))
+            A2B2A_var =  wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A2B2A.shape[1],
+                                            field=args.field, rem_R2=(args.out_vars=='FM'))
             A2B2A_sampled_var = tf.concat([A2B2A, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,4]
 
         ############ Cycle-Consistency Losses #############
@@ -263,12 +265,13 @@ def train_G_R2(A, B):
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
 
         # Magnitude of water/fat images
-        A2B_WF, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, only_mag=True)
+        A2B_WF, A2B2A_abs = wf.acq_to_acq(A, A2B_PM, field=args.field, only_mag=True)
         A2B2A_abs = tf.where(A[...,:1]!=0.0,A2B2A_abs,0.0)
         
         # Variance map mask and attach to recon-A
         if args.UQ:
-            A2B2A_var = wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A.shape[1], rem_R2=not(args.UQ_R2s), only_mag=True)
+            A2B2A_var =  wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A.shape[1],
+                                            field=args.field, rem_R2=not(args.UQ_R2s), only_mag=True)
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
@@ -342,9 +345,9 @@ def sample(A, B):
         A2B_R2 = tf.zeros_like(A2B_FM)
         A2B_PM = tf.concat([A2B_FM,A2B_R2], axis=-1)
         if args.remove_ech1:
-            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM)
+            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM, field=args.field)
         else:
-            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM, field=args.field)
         A2B = tf.concat([A2B_WF, A2B_PM],axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
         A2B2A = tf.where(A[:,:A2B2A.shape[1],...]!=0.0,A2B2A,0.0)
@@ -363,9 +366,9 @@ def sample(A, B):
 
         # Magnitude of water/fat images
         if args.remove_ech1:
-            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM)
+            A2B_WF, A2B2A = wf.acq_to_acq(A[:,1:,...], A2B_PM, field=args.field)
         else:
-            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM)
+            A2B_WF, A2B2A = wf.acq_to_acq(A, A2B_PM, field=args.field)
         A2B = tf.concat([A2B_WF,A2B_PM], axis=1)
         A2B = tf.where(A[:,:3,...]!=0,A2B,0.0)
         A2B2A = tf.where(A[:,:A2B2A.shape[1],...]!=0.0,A2B2A,0.0)

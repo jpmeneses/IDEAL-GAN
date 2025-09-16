@@ -77,15 +77,18 @@ def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False, get_H=False):
         return M
 
 
-def acq_to_acq(acqs, param_maps, te=None, only_mag=False):
+def acq_to_acq(acqs, param_maps, te=None, field=1.5, only_mag=False):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
-        te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
+        if field == 1.5:
+            te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
+        elif field == 3.0:
+            te = gen_TEvar(ne, bs=n_batch, TE_ini_min=0.879e-3, TE_ini_d=None, d_TE_min=0.6623e-3, d_TE_d=None) 
 
     te_complex = tf.complex(0.0,te) # (nb,ne,1)
 
-    M, M_pinv = gen_M(te) # M shape: (nb,ne,ns)
+    M, M_pinv = gen_M(te, field=field) # M shape: (nb,ne,ns)
 
     # Generate complex signal
     S = tf.complex(acqs[:,:,:,:,0],acqs[:,:,:,:,1]) # (nb,ne,hgt,wdt)
@@ -630,14 +633,17 @@ def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
 
 
 #@tf.function
-def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, rem_R2=False, only_mag=False):
+def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, field=1.5, rem_R2=False, only_mag=False):
     n_batch,_,hgt,wdt,n_ch = rho_maps.shape
 
     if te is None:
-        te = gen_TEvar(ne+1, bs=n_batch, orig=True) # (nb,ne,1)
-        te = te[:,1:,:]
+        if field == 1.5:
+            te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
+        elif field == 3.0:
+            te = gen_TEvar(ne, bs=n_batch, TE_ini_min=0.879e-3, TE_ini_d=None, d_TE_min=0.6623e-3, d_TE_d=None) 
+        # te = te[:,1:,:]
 
-    M = gen_M(te, get_Mpinv=False)
+    M = gen_M(te, field=field, get_Mpinv=False)
 
     # Generate complex water/fat signals
     real_rho = rho_maps[:,:2,:,:,0]
