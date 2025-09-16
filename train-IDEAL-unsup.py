@@ -134,6 +134,7 @@ elif args.train_data == 'DICOM':
     A_dataset = A_dataset.map(lambda f: data.tf_load_dicom_series(f))
     A_dataset = A_dataset.unbatch()
     A_dataset = A_dataset.batch(args.batch_size).shuffle(num_fold*20)
+    len_dataset = sum(1 for _ in A_dataset)
 
     A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//5)])
     A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
