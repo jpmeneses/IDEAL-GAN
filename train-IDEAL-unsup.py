@@ -20,6 +20,8 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
+py.arg('--train_data', default='HDF5', choices=['HDF5','DICOM'])
+py.arg('--args.dataset_dir', default='../datasets/')
 py.arg('--rand_ne', type=bool, default=False)
 py.arg('--out_vars', default='FM', choices=['R2s','FM','PM'])
 py.arg('--UQ', type=bool, default=False)
@@ -62,63 +64,80 @@ r2_sc = 200.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../datasets/'
-dataset_hdf5_1 = 'JGalgani_GC_384_complex_2D.hdf5'
-acqs_1, out_maps_1 = data.load_hdf5(dataset_dir, dataset_hdf5_1, end=100,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+if args.train_data == 'HDF5':
+    dataset_hdf5_1 = 'JGalgani_GC_384_complex_2D.hdf5'
+    acqs_1, out_maps_1 = data.load_hdf5(args.dataset_dir, dataset_hdf5_1, end=100,
+                                acqs_data=True, te_data=False, MEBCRN=True)
 
-dataset_hdf5_2 = 'INTA_GC_384_complex_2D.hdf5'
-acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+    dataset_hdf5_2 = 'INTA_GC_384_complex_2D.hdf5'
+    acqs_2, out_maps_2 = data.load_hdf5(args.dataset_dir,dataset_hdf5_2,
+                                acqs_data=True, te_data=False, MEBCRN=True)
 
-dataset_hdf5_3 = 'INTArest_GC_384_complex_2D.hdf5'
-acqs_3, out_maps_3 = data.load_hdf5(dataset_dir,dataset_hdf5_3,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+    dataset_hdf5_3 = 'INTArest_GC_384_complex_2D.hdf5'
+    acqs_3, out_maps_3 = data.load_hdf5(args.dataset_dir,dataset_hdf5_3,
+                                acqs_data=True, te_data=False, MEBCRN=True)
 
-dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
-acqs_4, out_maps_4 = data.load_hdf5(dataset_dir,dataset_hdf5_4,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+    dataset_hdf5_4 = 'Volunteers_GC_384_complex_2D.hdf5'
+    acqs_4, out_maps_4 = data.load_hdf5(args.dataset_dir,dataset_hdf5_4,
+                                acqs_data=True, te_data=False, MEBCRN=True)
 
-dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
-acqs_5, out_maps_5 = data.load_hdf5(dataset_dir,dataset_hdf5_5,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+    dataset_hdf5_5 = 'Attilio_GC_384_complex_2D.hdf5'
+    acqs_5, out_maps_5 = data.load_hdf5(args.dataset_dir,dataset_hdf5_5,
+                                acqs_data=True, te_data=False, MEBCRN=True)
 
-################################################################################
-########################### DATASET PARTITIONS #################################
-################################################################################
+    trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+    trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
+    k_divs = [0,832,1694,2547,3409,len(trainX)]
 
-trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
-trainY = np.concatenate((out_maps_1,out_maps_2,out_maps_3,out_maps_4,out_maps_5),axis=0)
-k_divs = [0,832,1694,2547,3409,len(trainX)]
+    if args.UQ_calib:
+        calib_divs = [404,1236,2100,2952,3814]
+        valX = trainX[calib_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+        valY = trainY[calib_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+        trainX = trainX[k_divs[args.k_fold-1]:calib_divs[args.k_fold-1],:,:,:,:]
+        trainY = trainY[k_divs[args.k_fold-1]:calib_divs[args.k_fold-1],:,:,:,:]
+    else:
+        valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+        valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
+        trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+        trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
 
-if args.UQ_calib:
-    calib_divs = [404,1236,2100,2952,3814]
-    valX = trainX[calib_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
-    valY = trainY[calib_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
-    trainX = trainX[k_divs[args.k_fold-1]:calib_divs[args.k_fold-1],:,:,:,:]
-    trainY = trainY[k_divs[args.k_fold-1]:calib_divs[args.k_fold-1],:,:,:,:]
-else:
-    valX = trainX[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
-    valY = trainY[k_divs[args.k_fold-1]:k_divs[args.k_fold],:,:,:,:]
-    trainX = np.delete(trainX,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
-    trainY = np.delete(trainY,np.s_[k_divs[args.k_fold-1]:k_divs[args.k_fold]],0)
+    # Overall dataset statistics
+    len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
+    _,n_out,_,_,_ = np.shape(valY)
 
-# Overall dataset statistics
-len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
-_,n_out,_,_,_ = np.shape(valY)
+    print('Acquisition Dimensions:', hgt,wdt)
+    print('Echoes:', ne)
+    print('Output Maps:', n_out)
 
-print('Acquisition Dimensions:', hgt,wdt)
-print('Echoes:', ne)
-print('Output Maps:', n_out)
+    # Input and output dimensions (validations data)
+    print('Training output shape:', trainY.shape)
+    print('Validation output shape:', valY.shape)
 
-# Input and output dimensions (validations data)
-print('Training output shape:', trainY.shape)
-print('Validation output shape:', valY.shape)
+    A_dataset = tf.data.Dataset.from_tensor_slices(trainX)
+    A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
+    A_dataset_val = tf.data.Dataset.from_tensor_slices(valX)
+    A_dataset_val.batch(1)
 
-A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX,trainY))
-A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
-A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX,valY))
-A_B_dataset_val.batch(1)
+elif args.train_data == 'DICOM':
+    folders = [os.path.join(args.dataset_dir, d) for d in os.listdir(args.dataset_dir) if os.path.isdir(os.path.join(args.dataset_dir, d))]
+    folders_mr = [os.path.join(f, os.listdir(f)[0]) for i, f in enumerate(folders) if os.path.join(f, os.listdir(f)[0])]
+    folders_cse = list()
+    for f in folders_mr:
+        scan_files = os.listdir(f)
+        cse_scan = [item for item in scan_files if "MECSE" in item]
+        folders_cse.append(os.path.join(f,cse_scan[0]))
+
+    num_fold = len(folders_cse)
+
+    A_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//5):])
+    A_dataset = A_dataset.map(lambda f: data.tf_load_dicom_series(f))
+    A_dataset = A_dataset.unbatch()
+    A_dataset = A_dataset.batch(args.batch_size).shuffle(num_fold*20)
+
+    A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//5)])
+    A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
+    A_dataset_val = A_dataset_val.unbatch()
+    A_dataset_val = A_dataset_val.batch(1)
 
 # ==============================================================================
 # =                                   models                                   =
@@ -199,9 +218,14 @@ def train_G(A, B):
                 A2B2A_cycle_loss = cycle_loss_fn(A, A2B2A)
 
         ########### Splitted R2s and FM Losses ############
-        WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
-        R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
-        FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
+        if B is not None:
+            WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
+            R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
+            FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
+        else:
+            WF_loss = tf.constant(0.0)
+            R2_loss = tf.constant(0.0)
+            FM_loss = tf.constant(0.0)
 
         ################ Regularizers #####################
         FM_TV = tf.reduce_sum(tf.image.total_variation(A2B_FM[:,0,:,:,:]))
@@ -250,9 +274,14 @@ def train_G_R2(A, B):
             A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
 
         ########### Splitted R2s and FM Losses ############
-        WF_abs_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
-        R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
-        FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
+        if B is not None:
+            WF_abs_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
+            R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
+            FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
+        else:
+            WF_loss = tf.constant(0.0)
+            R2_loss = tf.constant(0.0)
+            FM_loss = tf.constant(0.0)
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2[:,0,:,:,:]))
@@ -276,7 +305,7 @@ def train_G_R2(A, B):
             'L1_R2': R2_L1}
 
 
-def train_step(A, B):
+def train_step(A, B=None):
     if args.out_vars == 'R2s':
         G_loss_dict  = {'A2B2A_cycle_loss': tf.constant(0.0),
                         'WF_loss': tf.constant(0.0),
@@ -341,9 +370,14 @@ def sample(A, B):
         A2B_PM_var = tf.where(A[:,:1,...]!=0.0,A2B_PM_var,0.0) * (fm_sc**2)
 
     ########### Splitted R2s and FM Losses ############
-    WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
-    R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
-    FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
+    if B is not None:
+        WF_loss = cycle_loss_fn(B[:,:2,:,:,:], A2B_WF)
+        R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
+        FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
+    else:
+        WF_loss = tf.constant(0.0)
+        R2_loss = tf.constant(0.0)
+        FM_loss = tf.constant(0.0)
 
     if args.out_vars == 'FM':
         val_A2B2A_R2_loss = 0
@@ -370,7 +404,7 @@ def sample(A, B):
 
     return A2B, A2B_PM_var, val_FM_dict, val_R2_dict
 
-def validation_step(A, B):
+def validation_step(A, B=None):
     A2B, A2B_var, val_FM_dict, val_R2_dict = sample(A, B)
     return A2B, A2B_var, val_FM_dict, val_R2_dict
 
@@ -402,7 +436,7 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'validation'))
 
 # sample
-val_iter = cycle(A_B_dataset_val)
+val_iter = cycle(A_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
 n_div = np.ceil(total_steps/len(valY))
@@ -416,7 +450,7 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for A, B in A_B_dataset:
+    for A in A_dataset:
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
@@ -424,22 +458,13 @@ for ep in range(args.epochs):
         if p <= args.data_aug_p:
             aux_ne = A.shape[1]
             A = tf.reshape(tf.transpose(A,perm=[0,2,3,1,4]),[A.shape[0],hgt,wdt,aux_ne*n_ch])
-            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
-
             # Random 90 deg rotations
             A = tf.image.rot90(A,k=np.random.randint(3))
-            B = tf.image.rot90(B,k=np.random.randint(3))
-
             # Random horizontal reflections
             A = tf.image.random_flip_left_right(A)
-            B = tf.image.random_flip_left_right(B)
-
             # Random vertical reflections
             A = tf.image.random_flip_up_down(A)
-            B = tf.image.random_flip_up_down(B)
-
             A = tf.transpose(tf.reshape(A,[A.shape[0],hgt,wdt,aux_ne,n_ch]),[0,3,1,2,4])
-            B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
         # ==============================================================================
 
         # ==============================================================================
@@ -451,7 +476,7 @@ for ep in range(args.epochs):
         else:
             ne_sel = A.shape[1]
 
-        G_loss_dict, G_R2_loss_dict = train_step(A, B)
+        G_loss_dict, G_R2_loss_dict = train_step(A)
 
         if args.UQ_calib:
             opt_aux = G_calib_optimizer.iterations
@@ -469,9 +494,8 @@ for ep in range(args.epochs):
 
         # sample
         if (opt_aux.numpy() % n_div == 0) or (opt_aux.numpy() < 200//args.batch_size):
-            A, B = next(val_iter)
+            A = next(val_iter)
             A = tf.expand_dims(A,axis=0)
-            B = tf.expand_dims(B,axis=0)
             A = A[:,:ne_sel,:,:,:]
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=False))
             A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A, B)
@@ -482,7 +506,7 @@ for ep in range(args.epochs):
                 tl.summary(val_R2_dict, step=opt_aux, name='G_R2_losses')
 
             if (opt_aux.numpy() % (n_div*10) == 0) or (opt_aux.numpy() < 100):
-                fig, axs = plt.subplots(figsize=(20, 9), nrows=3, ncols=6)
+                fig, axs = plt.subplots(figsize=(20, 6), nrows=2, ncols=6)
 
                 # Magnitude of recon MR images at each echo
                 im_ech1 = np.squeeze(A_abs[:,0,:,:])
@@ -578,32 +602,32 @@ for ep in range(args.epochs):
                 axs[1,2].axis('off')
 
                 # Ground-truth in the third row
-                wn_aux = np.squeeze(tf.math.sqrt(tf.reduce_sum(tf.square(B[:,0,:,:,:]),axis=-1,keepdims=False)))
-                W_unet = axs[2,0].imshow(wn_aux, cmap='bone',
-                                    interpolation='none', vmin=0, vmax=1)
-                fig.colorbar(W_unet, ax=axs[2,0])
-                axs[2,0].axis('off')
+                # wn_aux = np.squeeze(tf.math.sqrt(tf.reduce_sum(tf.square(B[:,0,:,:,:]),axis=-1,keepdims=False)))
+                # W_unet = axs[2,0].imshow(wn_aux, cmap='bone',
+                #                     interpolation='none', vmin=0, vmax=1)
+                # fig.colorbar(W_unet, ax=axs[2,0])
+                # axs[2,0].axis('off')
 
-                fn_aux = np.squeeze(tf.math.sqrt(tf.reduce_sum(tf.square(B[:,1,:,:,:]),axis=-1,keepdims=False)))
-                F_unet = axs[2,1].imshow(fn_aux, cmap='pink',
-                                    interpolation='none', vmin=0, vmax=1)
-                fig.colorbar(F_unet, ax=axs[2,1])
-                axs[2,1].axis('off')
+                # fn_aux = np.squeeze(tf.math.sqrt(tf.reduce_sum(tf.square(B[:,1,:,:,:]),axis=-1,keepdims=False)))
+                # F_unet = axs[2,1].imshow(fn_aux, cmap='pink',
+                #                     interpolation='none', vmin=0, vmax=1)
+                # fig.colorbar(F_unet, ax=axs[2,1])
+                # axs[2,1].axis('off')
 
-                r2n_aux = np.squeeze(B[:,2,:,:,1])
-                r2_unet = axs[2,2].imshow(r2n_aux*r2_sc, cmap='copper',
-                                     interpolation='none', vmin=0, vmax=r2_sc)
-                fig.colorbar(r2_unet, ax=axs[2,2])
-                axs[2,2].axis('off')
+                # r2n_aux = np.squeeze(B[:,2,:,:,1])
+                # r2_unet = axs[2,2].imshow(r2n_aux*r2_sc, cmap='copper',
+                #                      interpolation='none', vmin=0, vmax=r2_sc)
+                # fig.colorbar(r2_unet, ax=axs[2,2])
+                # axs[2,2].axis('off')
 
-                fieldn_aux = np.squeeze(B[:,2,:,:,0])
-                field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-                fig.colorbar(field_unet, ax=axs[2,4])
-                axs[2,4].axis('off')
+                # fieldn_aux = np.squeeze(B[:,2,:,:,0])
+                # field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                #                         interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+                # fig.colorbar(field_unet, ax=axs[2,4])
+                # axs[2,4].axis('off')
 
-                fig.delaxes(axs[2,3])
-                fig.delaxes(axs[2,5])
+                # fig.delaxes(axs[2,3])
+                # fig.delaxes(axs[2,5])
 
                 if args.out_vars == 'R2s':
                     fig.suptitle('A2B Error: '+str(val_R2_dict['WF_loss']), fontsize=16)
