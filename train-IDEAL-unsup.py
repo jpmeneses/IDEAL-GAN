@@ -135,7 +135,7 @@ elif args.train_data == 'DICOM':
     A_dataset = A_dataset.unbatch()
 
     len_dataset = sum(1 for _ in A_dataset)
-    for a in dataset.take(1):
+    for a in A_dataset.take(1):
         _,ne,hgt,wdt,n_ch = a.shape
     A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 
