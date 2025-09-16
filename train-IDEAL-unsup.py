@@ -28,7 +28,6 @@ py.arg('--out_vars', default='FM', choices=['R2s','FM','PM'])
 py.arg('--UQ', type=bool, default=False)
 py.arg('--UQ_R2s', type=bool, default=False)
 py.arg('--UQ_calib', type=bool, default=False)
-py.arg('--ME_layer', type=bool, default=True)
 py.arg('--remove_ech1', type=bool, default=False)
 py.arg('--k_fold', type=int, default=1)
 py.arg('--n_G_filters', type=int, default=32)
@@ -153,12 +152,12 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 G_A2B = dl.UNet(input_shape=(None,hgt,wdt,n_ch),
                 bayesian=args.UQ,
-                ME_layer=args.ME_layer,
+                ME_layer=True,
                 filters=args.n_G_filters,
                 self_attention=args.D1_SelfAttention)
 G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
                 bayesian=args.UQ_R2s,
-                ME_layer=args.ME_layer,
+                ME_layer=True,
                 filters=args.n_G_filters,
                 output_activation='sigmoid',
                 output_initializer='he_uniform',
@@ -501,8 +500,9 @@ for ep in range(args.epochs):
         # sample
         if (opt_aux.numpy() % n_div == 0) or (opt_aux.numpy() < 200//args.batch_size):
             A = next(val_iter)
-            A = tf.expand_dims(A,axis=0)
-            A = A[:,:ne_sel,:,:,:]
+            if len(A.shape) < 5:
+                A = tf.expand_dims(A,axis=0)
+            A = A[:,:ne_sel,...]
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=False))
             A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A)
 
