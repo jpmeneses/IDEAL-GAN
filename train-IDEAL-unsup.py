@@ -21,7 +21,7 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--train_data', default='HDF5', choices=['HDF5','DICOM'])
-py.arg('--args.dataset_dir', default='../datasets/')
+py.arg('--dataset_dir', default='../datasets/')
 py.arg('--rand_ne', type=bool, default=False)
 py.arg('--out_vars', default='FM', choices=['R2s','FM','PM'])
 py.arg('--UQ', type=bool, default=False)
