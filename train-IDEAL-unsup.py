@@ -104,7 +104,7 @@ if args.train_data == 'HDF5':
 
     # Overall dataset statistics
     len_dataset,ne,hgt,wdt,n_ch = np.shape(trainX)
-    _,n_out,_,_,_ = np.shape(valY)
+    len_val,n_out,_,_,_ = np.shape(valY)
 
     print('Acquisition Dimensions:', hgt,wdt)
     print('Echoes:', ne)
@@ -142,6 +142,7 @@ elif args.train_data == 'DICOM':
     A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//5)])
     A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
     A_dataset_val = A_dataset_val.unbatch()
+    len_val = sum(1 for _ in A_dataset_val)
     A_dataset_val = A_dataset_val.batch(1)
 
 # ==============================================================================
@@ -444,7 +445,7 @@ val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summarie
 val_iter = cycle(A_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(valY))
+n_div = np.ceil(total_steps/len_val)
 
 # main loop
 for ep in range(args.epochs):
