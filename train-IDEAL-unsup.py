@@ -136,7 +136,7 @@ elif args.train_data == 'DICOM':
 
     len_dataset = sum(1 for _ in A_dataset)
     for a in A_dataset.take(1):
-        _,ne,hgt,wdt,n_ch = a.shape
+        ne,hgt,wdt,n_ch = a.shape
     A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 
     A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//5)])
