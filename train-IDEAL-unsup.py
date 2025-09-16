@@ -504,7 +504,7 @@ for ep in range(args.epochs):
             A = tf.expand_dims(A,axis=0)
             A = A[:,:ne_sel,:,:,:]
             A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=False))
-            A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A, B)
+            A2B, A2B_var, val_FM_dict, val_R2_dict = validation_step(A)
 
             # # summary
             with val_summary_writer.as_default():
