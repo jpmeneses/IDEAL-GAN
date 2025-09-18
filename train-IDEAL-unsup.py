@@ -119,19 +119,25 @@ if args.train_data == 'HDF5':
     A_dataset_val = tf.data.Dataset.from_tensor_slices(valX)
     A_dataset_val.batch(1)
 
-elif args.train_data == 'DICOM':
+else:
     folders = [os.path.join(args.dataset_dir, d) for d in os.listdir(args.dataset_dir) if os.path.isdir(os.path.join(args.dataset_dir, d))]
     folders_mr = [os.path.join(f, os.listdir(f)[0]) for i, f in enumerate(folders) if os.path.join(f, os.listdir(f)[0])]
     folders_cse = list()
     for f in folders_mr:
         scan_files = os.listdir(f)
-        cse_scan = [item for item in scan_files if "MECSE" in item]
+        if args.train_data == 'DICOM'
+            cse_scan = [item for item in scan_files if "MECSE" in item]
+        elif args.train_data == 'NIFTI'
+            cse_scan = [item for item in scan_files if "nifti" in item]
         folders_cse.append(os.path.join(f,cse_scan[0]))
 
     num_fold = len(folders_cse)
 
-    A_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//5):])
-    A_dataset = A_dataset.map(lambda f: data.tf_load_dicom_series(f))
+    A_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//2):])
+    if args.train_data == 'DICOM':
+        A_dataset = A_dataset.map(lambda f: data.tf_load_dicom_series(f))
+    elif args.train_data == 'NIFTI':
+        A_dataset = A_dataset.map(lambda f: data.tf_load_nifti_series(f))
     A_dataset = A_dataset.unbatch()
 
     len_dataset = sum(1 for _ in A_dataset)
@@ -139,11 +145,15 @@ elif args.train_data == 'DICOM':
         ne,hgt,wdt,n_ch = a.shape
     A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 
-    A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//5)])
-    A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
+    A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//2)])
+    if args.train_data == 'DICOM':
+        A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
+    elif args.train_data == 'nifti':
+        A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_nifti_series(f))
     A_dataset_val = A_dataset_val.unbatch()
     len_val = sum(1 for _ in A_dataset_val)
     A_dataset_val = A_dataset_val.batch(1)
+
 
 # ==============================================================================
 # =                                   models                                   =

@@ -496,3 +496,109 @@ def tf_load_dicom_series(folder_path):
     )
     
     return data
+
+
+def load_nifti_series(folder_path):
+    dicom_files = sorted([os.path.join(folder_path, f) for f in os.listdir(folder_path)
+                          if f.endswith(".nii.gz")])
+    avoid_comps = ['imaginary','real','Eq']
+    dicom_files = sorted([f for f in dicom_files if not any(char in f for char in avoid_comps)])
+    # print(dicom_files)
+
+    nifti_file = dicom_files[0]
+    fn_noEch = nifti_file.split("_e")[0]
+
+    # Load NIfTI image
+    img = nib.load(nifti_file)
+    data = img.get_fdata(dtype=np.float32)  # shape: (X, Y, Z, echoes?) or (X, Y, Z)
+    
+    # Load JSON sidecar (contains echo times, etc.)
+    json_file = nifti_file.replace(".nii.gz", ".json")
+    metadata = {}
+    if os.path.exists(json_file):
+        with open(json_file, "r") as f:
+            metadata = json.load(f)
+
+    # Define useful parameters
+    ne = metadata["EchoTrainLength"]
+
+    # Generate multi-echo volume to be filled
+    V_shape = list(data.shape)
+    V_shape.insert(2, ne)
+    V = np.zeros(V_shape+[2], dtype=np.float32)
+    TE = np.zeros((V_shape[-1],ne), dtype=np.float32)
+    V_mag_all = np.zeros(V_shape, dtype=np.float32)
+
+    for ech in range(ne):
+        # Magnitude file processing
+        nifti_file_mag = fn_noEch + '_e' + str(ech+1) + '.nii.gz'
+        img_mag = nib.load(nifti_file_mag)
+        V_mag = img_mag.get_fdata(dtype=np.float32)
+
+        json_file_mag = nifti_file_mag.replace(".nii.gz", ".json")
+        metadata_mag = {}
+        if os.path.exists(json_file_mag):
+            with open(json_file_mag, "r") as f:
+                metadata_mag = json.load(f)
+
+        V_mag_resc = np.array(V_mag) # / float(metadata_mag["PhilipsScaleSlope"]);
+        if ech == 0:
+            V_sc = np.max(V_mag_resc)
+
+        # Phase file processing
+        nifti_file_ph = fn_noEch + '_e' + str(ech+1) + '_ph.nii.gz'
+        img_ph = nib.load(nifti_file_ph)
+        V_ph = img_ph.get_fdata(dtype=np.float32)
+
+        json_file_ph = nifti_file_ph.replace(".nii.gz", ".json")
+        metadata_ph = {}
+        if os.path.exists(json_file_ph):
+            with open(json_file_ph, "r") as f:
+                metadata_ph = json.load(f)
+
+        V_ph_resc = np.array(V_ph) # / float(metadata_ph["PhilipsScaleSlope"]);
+
+        # Combining into complex volume
+        if V_mag_resc.shape[2] == V_ph_resc.shape[2]:
+            V_ech = V_mag_resc * np.exp(1j*V_ph_resc) / V_sc;
+        else:
+            V_ech = np.zeros([V.shape[0],V.shape[1],V.shape[3]]);
+            print('\tMismatch between mag and phase at echo:',str(ech))
+
+        if V.shape[3] == V_ech.shape[2]:
+            V[:,:,ech,:,0] = np.real(V_ech);
+            V[:,:,ech,:,1] = np.imag(V_ech);
+            TE[:,ech] = float(metadata_mag["EchoTime"]);
+            V_mag_all[:,:,ech,:] = np.abs(V_ech)
+        else:
+            print('\tMismatch between complex array and 1st echo at echo',str(ech))
+
+    # Get mask from the mean of all-echoes magnitudes
+    V_mag_mean = np.mean(V_mag_all,axis=2,keepdims=True)
+    V_mag_mean = np.expand_dims(np.repeat(V_mag_mean,ne,axis=2),axis=-1)
+    V_mag_mean = np.repeat(V_mag_mean,2,axis=-1)
+    V = np.where(V_mag_mean >= 0.05, V, 0.0)
+    
+    # Rearrange to obtain the required dimensionality
+    V = np.transpose(V, axes=[3,2,1,0,4]) # (num_slices, num_echoes, H, W, 2)
+    V = np.flip(V,axis=2)
+
+    return V
+
+
+def tf_load_nifti_series(folder_path):
+    """
+    Wrap load_nifti_series in tf.py_function for use in tf.data.Dataset.
+    """
+    def _load(path):
+        path = path.numpy().decode("utf-8")
+        arr = load_nifti_series(path)
+        return arr
+
+    data = tf.py_function(
+        func=_load,
+        inp=[folder_path],
+        Tout=tf.float32
+    )
+    
+    return data
