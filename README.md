@@ -10,6 +10,9 @@
   <a href='https://link.springer.com/10.1007/s00330-024-11164-x' style='padding-left: 0.5rem;'>
     <img src='https://img.shields.io/badge/Media.Journal-2025.103503-red' alt='Media Journal'>
   </a>
+  <a href='https://doi.org/10.1016/j.media.2025.103811' style='padding-left: 0.5rem;'>
+    <img src='https://img.shields.io/badge/Media.Journal-2025.103503-red' alt='Media Journal'>
+  </a>
 </p>
 
 ## Intro
@@ -22,7 +25,7 @@ In this repository, several deep learning models for MRI water-fat separation, b
 	- ```train-IDEAL-TEaug.py```: Training of water-fat separation models considering Graph Cuts results as labels, as described in Meneses et al., 2023.
 	- ```train-IDEAL-TEaug.py```: Training of water-fat separation models using a physics-based data augmentation process, as described in Meneses et al., 2024.
 2. Unsupervised training:
-	- ```train-IDEAL-unsup.py```: Training of water-fat separation models using a purely physics-based loss; uncertainty awareness can also be enabled.
+	- ```train-IDEAL-unsup.py```: Training of water-fat separation models using a purely physics-based loss; uncertainty awareness can also be enabled, as described in Meneses et al., 2025.
 	- ```train-IDEAL-single.py```: Self-supervised model for water-fat separation on a single sample; the use of bipolar gradient-echo multi-echo MRI can also be enabled.
 3. Generative modeling:
 	- ```train-IDEAL-GAN.py```: Training of a Physics-based Variational Autoencoder (PI-VAE) to synthesize gradient-echo multi-echo MRI along with their respective quantitative maps.
