@@ -125,9 +125,9 @@ else:
     folders_cse = list()
     for f in folders_mr:
         scan_files = os.listdir(f)
-        if args.train_data == 'DICOM'
+        if args.train_data == 'DICOM':
             cse_scan = [item for item in scan_files if "MECSE" in item]
-        elif args.train_data == 'NIFTI'
+        elif args.train_data == 'NIFTI':
             cse_scan = [item for item in scan_files if "nifti" in item]
         folders_cse.append(os.path.join(f,cse_scan[0]))
 
