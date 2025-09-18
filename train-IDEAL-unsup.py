@@ -21,7 +21,7 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
-py.arg('--train_data', default='HDF5', choices=['HDF5','DICOM'])
+py.arg('--train_data', default='HDF5', choices=['HDF5','DICOM','NIFTI'])
 py.arg('--dataset_dir', default='../datasets/')
 py.arg('--rand_ne', type=bool, default=False)
 py.arg('--field', type=float, default=1.5)
