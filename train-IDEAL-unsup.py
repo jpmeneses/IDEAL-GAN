@@ -130,10 +130,9 @@ else:
         elif args.train_data == 'NIFTI':
             cse_scan = [item for item in scan_files if "nifti" in item]
         folders_cse.append(os.path.join(f,cse_scan[0]))
-
     num_fold = len(folders_cse)
 
-    A_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//2):])
+    A_dataset = tf.data.Dataset.from_tensor_slices(folders_cse)
     if args.train_data == 'DICOM':
         A_dataset = A_dataset.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
