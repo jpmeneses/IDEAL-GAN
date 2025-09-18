@@ -148,7 +148,7 @@ else:
     A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//2)])
     if args.train_data == 'DICOM':
         A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
-    elif args.train_data == 'nifti':
+    elif args.train_data == 'NIFTI':
         A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_nifti_series(f))
     A_dataset_val = A_dataset_val.unbatch()
     len_val = sum(1 for _ in A_dataset_val)
