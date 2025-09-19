@@ -585,7 +585,7 @@ def load_nifti_series(folder_path):
     V = np.transpose(V, axes=[3,2,1,0,4]) # (num_slices, num_echoes, H, W, 2)
     V = np.flip(V,axis=2)
 
-    return V
+    return V[:,::2,...]
 
 
 def tf_load_nifti_series(folder_path):
