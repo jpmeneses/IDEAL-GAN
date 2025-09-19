@@ -22,13 +22,11 @@ from itertools import cycle
 
 py.arg('--dataset', default='WF-IDEAL')
 py.arg('--data_size', type=int, default=192, choices=[192,384])
-py.arg('--DL_gen', type=bool, default=False)
-py.arg('--DL_partial_real', type=int, default=0, choices=[0,2,6,10])
-py.arg('--DL_filename', default='LDM_ds')
-py.arg('--sigma_noise', type=float, default=0.0)
+py.arg('--gen_data_aug', type=bool, default=False)
+py.arg('--gen_partial_real', type=int, default=0, choices=[0,2,6,10])
+py.arg('--gen_filename', default='LDM_ds')
 py.arg('--shuffle', type=bool, default=True)
 py.arg('--n_echoes', type=int, default=6)
-py.arg('--bip_grad', type=bool, default=False)
 py.arg('--field', type=float, default=1.5)
 py.arg('--G_model', default='multi-decod', choices=['multi-decod','U-Net','2U-Net'])
 py.arg('--out_vars', default='WF', choices=['WF','WFc','PM','WF-PM'])
@@ -41,14 +39,10 @@ py.arg('--epoch_ckpt', type=int, default=20)  # num. of epochs to save a checkpo
 py.arg('--lr', type=float, default=0.0002)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
-py.arg('--sel_weight', type=bool, default=False)
-py.arg('--sel_weight_pwr', type=float, default=1.0)
 py.arg('--FM_aug', type=bool, default=False)
 py.arg('--FM_mean', type=float, default=1.0)
 py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--FM_TV_weight', type=float, default=0.0)
-py.arg('--R2_L1_weight', type=float, default=0.0)
-py.arg('--FM_L1_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 py.arg('--D2_SelfAttention',type=bool, default=True)
 py.arg('--D3_SelfAttention',type=bool, default=True)
@@ -353,9 +347,7 @@ def train_G(B, te=None):
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_R2)) * args.R2_TV_weight
         FM_TV = tf.reduce_sum(tf.image.total_variation(B2A2B_FM)) * args.FM_TV_weight
-        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_R2),axis=(1,2,3))) * args.R2_L1_weight
-        FM_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_FM),axis=(1,2,3))) * args.FM_L1_weight
-        reg_term = R2_TV + FM_TV + R2_L1 + FM_L1
+        reg_term = R2_TV + FM_TV
         
         G_loss = sup_loss + reg_term
         
@@ -367,9 +359,7 @@ def train_G(B, te=None):
             'R2_loss': R2_loss,
             'FM_loss': FM_loss,
             'TV_R2': R2_TV,
-            'TV_FM': FM_TV,
-            'L1_R2': R2_L1,
-            'L1_FM': FM_L1}
+            'TV_FM': FM_TV}
 
 @tf.function
 def train_G_R2(B, te=None):
@@ -419,8 +409,7 @@ def train_G_R2(B, te=None):
 
         ################ Regularizers #####################
         R2_TV = tf.reduce_sum(tf.image.total_variation(tf.squeeze(B2A2B_R2[:,:1,...],axis=1))) * args.R2_TV_weight
-        R2_L1 = tf.reduce_sum(tf.reduce_mean(tf.abs(B2A2B_R2[:,:1,...]),axis=(1,2,3,4))) * args.R2_L1_weight
-        reg_term = R2_TV + R2_L1
+        reg_term = R2_TV
         
         G_loss = R2_loss + reg_term
         
@@ -428,8 +417,7 @@ def train_G_R2(B, te=None):
     G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
 
     return {'R2_loss': R2_loss,
-            'TV_R2': R2_TV,
-            'L1_R2': R2_L1}
+            'TV_R2': R2_TV}
 
 
 
