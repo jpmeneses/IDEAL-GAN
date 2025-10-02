@@ -8,6 +8,85 @@ from DLlib import bn, complex_utils
 from DLlib.attention import SelfAttention, AdaIN
 
 # ==============================================================================
+# =                       Rician distribution TFP layer                        =
+# ==============================================================================
+
+tfd = tfp.distributions
+tfb = tfp.bijectors
+
+class Rician(tfd.Distribution):
+    def __init__(self, nu, sigma, validate_args=False, allow_nan_stats=True, name="Rician"):
+        parameters = dict(locals())
+        with tf.name_scope(name) as name:
+            self._nu = nu
+            self._sigma = sigma
+            super(Rician, self).__init__(
+                dtype=self._nu.dtype,
+                reparameterization_type=tfd.NOT_REPARAMETERIZED,
+                validate_args=validate_args,
+                allow_nan_stats=allow_nan_stats,
+                parameters=parameters,
+                name=name
+            )
+
+    @property
+    def nu(self):
+        return self._nu
+
+    @property
+    def sigma(self):
+        return self._sigma
+
+    def _batch_shape_tensor(self):
+        return tf.shape(self._nu)
+
+    def _batch_shape(self):
+        return self._nu.shape
+
+    def _event_shape_tensor(self):
+        return tf.constant([], dtype=tf.int32)
+
+    def _event_shape(self):
+        return tf.TensorShape([])
+
+    def _log_prob(self, x):
+        x = tf.convert_to_tensor(x, dtype=self.dtype)
+        nu = self._nu
+        sigma = self._sigma
+
+        log_unnorm = (
+            tf.math.log(x) - 2.0 * tf.math.log(sigma)
+            - (x**2 + nu**2) / (2.0 * sigma**2)
+        )
+        bessel_term = tf.math.log(tf.math.bessel_i0(x * nu / (sigma**2)))
+        return log_unnorm + bessel_term
+
+    def _sample_n(self, n, seed=None):
+        # Sampling: Rician(nu, sigma) = sqrt((X + nu)^2 + Y^2), 
+        # where X,Y ~ N(0, sigma^2) iid
+        shape = tf.constant([n])
+        normal = tfd.Normal(loc=0.0, scale=self._sigma)
+        x = normal.sample(shape, seed=seed)
+        y = normal.sample(shape, seed=seed)
+        return tf.sqrt((x + self._nu)**2 + y**2)
+
+    def _mean(self):
+        x = -tf.square(self._nu)/(2*tf.square(self._sigma))
+        L = tf.math.exp(x) * ((1-x) * tf.math.bessel_i0(-x/2) - x*tf.math.bessel_i0(-x/2))
+        return self._sigma * tf.math.sqrt(np.pi/2) * L
+
+    def _variance(self):
+        x = -tf.square(self._nu)/(2*tf.square(self._sigma))
+        L = tf.math.exp(x) * ((1-x) * tf.math.bessel_i0(-x/2) - x*tf.math.bessel_i0(-x/2))
+        return 2*tf.square(self._sigma) + tf.square(self._nu) - np.pi*tf.square(self._sigma)/2 * L
+
+
+def rician_fn(nu, sigma):
+    sigma = tf.nn.softplus(sigma) + 1e-5  # ensure positivity
+    return Rician(nu=nu, sigma=sigma)
+
+
+# ==============================================================================
 # =                                  networks                                  =
 # ==============================================================================
 
@@ -313,12 +392,10 @@ def UNet(
             else:
                 # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
                 output = tfp.layers.DistributionLambda(
-                            lambda t: tfp.distributions.TruncatedNormal(
-                                loc=t[...,:n_out],
-                                scale=t[...,n_out:],
-                                low=0.0,
-                                high=1e4),
-                            )(x_prob) # Random variable: R2s**2/r2s_var
+                            lambda t: Rician(
+                                nu=t[...,:n_out],
+                                sigma=t[...,n_out:])
+                            )(x_prob)
 
     if te_input:
         return keras.Model(inputs=[inputs1,inputs2], outputs=output)
@@ -873,4 +950,5 @@ def PM_decoder_idxs(decod_idx,
         elif (FM_self_attention^R2_self_attention) and ((a+1)%num_decoders==(num_decoders-decod_idx) and (a+1)>sa_idx):
             idxs.append(a+1)
     return idxs
+
 
