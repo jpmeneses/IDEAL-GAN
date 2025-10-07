@@ -19,7 +19,10 @@ class Rician(tfd.Distribution):
         parameters = dict(locals())
         with tf.name_scope(name) as name:
             self._nu = nu
-            self._sigma = sigma
+            if sigma < 1e-8:
+                self._sigma = 1e-8
+            else:
+                self._sigma = sigma
             super(Rician, self).__init__(
                 dtype=self._nu.dtype,
                 reparameterization_type=tfd.NOT_REPARAMETERIZED,
@@ -79,11 +82,6 @@ class Rician(tfd.Distribution):
         x = -tf.square(self._nu)/(2*tf.square(self._sigma))
         L = tf.math.exp(x) * ((1-x) * tf.math.bessel_i0(-x/2) - x*tf.math.bessel_i0(-x/2))
         return 2*tf.square(self._sigma) + tf.square(self._nu) - np.pi*tf.square(self._sigma)/2 * L
-
-
-def rician_fn(nu, sigma):
-    sigma = tf.nn.softplus(sigma) + 1e-5  # ensure positivity
-    return Rician(nu=nu, sigma=sigma)
 
 
 # ==============================================================================
