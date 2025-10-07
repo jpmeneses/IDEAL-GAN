@@ -169,7 +169,7 @@ G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
                 bayesian=args.UQ_R2s,
                 ME_layer=True,
                 filters=args.n_G_filters,
-                output_activation='sigmoid',
+                output_activation='softplus',
                 output_initializer='he_uniform',
                 self_attention=args.D2_SelfAttention)
 G_calib = tf.keras.Sequential()
