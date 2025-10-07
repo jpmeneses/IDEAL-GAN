@@ -184,6 +184,7 @@ G_lr_scheduler = dl.LinearDecay(args.lr, total_steps, args.epoch_decay * total_s
 G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
 
 G_R2_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args.beta_1, beta_2=args.beta_2)
+G_R2_optimizer = tf.keras.mixed_precision.LossScaleOptimizer(G_R2_optimizer)
 G_calib_optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr)
 
 # ==============================================================================
@@ -312,6 +313,7 @@ def train_G_R2(A, B):
         G_calib_optimizer.apply_gradients(zip(G_grad, G_calib.trainable_variables))
     else:
         G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
+        G_grad, _ = tf.clip_by_global_norm(G_grad, clip_norm=5.0)
         G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
