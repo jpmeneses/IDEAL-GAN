@@ -18,8 +18,8 @@ class Rician(tfd.Distribution):
     def __init__(self, nu, sigma, validate_args=False, allow_nan_stats=True, name="Rician"):
         parameters = dict(locals())
         with tf.name_scope(name) as name:
-            self._nu = nu
-            self._sigma = sigma + 1e-6
+            self._nu = tf.convert_to_tensor(nu, name="nu")
+            self._sigma = tf.convert_to_tensor(sigma, name="sigma")
             super(Rician, self).__init__(
                 dtype=self._nu.dtype,
                 reparameterization_type=tfd.NOT_REPARAMETERIZED,
@@ -38,10 +38,10 @@ class Rician(tfd.Distribution):
         return self._sigma
 
     def _batch_shape_tensor(self):
-        return tf.shape(self._nu)
+        return tf.broadcast_dynamic_shape(tf.shape(self._nu), tf.shape(self._sigma))
 
     def _batch_shape(self):
-        return self._nu.shape
+        return tf.broadcast_static_shape(self._nu.shape, self._sigma.shape)
 
     def _event_shape_tensor(self):
         return tf.constant([], dtype=tf.int32)
@@ -78,40 +78,41 @@ class Rician(tfd.Distribution):
         return tf.sqrt((x + self._nu)**2 + y**2)
 
     def _mean(self):
-        x = -tf.square(self._nu) / (2.0 * tf.square(self._sigma))
-        half_x = -x / 2.0
+        nu = self._nu
+        sigma = self._sigma
 
-        # Use exponentially scaled Bessel functions
-        i0e = tf.math.bessel_i0e(half_x)
-        i1e = tf.math.bessel_i1e(half_x)
+        x = -tf.square(nu) / (2.0 * tf.square(sigma))
+        half_x = -x / 2.0
 
         # Recover true I0 and I1 in log-space: I_n(x) = I_n^e(x) * exp(|x|)
         exp_half_x = tf.exp(tf.abs(half_x))
-        I0 = i0e * exp_half_x
-        I1 = i1e * exp_half_x
 
         # Compute L_{1/2}(x) = exp(x/2) * [ (1 - x) I0(-x/2) - x I1(-x/2) ]
-        L = tf.exp(x / 2.0) * ((1.0 - x) * I0 - x * I1)
+        log_exp_term = x / 2.0 + tf.abs(half_x)
+        log_L = log_exp_term + tf.math.log(
+            tf.abs((1.0 - x) * tf.math.bessel_i0e(half_x) - x * tf.math.bessel_i1e(half_x)) + 1e-12
+        )
+        L = tf.exp(log_L)
 
-        return self._sigma * tf.sqrt(np.pi / 2.0) * L
+        return sigma * tf.sqrt(np.pi / 2.0) * L
 
     def _variance(self):
-        x = -tf.square(self._nu) / (2.0 * tf.square(self._sigma))
+        nu = self._nu
+        sigma = self._sigma
+
+        x = -tf.square(nu) / (2.0 * tf.square(sigma))
         half_x = -x / 2.0
 
-        i0e = tf.math.bessel_i0e(half_x)
-        i1e = tf.math.bessel_i1e(half_x)
-
-        exp_half_x = tf.exp(tf.abs(half_x))
-        I0 = i0e * exp_half_x
-        I1 = i1e * exp_half_x
-
-        L = tf.exp(x / 2.0) * ((1.0 - x) * I0 - x * I1)
+        log_exp_term = x / 2.0 + tf.abs(half_x)
+        L = tf.exp(log_exp_term) * (
+            (1.0 - x) * tf.math.bessel_i0e(half_x)
+            - x * tf.math.bessel_i1e(half_x)
+        )
 
         return (
-            2.0 * tf.square(self._sigma)
-            + tf.square(self._nu)
-            - (np.pi * tf.square(self._sigma) / 2.0) * tf.square(L)
+            2.0 * tf.square(sigma)
+            + tf.square(nu)
+            - (np.pi * tf.square(sigma) / 2.0) * tf.square(L)
         )
 
 
