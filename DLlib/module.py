@@ -421,6 +421,7 @@ def UNet(
                                 scale=t[...,n_out:])
                             )(x_prob)
             else:
+                output = keras.layers.Lambda(lambda z: tf.where(z>1e17,1e17,z))(output)
                 # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
                 output = tfp.layers.DistributionLambda(
                             lambda t: Rician(
