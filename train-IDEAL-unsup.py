@@ -296,7 +296,7 @@ def train_G_R2(A, B):
             R2_loss = cycle_loss_fn(B[:,2:,:,:,1:], A2B_R2)
             FM_loss = cycle_loss_fn(B[:,2:,:,:,:1], A2B_FM)
         else:
-            WF_loss = tf.constant(0.0)
+            WF_abs_loss = tf.constant(0.0)
             R2_loss = tf.constant(0.0)
             FM_loss = tf.constant(0.0)
 
