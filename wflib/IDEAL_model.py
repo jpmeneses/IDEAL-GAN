@@ -97,7 +97,7 @@ def acq_to_acq(acqs, param_maps, te=None, field=1.5, only_mag=False):
     num_voxel = tf.math.reduce_prod(voxel_shape)
     Smtx = tf.reshape(S, [n_batch, ne, num_voxel]) # shape: (nb,ne,nv)
 
-    r2s = param_maps[:,0,:,:,1] * r2_sc
+    r2s = param_maps[:,0,:,:,1] #* r2_sc
     phi = param_maps[:,0,:,:,0] * fm_sc
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
@@ -661,8 +661,8 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, field=1.5, rem_R2
         r2s_mean = tf.zeros_like(phi_var)
         r2s_var = tf.zeros_like(phi_var)
     else:
-        r2s_mean = r2s_tfp.mean() * r2_sc
-        r2s_var = r2s_tfp.variance() * (r2_sc**2)
+        r2s_mean = r2s_tfp.mean() #* r2_sc
+        r2s_var = r2s_tfp.variance() #* (r2_sc**2)
         if r2s_mean.shape[-1] > 1:
             r2s_mean = r2s_mean[...,:1]
             r2s_var = r2s_var[...,:1] 
