@@ -19,7 +19,8 @@ class Rician(tfd.Distribution):
         parameters = dict(locals())
         with tf.name_scope(name) as name:
             self._nu = tf.convert_to_tensor(nu, name="nu")
-            self._sigma = tf.convert_to_tensor(sigma, name="sigma")
+            sigma_aux = tf.convert_to_tensor(sigma, name="sigma")
+            self._sigma = tf.where(sigma_aux<1e-16,1e-16,sigma_aux)
             super(Rician, self).__init__(
                 dtype=self._nu.dtype,
                 reparameterization_type=tfd.NOT_REPARAMETERIZED,
