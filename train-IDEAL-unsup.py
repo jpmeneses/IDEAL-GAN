@@ -590,7 +590,7 @@ for ep in range(args.epochs):
                 axs[1,1].axis('off')
                 
                 if args.UQ:
-                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,1])*(r2_sc**2)
+                    R2_var_aux = np.squeeze(A2B_var[:,0,:,:,1])#*(r2_sc**2)
                     R2_var_ok= axs[1,3].imshow(R2_var_aux, cmap='gnuplot',
                                             interpolation='none', vmin=0, vmax=10)
                     fig.colorbar(R2_var_ok, ax=axs[1,3])
@@ -614,7 +614,7 @@ for ep in range(args.epochs):
                 fig.colorbar(field_ok, ax=axs[1,4])
                 axs[1,4].axis('off')
                 r2_aux = np.squeeze(A2B[:,2,:,:,1])
-                r2_ok = axs[1,2].imshow(r2_aux*r2_sc, cmap='copper',
+                r2_ok = axs[1,2].imshow(r2_aux, cmap='copper',
                                         interpolation='none', vmin=0, vmax=r2_sc)
                 fig.colorbar(r2_ok, ax=axs[1,2])
                 axs[1,2].axis('off')
