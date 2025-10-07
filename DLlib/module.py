@@ -19,10 +19,7 @@ class Rician(tfd.Distribution):
         parameters = dict(locals())
         with tf.name_scope(name) as name:
             self._nu = nu
-            if sigma < 1e-8:
-                self._sigma = 1e-8
-            else:
-                self._sigma = sigma
+            self._sigma = sigma + 1e-6
             super(Rician, self).__init__(
                 dtype=self._nu.dtype,
                 reparameterization_type=tfd.NOT_REPARAMETERIZED,
