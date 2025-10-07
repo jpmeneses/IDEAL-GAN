@@ -409,7 +409,7 @@ def UNet(
     if bayesian or std_out:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         # Compute standard deviation (sigma; NOT sigma^2)
-        out_var = keras.layers.Conv2D(n_out, (1,1), activation='sigmoid', kernel_initializer='he_normal')(x_std)
+        out_var = keras.layers.Conv2D(n_out, (1,1), activation='softplus', kernel_initializer='he_normal')(x_std)
         if ME_layer:
             out_var = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(out_var)
         if bayesian:
@@ -421,11 +421,11 @@ def UNet(
                                 scale=t[...,n_out:])
                             )(x_prob)
             else:
-                output = keras.layers.Lambda(lambda z: tf.where(z>1e17,1e17,z))(output)
+                x_prob = keras.layers.Lambda(lambda z: tf.where(z>1e17,1e17,z))(x_prob)
                 # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
                 output = tfp.layers.DistributionLambda(
                             lambda t: Rician(
-                                nu=t[...,:n_out],
+                                nu=t[...,:n_out]+t[...,n_out:],
                                 sigma=t[...,n_out:])
                             )(x_prob)
 
