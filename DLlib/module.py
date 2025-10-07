@@ -54,12 +54,19 @@ class Rician(tfd.Distribution):
         nu = self._nu
         sigma = self._sigma
 
+        # Compute argument of the Bessel function
+        arg = x * nu / (sigma**2)
+
+        # Use exponentially scaled Bessel function for numerical stability:
+        # log(I0(x)) = log(I0e(x)) + |x|
+        log_bessel = tf.math.log(tf.math.bessel_i0e(arg)) + tf.abs(arg)
+
+        # Combine all terms
         log_unnorm = (
             tf.math.log(x) - 2.0 * tf.math.log(sigma)
             - (x**2 + nu**2) / (2.0 * sigma**2)
         )
-        bessel_term = tf.math.log(tf.math.bessel_i0(x * nu / (sigma**2)))
-        return log_unnorm + bessel_term
+        return log_unnorm + log_bessel
 
     def _sample_n(self, n, seed=None):
         # Sampling: Rician(nu, sigma) = sqrt((X + nu)^2 + Y^2), 
@@ -71,14 +78,41 @@ class Rician(tfd.Distribution):
         return tf.sqrt((x + self._nu)**2 + y**2)
 
     def _mean(self):
-        x = -tf.square(self._nu)/(2*tf.square(self._sigma))
-        L = tf.math.exp(x) * ((1-x) * tf.math.bessel_i0(-x/2) - x*tf.math.bessel_i0(-x/2))
-        return self._sigma * tf.math.sqrt(np.pi/2) * L
+        x = -tf.square(self._nu) / (2.0 * tf.square(self._sigma))
+        half_x = -x / 2.0
+
+        # Use exponentially scaled Bessel functions
+        i0e = tf.math.bessel_i0e(half_x)
+        i1e = tf.math.bessel_i1e(half_x)
+
+        # Recover true I0 and I1 in log-space: I_n(x) = I_n^e(x) * exp(|x|)
+        exp_half_x = tf.exp(tf.abs(half_x))
+        I0 = i0e * exp_half_x
+        I1 = i1e * exp_half_x
+
+        # Compute L_{1/2}(x) = exp(x/2) * [ (1 - x) I0(-x/2) - x I1(-x/2) ]
+        L = tf.exp(x / 2.0) * ((1.0 - x) * I0 - x * I1)
+
+        return self._sigma * tf.sqrt(np.pi / 2.0) * L
 
     def _variance(self):
-        x = -tf.square(self._nu)/(2*tf.square(self._sigma))
-        L = tf.math.exp(x) * ((1-x) * tf.math.bessel_i0(-x/2) - x*tf.math.bessel_i0(-x/2))
-        return 2*tf.square(self._sigma) + tf.square(self._nu) - np.pi*tf.square(self._sigma)/2 * L
+        x = -tf.square(self._nu) / (2.0 * tf.square(self._sigma))
+        half_x = -x / 2.0
+
+        i0e = tf.math.bessel_i0e(half_x)
+        i1e = tf.math.bessel_i1e(half_x)
+
+        exp_half_x = tf.exp(tf.abs(half_x))
+        I0 = i0e * exp_half_x
+        I1 = i1e * exp_half_x
+
+        L = tf.exp(x / 2.0) * ((1.0 - x) * I0 - x * I1)
+
+        return (
+            2.0 * tf.square(self._sigma)
+            + tf.square(self._nu)
+            - (np.pi * tf.square(self._sigma) / 2.0) * tf.square(L)
+        )
 
 
 # ==============================================================================
