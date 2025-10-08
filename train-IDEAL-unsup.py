@@ -37,6 +37,7 @@ py.arg('--epochs', type=int, default=60)
 py.arg('--epoch_decay', type=int, default=60)  # epoch to start decaying learning rate
 py.arg('--epoch_ckpt', type=int, default=5)  # num. of epochs to save a checkpoint
 py.arg('--lr', type=float, default=0.0001)
+py.arg('--grad_clip_norm', type=float, default=10.0)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
 py.arg('--data_aug_p', type=float, default=0.0)
@@ -313,7 +314,7 @@ def train_G_R2(A, B):
         G_calib_optimizer.apply_gradients(zip(G_grad, G_calib.trainable_variables))
     else:
         G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
-        G_grad, _ = tf.clip_by_global_norm(G_grad, clip_norm=5.0)
+        G_grad, _ = tf.clip_by_global_norm(G_grad, clip_norm=args.grad_clip_norm)
         G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
@@ -663,7 +664,4 @@ for ep in range(args.epochs):
 
     # save checkpoint
     if (((ep+1) % args.epoch_ckpt) == 0) or ((ep+1)==args.epochs):
-        if args.out_vars == 'FM':
-            checkpoint.save(ep)
-        else:
-            checkpoint_2.save(ep)
+        checkpoint.save(ep)
