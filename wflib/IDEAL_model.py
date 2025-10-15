@@ -663,6 +663,7 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, field=1.5, rem_R2
     else:
         r2s_mean = r2s_tfp.mean() * r2_sc
         r2s_var = r2s_tfp.variance() * (r2_sc**2)
+        tf.debugging.assert_all_finite(r2s_var, 'Rescaled R2* variances must be all finite')
         if r2s_mean.shape[-1] > 1:
             r2s_mean = r2s_mean[...,:1]
             r2s_var = r2s_var[...,:1] 
@@ -675,7 +676,9 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, field=1.5, rem_R2
     Wp_var = 1 - tf.math.exp(tf.linalg.matmul(-(2*np.pi * te)**2, phi_sigma_rav)) # (nb,ne,nv) NEG
     if not(rem_R2):
         r2s_var_aux = tf.math.exp(tf.linalg.matmul(-te, r2s_mu_rav))
-        r2s_var_aux = tf.linalg.matmul(te**2, r2s_sigma_rav) #*
+        tf.debugging.assert_all_finite(r2s_var_aux, 'Aux_1 R2* variances must be all finite')
+        r2s_var_aux *= tf.linalg.matmul(te**2, r2s_sigma_rav) #*
+        tf.debugging.assert_all_finite(r2s_var_aux, 'Aux_2 R2* variances must be all finite')
         Wp_var += r2s_var_aux # (nb,ne,nv) NEG
 
     # Matrix operations (variance)
