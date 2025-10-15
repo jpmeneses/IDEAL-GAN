@@ -319,7 +319,7 @@ def train_G_R2(A, B):
         G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
         for gg in G_grad:
             tf.debugging.assert_all_finite(gg, 'Applied gradients must be all finite')
-            tf.debugging.assert_type(gg, tf_type=tf.float32, 'Applied gradient must be in a float32 data format')
+            tf.debugging.assert_type(gg, tf_type=tf.float32, message='Applied gradient must be in a float32 data format')
         G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
