@@ -283,6 +283,7 @@ def train_G_R2(A, B):
         if args.UQ:
             A2B2A_var =  wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A.shape[1],
                                             field=args.field, rem_R2=not(args.UQ_R2s), only_mag=True)
+            tf.debugging.assert_all_finite(A2B2A_var, 'Recon variances must be all finite')
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
@@ -291,6 +292,7 @@ def train_G_R2(A, B):
             A2B2A_cycle_loss = uncertain_loss_R2(A_abs, A2B2A_sampled_var)
         else:
             A2B2A_cycle_loss = cycle_loss_fn(A_abs, A2B2A_abs)
+        tf.debugging.assert_all_finite(A2B2A_cycle_loss, 'Physics loss must be finite')
 
         ########### Splitted R2s and FM Losses ############
         if B is not None:
@@ -308,13 +310,16 @@ def train_G_R2(A, B):
         reg_term = R2_TV * args.R2_TV_weight + R2_L1 * args.R2_L1_weight
         
         G_loss = A2B2A_cycle_loss + reg_term
+        tf.debugging.assert_all_finite(G_loss, 'Loss function must be finite')
         
     if args.UQ_calib:
         G_grad = t.gradient(G_loss, G_calib.trainable_variables)
         G_calib_optimizer.apply_gradients(zip(G_grad, G_calib.trainable_variables))
     else:
         G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
-        # G_grad, _ = tf.clip_by_global_norm(G_grad, clip_norm=args.grad_clip_norm)
+        for gg in G_grad:
+            tf.debugging.assert_all_finite(gg, 'Applied gradients must be all finite')
+            tf.debugging.assert_type(gg, tf_type=tf.float32, 'Applied gradient must be in a float32 data format')
         G_R2_optimizer.apply_gradients(zip(G_grad, G_A2R2.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
