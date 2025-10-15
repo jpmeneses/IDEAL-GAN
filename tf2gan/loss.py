@@ -148,13 +148,15 @@ class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
         var_map = tf.where(var_map>=1e-5, var_map, 1e-5)
         # Based on ISMRM 2024 abstract No 1766: Non-central chi likelihood loss for 
         # quantitative MRI from parallel acquisitions with self-supervised deep learning
-        loglik = tf.where(y_true>0.0,tf.math.log(y_true),0.0)
+        loglik = tf.where(y_true>1e-5,tf.math.log(y_true),0.0)
         tf.debugging.assert_all_finite(loglik, "log-likelihood-1 produced NaN/Inf")
         loglik -= tf.math.log(var_map)
         tf.debugging.assert_all_finite(loglik, "log-likelihood-2 produced NaN/Inf")
         loglik -= tf.math.divide_no_nan(tf.square(y_true)+tf.square(y_pred),2*var_map)
         tf.debugging.assert_all_finite(loglik, "log-likelihood-3 produced NaN/Inf")
-        aux_log = tf.math.bessel_i0e(tf.math.divide_no_nan(y_true*y_pred,var_map))
+        prod_div_aux = tf.math.divide_no_nan(y_true*y_pred,var_map)
+        prod_div_aux = tf.clip_by_value(prod_div_aux, -50, 50)
+        aux_log = tf.math.bessel_i0e(prod_div_aux)
         loglik += tf.where(aux_log>0.0,tf.math.log(aux_log),0.0)
         tf.debugging.assert_all_finite(loglik, "log-likelihood-4 produced NaN/Inf")
         loglik += tf.math.divide_no_nan(y_true*y_pred,var_map)
