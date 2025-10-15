@@ -54,12 +54,14 @@ class Rician(tfd.Distribution):
         x = tf.convert_to_tensor(x, dtype=self.dtype)
         nu = self._nu
         sigma = self._sigma
+        sigma = tf.nn.softplus(raw_sigma) + 1e-3
+        sigma = tf.clip_by_value(sigma, 1e-3, 1e2)
         tf.debugging.assert_all_finite(x, "y contained NaN/Inf")
         tf.debugging.assert_all_finite(nu, "nu contained NaN/Inf")
         tf.debugging.assert_all_finite(sigma, "sigma contained NaN/Inf")
 
         # Compute argument of the Bessel function
-        arg = x * nu / (sigma**2)
+        arg = tf.clip_by_value(x * nu / tf.square(sigma), -50.0, 50.0)
         tf.debugging.assert_all_finite(arg, "x contained NaN/Inf before bessel_i0")
 
         # Use exponentially scaled Bessel function for numerical stability:
