@@ -425,7 +425,7 @@ def UNet(
                 # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
                 output = tfp.layers.DistributionLambda(
                             lambda t: Rician(
-                                nu=t[...,:n_out]+t[...,n_out:],
+                                nu=t[...,:n_out],
                                 sigma=t[...,n_out:])
                             )(x_prob)
 
