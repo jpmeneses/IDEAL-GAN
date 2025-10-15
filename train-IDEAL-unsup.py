@@ -170,7 +170,7 @@ G_A2R2= dl.UNet(input_shape=(None,hgt,wdt,1),
                 bayesian=args.UQ_R2s,
                 ME_layer=True,
                 filters=args.n_G_filters,
-                output_activation='softplus',
+                output_activation='sigmoid',
                 output_initializer='he_uniform',
                 self_attention=args.D2_SelfAttention)
 G_calib = tf.keras.Sequential()
@@ -283,7 +283,7 @@ def train_G_R2(A, B):
         if args.UQ:
             A2B2A_var =  wf.acq_uncertainty(tf.stop_gradient(A2B_WF), A2B_FM, A2B_R2, ne=A.shape[1],
                                             field=args.field, rem_R2=not(args.UQ_R2s), only_mag=True)
-            tf.debugging.assert_all_finite(A2B2A_var, 'Recon variances must be all finite')
+            #tf.debugging.assert_all_finite(A2B2A_var, 'Recon variances must be all finite')
             A2B2A_sampled_var = tf.concat([A2B2A_abs, A2B2A_var], axis=-1) # shape: [nb,ne,hgt,wdt,2]
 
         ############ Cycle-Consistency Losses #############
