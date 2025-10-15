@@ -317,6 +317,7 @@ def train_G_R2(A, B):
         G_calib_optimizer.apply_gradients(zip(G_grad, G_calib.trainable_variables))
     else:
         G_grad = t.gradient(G_loss, G_A2R2.trainable_variables)
+        G_grad, _ = tf.clip_by_global_norm(G_grad, clip_norm=args.grad_clip_norm)
         for gg in G_grad:
             tf.debugging.assert_all_finite(gg, 'Applied gradients must be all finite')
             tf.debugging.assert_type(gg, tf_type=tf.float32, message='Applied gradient must be in a float32 data format')
