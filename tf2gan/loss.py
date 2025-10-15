@@ -149,18 +149,13 @@ class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
         # Based on ISMRM 2024 abstract No 1766: Non-central chi likelihood loss for 
         # quantitative MRI from parallel acquisitions with self-supervised deep learning
         loglik = tf.where(y_true>1e-5,tf.math.log(y_true),0.0)
-        tf.debugging.assert_all_finite(loglik, "log-likelihood-1 produced NaN/Inf")
         loglik -= tf.math.log(var_map)
-        tf.debugging.assert_all_finite(loglik, "log-likelihood-2 produced NaN/Inf")
         loglik -= tf.math.divide_no_nan(tf.square(y_true)+tf.square(y_pred),2*var_map)
-        tf.debugging.assert_all_finite(loglik, "log-likelihood-3 produced NaN/Inf")
         prod_div_aux = tf.math.divide_no_nan(y_true*y_pred,var_map)
         prod_div_aux = tf.clip_by_value(prod_div_aux, -50, 50)
         aux_log = tf.math.bessel_i0e(prod_div_aux)
         loglik += tf.where(aux_log>0.0,tf.math.log(aux_log),0.0)
-        tf.debugging.assert_all_finite(loglik, "log-likelihood-4 produced NaN/Inf")
         loglik += tf.math.divide_no_nan(y_true*y_pred,var_map)
-        tf.debugging.assert_all_finite(loglik, "log-likelihood-5 produced NaN/Inf")
         return tf.reduce_mean(-loglik)
 
 
@@ -178,3 +173,36 @@ class AbsolutePhaseDisparity(tf.keras.losses.Loss):
         y_APD_num_sum = tf.reduce_sum(y_APD_num, axis=(1,2,3,4))
         y_APD_den_sum = tf.reduce_sum(y_true[...,:1], axis=(1,2,3,4))
         return tf.math.divide_no_nan(y_APD_num_sum, y_APD_den_sum)
+
+
+class RicianNLL(tf.keras.losses.Loss):
+    def call(y_true, rv_y):
+        """
+        y_true: ground-truth tensor (shape matches rv_y batch/event)
+        rv_y: tfd.Distribution (custom Rician exposing .nu and .sigma tensors)
+        returns: scalar loss per batch
+        """
+        # 1) negative log-likelihood (mean over batch & pixels)
+        logp = rv_y.log_prob(y_true)                      # shape [batch, ...]
+        nll = -tf.reduce_mean(logp)
+
+        # 2) extract parameters (make sure your Rician class exposes them)
+        nu = tf.cast(rv_y.nu, tf.float32)
+        sigma = tf.cast(rv_y.sigma, tf.float32)
+
+        # Use a stable sigma (parametrization should already use softplus)
+        sigma_safe = tf.maximum(sigma, sigma_min)
+
+        # 3) soft penalty to encourage nu > sigma:
+        # penalize where sigma > nu (i.e. max(0, sigma - nu))
+        penalty_nu_gt_sigma = tf.reduce_mean(tf.nn.relu(sigma_safe - nu))
+
+        # 4) penalty to avoid tiny sigma (push sigma above sigma_min)
+        penalty_sigma_floor = tf.reduce_mean(tf.nn.relu(sigma_min - sigma_safe))
+
+        # 5) optional L2 on (nu, log(sigma)) to avoid runaway values
+        l2_term = tf.reduce_mean(tf.square(nu)) + tf.reduce_mean(tf.square(tf.math.log(sigma_safe + 1e-12)))
+
+        loss = nll 
+
+        return loss
