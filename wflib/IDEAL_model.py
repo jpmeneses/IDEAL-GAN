@@ -661,8 +661,8 @@ def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, field=1.5, rem_R2
         r2s_mean = tf.zeros_like(phi_var)
         r2s_var = tf.zeros_like(phi_var)
     else:
-        r2s_mean = r2s_tfp.mean() * r2_sc
-        r2s_var = r2s_tfp.variance() * (r2_sc**2)
+        r2s_mean = r2s_tfp.nu * r2_sc
+        r2s_var = tf.square(r2s_tfp.sigma * r2_sc)
         tf.debugging.assert_all_finite(r2s_var, 'Rescaled R2* variances must be all finite')
         if r2s_mean.shape[-1] > 1:
             r2s_mean = r2s_mean[...,:1]
