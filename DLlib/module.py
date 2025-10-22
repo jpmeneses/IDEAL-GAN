@@ -89,34 +89,38 @@ class Rician(tfd.Distribution):
     def _mean(self):
         nu = self._nu
         sigma = self._sigma
+        sigma = tf.nn.softplus(raw_sigma) + 1e-3
+        sigma = tf.clip_by_value(sigma, 1e-3, 1e2)
 
         x = -tf.square(nu) / (2.0 * tf.square(sigma))
         half_x = -x / 2.0
 
-        # Recover true I0 and I1 in log-space: I_n(x) = I_n^e(x) * exp(|x|)
-        exp_half_x = tf.exp(tf.abs(half_x))
-
         # Compute L_{1/2}(x) = exp(x/2) * [ (1 - x) I0(-x/2) - x I1(-x/2) ]
-        log_exp_term = x / 2.0 + tf.abs(half_x)
+        log_exp_term = x / 2.0 # + tf.abs(half_x)
         log_L = log_exp_term + tf.math.log(
-            tf.abs((1.0 - x) * tf.math.bessel_i0e(half_x) - x * tf.math.bessel_i1e(half_x)) + 1e-12
+            (1.0 - x) * tf.math.bessel_i0e(half_x) - x * tf.math.bessel_i1e(half_x) + 1e-12
         )
+        tf.debugging.assert_all_finite(log_L, "log_L contained NaN/Inf after bessel_i0e [mean calc]")
         L = tf.exp(log_L)
+        tf.debugging.assert_all_finite(L, "L contained NaN/Inf after exp [mean calc]")
 
         return sigma * tf.sqrt(np.pi / 2.0) * L
 
     def _variance(self):
         nu = self._nu
         sigma = self._sigma
+        sigma = tf.nn.softplus(raw_sigma) + 1e-3
+        sigma = tf.clip_by_value(sigma, 1e-3, 1e2)
 
         x = -tf.square(nu) / (2.0 * tf.square(sigma))
         half_x = -x / 2.0
 
-        log_exp_term = x / 2.0 + tf.abs(half_x)
-        L = tf.exp(log_exp_term) * (
-            (1.0 - x) * tf.math.bessel_i0e(half_x)
-            - x * tf.math.bessel_i1e(half_x)
+        log_L = log_exp_term + tf.math.log(
+            (1.0 - x) * tf.math.bessel_i0e(half_x) - x * tf.math.bessel_i1e(half_x) + 1e-12
         )
+        tf.debugging.assert_all_finite(log_L, "log_L contained NaN/Inf after bessel_i0e [var calc]")
+        L = tf.exp(log_L)
+        tf.debugging.assert_all_finite(L, "L contained NaN/Inf after exp [var calc]")
 
         return (
             2.0 * tf.square(sigma)
