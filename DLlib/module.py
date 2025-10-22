@@ -54,8 +54,7 @@ class Rician(tfd.Distribution):
         x = tf.convert_to_tensor(x, dtype=self.dtype)
         nu = self._nu
         sigma = self._sigma
-        sigma = tf.nn.softplus(sigma) + 1e-3
-        sigma = tf.clip_by_value(sigma, 1e-3, 1e2)
+        sigma = tf.nn.softplus(sigma)
         tf.debugging.assert_all_finite(x, "y contained NaN/Inf")
         tf.debugging.assert_all_finite(nu, "nu contained NaN/Inf")
         tf.debugging.assert_all_finite(sigma, "sigma contained NaN/Inf")
@@ -89,8 +88,7 @@ class Rician(tfd.Distribution):
     def _mean(self):
         nu = self._nu
         sigma = self._sigma
-        sigma = tf.nn.softplus(sigma) + 1e-3
-        sigma = tf.clip_by_value(sigma, 1e-3, 1e2)
+        sigma = tf.nn.softplus(sigma) 
 
         x = -tf.square(nu) / (2.0 * tf.square(sigma))
         half_x = -x / 2.0
@@ -109,8 +107,7 @@ class Rician(tfd.Distribution):
     def _variance(self):
         nu = self._nu
         sigma = self._sigma
-        sigma = tf.nn.softplus(sigma) + 1e-3
-        sigma = tf.clip_by_value(sigma, 1e-3, 1e2)
+        sigma = tf.nn.softplus(sigma)
 
         x = -tf.square(nu) / (2.0 * tf.square(sigma))
         half_x = -x / 2.0
