@@ -1,8 +1,8 @@
-clearvars('-except','location'), clc
-% clearvars, clc
-% location = uigetdir();
+% clearvars('-except','location'), clc
+clearvars, clc
+location = uigetdir();
 
-load([location,'/results_MP_GC_IM_0007/IM_0007_MP_GC.mat'])
+load([location,'/results_MP_GC_IM_0010/IM_0010_MP_GC.mat'])
 % load([location,'/site6_1p5T_protocol2.mat'])
 F_gt = F; P_gt = P; R_gt = R; R2_gt = R2;
 % msk=abs(mean(imDataAll.images,5));
@@ -11,17 +11,23 @@ F_gt = F; P_gt = P; R_gt = R; R2_gt = R2;
 % R2_gt = R2_gt(1:end-mod(size(R2_gt,1),16),:,:);
 % P_gt=zeros(size(F_gt)); 
 
-load([location,'/2D_NSA1_ORIG_IM_0007/res_MP_UNet_0007.mat'])
-% load([location,'/results_MP_DL/res_MP_UNet_jpmen.mat'])
+load([location,'/2D_NSA1_ORIG_IM_0010/res_MP_VETNet_0010.mat'])
+F_VET = F;
 F_gt = F_gt.*(F(:,:,end:-1:1)>0);
 P_gt = P_gt.*(P(:,:,end:-1:1)>0);
 R_gt = R_gt.*(R(:,:,end:-1:1,:)>0);
 R2_gt = R2_gt.*(R2(:,:,end:-1:1)>0);
 
+load([location,'/2D_NSA1_ORIG_IM_0010/res_MP_UNet_0010.mat'])
+F_UNet = F;
+
+load([location,'/2D_NSA1_ORIG_IM_0010/res_MP_MDWFNet_0010.mat'])
+F_MDWF = F;
+
 figure(1), imshow3D(F)
 
 %% Quantitative maps
-n = 10;
+n = 4;
 figure(2)
 t = tiledlayout(3,3,'TileSpacing','tight','Padding','tight');
 ax1=nexttile; imagesc(F(:,:,n),[0,100]), colormap(ax1,'turbo'),
@@ -66,13 +72,13 @@ c15.Label.String = 'Hz'; c15.Label.FontSize = 12; axis off
 %% Uncertainty maps
 figure(3)
 t2 = tiledlayout(1,3,'TileSpacing','tight','Padding','tight');
-bx1=nexttile; imagesc(F_var(:,:,n)./1e4,[1e-2,2e1]), set(gca,'ColorScale','log') 
+bx1=nexttile; imagesc(F_var(:,:,n).*(F(:,:,n)>0.0),[0,25]), % set(gca,'ColorScale','log') 
 colormap(bx1,'parula'), cc1 = colorbar('southoutside','FontSize',11); 
 title('PDFF Var','FontSize',12), axis off
-bx4=nexttile; imagesc(R2_var(:,:,n)./(200^2),[1e-4,2e-1]), set(gca,'ColorScale','log') 
+bx4=nexttile; imagesc(R2_var(:,:,n),[0,250]), %set(gca,'ColorScale','log') 
 colormap(bx4,'autumn'), cc4 = colorbar('southoutside','FontSize',11);
 title('R2* Var','FontSize',12), axis off
-bx5=nexttile; imagesc(P_var(:,:,n),[1e-5,2e-2]), set(gca,'ColorScale','log') 
+bx5=nexttile; imagesc(P_var(:,:,n),[0,5.2e-4]), %set(gca,'ColorScale','log') 
 colormap(bx5,'spring'), cc5 = colorbar('southoutside','FontSize',11);
 title('\phi Var','FontSize',12), axis off
 
@@ -84,36 +90,63 @@ imagesc(abs(F(:,:,n)-F_gt(:,:,end-n+1)),[0,20]), colormap('turbo'),
 % imagesc(F_var(:,:,n)./1e4,[1e-2,2e1]), set(gca,'ColorScale','log'), colormap('parula')
 colorbar('FontSize',14); axis off
 
+%% Compare different methods
+figure(5), n = 10; F_gt2 = flip(F_gt,3);
+t = tiledlayout(2,4,'TileSpacing','tight','Padding','tight');
+ax1=nexttile; imagesc(F_gt2(:,:,n),[0,100]), colormap(ax1,'turbo'),
+title('Graph Cuts','FontSize',14), axis off
+ax2=nexttile; imagesc(F_VET(:,:,n),[0,100]), colormap(ax2,'turbo'),
+title('VET-Net','FontSize',14), axis off
+ax3=nexttile; imagesc(F_MDWF(:,:,n),[0,100]), colormap(ax3,'turbo'),
+title('MDWF-Net','FontSize',14), axis off
+ax4=nexttile; imagesc(F_UNet(:,:,n),[0,100]), colormap(ax4,'turbo'),
+title('U-Net','FontSize',14), axis off, 
+c4 = colorbar('eastoutside','FontSize',11); 
+c4.Label.String = '%'; c4.Label.FontSize = 12;
+
+ax5=nexttile; imagesc(abs(F_gt2(:,:,n)-F_gt2(:,:,n)),[0,15]), 
+colormap(ax5,'gray'), axis off
+ax6=nexttile; imagesc(abs(F_gt2(:,:,n)-F_VET(:,:,n)),[0,15]),
+colormap(ax6,'gray'), axis off
+ax7=nexttile; imagesc(abs(F_gt2(:,:,n)-F_MDWF(:,:,n)),[0,15]),
+colormap(ax7,'gray'), axis off
+ax8=nexttile; imagesc(abs(F_gt2(:,:,n)-F_UNet(:,:,n)),[0,15]), 
+colormap(ax8,'gray'), axis off, 
+c8 = colorbar('eastoutside','FontSize',11); 
+c8.Label.String = '%'; c8.Label.FontSize = 12;
+
 %% Multiple linear regression 
 % Check wether there is correlation between error, ROI-sd, and variance
 % https://au.mathworks.com/help/stats/regress.html
-X1a = PDFF_var_JGalgani_ROIs.Q2;
-X1b = PDFF_var_ROIs_13_21.Q2;
-X2a = PDFF_var_JGalgani_ROIs.Q3 - PDFF_var_JGalgani_ROIs.Q1;
-X2b = PDFF_var_ROIs_13_21.Q3 - PDFF_var_ROIs_13_21.Q1;
+X1a = 100*PDFF_var_JGalgani_ROIs.Q2;
+X1b = 100*PDFF_var_ROIs_13_21.Q2;
+X2a = 100*(PDFF_var_JGalgani_ROIs.Q3 - PDFF_var_JGalgani_ROIs.Q1);
+X2b = 100*(PDFF_var_ROIs_13_21.Q3 - PDFF_var_ROIs_13_21.Q1);
 X1 = [X1a; X1b]; X2 = [X2a; X2b];
 
-y_a = PDFF_var_JGalgani_ROIs.PDFFVar; y_b = PDFF_var_ROIs_13_21.PDFFVar;
+y_a = 100*sqrt(PDFF_var_JGalgani_ROIs.PDFFVar); 
+y_b = 100*sqrt(PDFF_var_ROIs_13_21.PDFFVar);
 y = [y_a; y_b];
 
 % Perform multiple linear regression analysis
 [b,bint,r,rint,stats] = regress(y, [ones(size(X1, 1), 1), X1, X2]);
 
-figure(5)
+figure(6)
 scatter3(X1,X2,y,'filled')
 hold on
-x1fit = min(X1):1e-3:max(X1);
-x2fit = min(X2):1e-3:max(X2);
+x1fit = min(X1):1e-1:max(X1);
+x2fit = min(X2):1e-1:max(X2);
 [X1FIT,X2FIT] = meshgrid(x1fit,x2fit);
 YFIT = b(1) + b(2)*X1FIT + b(3)*X2FIT;
 mesh(X1FIT,X2FIT,YFIT)
-xlabel('PDFF error','FontSize',16)
-ylabel('PDFF IQR','FontSize',16)
-zlabel('PDFF Var','FontSize',16)
+xlabel('PDFF error [%]','FontSize',16)
+ylabel('PDFF IQR [%]','FontSize',16)
+zlabel('PDFF SD [%]','FontSize',16)
 ax = gca; ax.FontSize = 14;
-view(50,10)
+% view(50,10)
 hold off
 
+% Find outliers
 contain0 = (rint(:,1)<0 & rint(:,2)>0);
 idx = find(contain0==false)
 
