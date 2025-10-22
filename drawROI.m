@@ -3,7 +3,7 @@
 close all, clearvars, clc
 addpath(genpath([pwd '/matlab']));
 
-sel_map = 'PDFF'; % OPTIONS: PDFF,AI-PDFF,AI-PDFF-var,R2s,AI-R2s,
+sel_map = 'AI-PDFF'; % OPTIONS: PDFF,AI-PDFF,AI-PDFF-var,R2s,AI-R2s,
                 % AI-R2s-var,AI-FM,ECH-1,ECH-2 - YOU CAN CHANGE THIS
 location = uigetdir();
 location = [location,'/'];
@@ -22,7 +22,7 @@ end
 file = filenames.name;
 cd(curFolder)
 %% SECOND BLOCK: DISPLAY SELECTED SLICE AND DRAW ROI
-num_slice = 14; % YOU CAN CHANGE THIS
+num_slice = 15; % YOU CAN CHANGE THIS
 if strcmp(sel_map,'PDFF')
     load([location,'results_MP_GC/',file])
     outmap = F;
@@ -66,7 +66,7 @@ im_slice = outmap(:,:,num_slice);
 figure(1)
 imshow(im_slice,val_range)
 roi =drawcircle('InteractionsAllowed','translate','LineWidth',1,...
-                'Center',[132,232],'Radius',sqrt(200/pi));
+                'Center',[115,208],'Radius',sqrt(200/pi));
 % roi.Center
 %% THIRD BLOCK: RUN TO REPEAT ROI MEASUREMENTS
 clc
@@ -89,14 +89,14 @@ fprintf('    Area [cm^2] = %3.1f\n',AREA)
 if contains(sel_map,'AI')
     PDFF_slice = F(:,:,num_slice); PDFF = median(PDFF_slice(mask));
     PDFFv_slice= F_var(:,:,num_slice); PDFFv = mean(PDFFv_slice(mask));
-    R2_slice = R2(:,:,num_slice); R2 = mean(R2_slice(mask));
+    R2_slice = R2(:,:,num_slice); R2c = mean(R2_slice(mask));
     R2v_slice = R2_var(:,:,num_slice); R2v = mean(R2v_slice(mask));
     FM_slice = P(:,:,num_slice); FM = mean(FM_slice(mask));
     FMv_slice = P_var(:,:,num_slice); FMv = mean(FMv_slice(mask));
     fprintf('  Q-Maps at ROI:\n')
     fprintf('    PDFF = %3.1f\n',PDFF)
     fprintf('    PDFF var = %3.1f\n',PDFFv)
-    fprintf('    R2* = %3.1f\n',R2)
+    fprintf('    R2* = %3.1f\n',R2c)
     fprintf('    R2* var = %3.1f\n',R2v)
     fprintf('    FM = %3.1f\n',FM)
     fprintf('    FM var = %3.1f\n',FMv)
