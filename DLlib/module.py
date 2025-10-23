@@ -94,7 +94,7 @@ class Rician(tfd.Distribution):
         half_x = -x / 2.0
 
         # Compute L_{1/2}(x) = exp(x/2) * [ (1 - x) I0(-x/2) - x I1(-x/2) ]
-        log_exp_term = x / 2.0 # + tf.abs(half_x)
+        log_exp_term = x / 2.0 + tf.abs(half_x)
         log_L = log_exp_term + tf.math.log(
             (1.0 - x) * tf.math.bessel_i0e(half_x) - x * tf.math.bessel_i1e(half_x) + 1e-12
         )
@@ -112,7 +112,7 @@ class Rician(tfd.Distribution):
         half_x = -x / 2.0
 
         # Compute L_{1/2}(x) = exp(x/2) * [ (1 - x) I0(-x/2) - x I1(-x/2) ]
-        log_exp_term = x / 2.0 # + tf.abs(half_x)
+        log_exp_term = x / 2.0 + tf.abs(half_x)
         log_L = log_exp_term + tf.math.log(
             (1.0 - x) * tf.math.bessel_i0e(half_x) - x * tf.math.bessel_i1e(half_x) + 1e-12
         )
