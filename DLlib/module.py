@@ -22,8 +22,7 @@ class Rician(tfd.Distribution):
         parameters = dict(locals())
         with tf.name_scope(name) as name:
             self._nu = tf.convert_to_tensor(nu, name="nu")
-            sigma_aux = tf.convert_to_tensor(sigma, name="sigma")
-            self._sigma = softplus_lb(sigma_aux)
+            self._sigma = tf.convert_to_tensor(sigma, name="sigma")
             super(Rician, self).__init__(
                 dtype=self._nu.dtype,
                 reparameterization_type=tfd.NOT_REPARAMETERIZED,
@@ -432,7 +431,6 @@ def UNet(
                                 scale=t[...,n_out:])
                             )(x_prob)
             else:
-                x_prob = keras.layers.Lambda(lambda z: tf.where(z>1e17,1e17,z))(x_prob)
                 # Based on: https://en.wikipedia.org/wiki/Folded_normal_distribution#Related_distributions
                 output = tfp.layers.DistributionLambda(
                             lambda t: Rician(
