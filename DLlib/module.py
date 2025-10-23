@@ -14,13 +14,16 @@ from DLlib.attention import SelfAttention, AdaIN
 tfd = tfp.distributions
 tfb = tfp.bijectors
 
+def softplus_lb(x, ln_offset=1.0001):
+    return tf.math.log(ln_offset + tf.math.exp(x))
+
 class Rician(tfd.Distribution):
     def __init__(self, nu, sigma, validate_args=False, allow_nan_stats=True, name="Rician"):
         parameters = dict(locals())
         with tf.name_scope(name) as name:
             self._nu = tf.convert_to_tensor(nu, name="nu")
             sigma_aux = tf.convert_to_tensor(sigma, name="sigma")
-            self._sigma = tf.nn.softplus(sigma_aux)
+            self._sigma = softplus_lb(sigma_aux)
             super(Rician, self).__init__(
                 dtype=self._nu.dtype,
                 reparameterization_type=tfd.NOT_REPARAMETERIZED,
