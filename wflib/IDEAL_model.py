@@ -77,6 +77,47 @@ def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False, get_H=False):
         return M
 
 
+@tf.function
+def gen_A(M):
+    M_abs = tf.abs(M)
+    M_real= tf.math.real(M)
+    C1 = M_abs[...,:1]
+    C2 = M_real[...,1:]
+    C3 = tf.square(M_abs[...,1:])
+    A = tf.concat([C1,C2,C3],axis=-1) # shape: bs x ne x 3
+
+    Q, R = tf.linalg.qr(A)
+    A_pinv = tf.linalg.solve(R, tf.transpose(Q, perm=[0,2,1])) # shape: bs x 3 x ne
+    return A, A_pinv
+
+
+def eigenvals(X):
+    a = X[...,:1]
+    b = X[...,1:2]
+    c = X[...,2:]
+    
+    # Closed-form largest eigenvalue
+    delta = tf.sqrt(((a - c) / 2.0)**2 + (b / 2.0)**2)
+    lambda_max = (a + c) / 2.0 + delta
+
+    # Corresponding eigenvector (unnormalized)
+    vx = b / 2.0
+    vy = lambda_max - a
+
+    # Normalize eigenvectors
+    norm = tf.sqrt(vx**2 + vy**2)
+    vx = tf.math.divide_no_nan(vx,norm)
+    vy = tf.math.divide_no_nan(vy,norm)
+
+    # Form eigenvector matrix
+    v_max = tf.concat([vx, vy], axis=-1) 
+
+    # Recover x,y estimates
+    scale = tf.sqrt(tf.maximum(lambda_max, 0.0))
+    return scale * v_max
+
+
+
 def acq_to_acq(acqs, param_maps, te=None, field=1.5, only_mag=False):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
@@ -270,6 +311,53 @@ class LWF_Layer(tf.keras.layers.Layer):
         res_gt = tf.concat([Re_gt,Im_gt],axis=-1)
 
         return res_gt
+
+
+def CSE_mag(acqs, out_maps, params):
+    n_batch,_,hgt,wdt,_ = out_maps.shape
+    voxel_shape = tf.convert_to_tensor((hgt,wdt))
+    num_voxel = tf.math.reduce_prod(voxel_shape)
+
+    if te is None:
+        if field == 1.5:
+            te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
+        elif field == 3.0:
+            te = gen_TEvar(ne, bs=n_batch, TE_ini_min=0.879e-3, TE_ini_d=None, d_TE_min=0.6623e-3, d_TE_d=None) 
+
+    te = params[1] # (nb,ne,1)
+    ne = te.shape[1]
+
+    M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
+    A, A_pinv = gen_A(M)
+
+    # Generate magnitude signal
+    Smtx = tf.reshape(acqs, [n_batch, ne, num_voxel]) # shape: (nb,ne,nv)
+    
+    # Extract R2s
+    r2s = out_maps[:,0,:,:,0] * r2_sc # (nb,hgt,wdt)
+
+    # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
+    xi_rav = tf.reshape(r2s,[n_batch,-1])
+    xi_rav = tf.expand_dims(xi_rav,1) # (nb,1,nv)
+
+    Wm = tf.math.exp(tf.linalg.matmul(te, xi_rav)) # (nb,ne,nv)
+    Wp = tf.math.exp(tf.linalg.matmul(-te, xi_rav))
+
+    # Matrix operations
+    WmS = tf.square(Wm * Smtx) # shape = (nb,ne,nv)
+    AWmS = tf.linalg.matmul(A_pinv,WmS) # shape = (nb,3,nv)
+    AAWmS = tf.linalg.matmul(A,AWmS) # shape = (nb,ne,nv)
+    Smtx_hat = Wp * tf.math.sqrt(AAWmS) # shape = (nb,ne,nv)
+
+    # Extract corresponding Water/Fat signals
+    # Reshape to original images dimensions
+    rho_abc = tf.transpose(AWmS,perm=[0,2,1]) # shape = (nb,nv,3)
+    rho_hat = eigenvals(rho_abc)
+
+    # Reshape to original acquisition dimensions
+    res_rho = tf.reshape(tf.transpose(rho_hat,perm=[0,2,1]), [n_batch,ns,hgt,wdt,1]) / rho_sc
+    res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
+    return (res_rho,res_gt)
 
 
 def IDEAL_mag(out_maps, params):

@@ -142,8 +142,12 @@ class VarMeanSquaredError(tf.keras.losses.Loss):
 
 class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
     def call(self, y_true, y_pred):
-        idx = y_pred.shape[-1]//2
-        var_map = y_pred[...,idx:]
+        if y_pred.shape[-1] > 1:
+            idx = y_pred.shape[-1]//2
+            var_map = y_pred[...,idx:]
+        else:
+            idx = 1
+            var_map = tf.ones_like(y_pred[...,:idx])
         y_pred = y_pred[...,:idx]
         var_map = tf.where(var_map>=1e-5, var_map, 1e-5)
         # Based on ISMRM 2024 abstract No 1766: Non-central chi likelihood loss for 
@@ -152,7 +156,6 @@ class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
         loglik -= tf.math.log(var_map)
         loglik -= tf.math.divide_no_nan(tf.square(y_true)+tf.square(y_pred),2*var_map)
         prod_div_aux = tf.math.divide_no_nan(y_true*y_pred,var_map)
-        prod_div_aux = tf.clip_by_value(prod_div_aux, -50, 50)
         aux_log = tf.math.bessel_i0e(prod_div_aux)
         loglik += tf.where(aux_log>0.0,tf.math.log(aux_log),0.0)
         loglik += tf.math.divide_no_nan(y_true*y_pred,var_map)
