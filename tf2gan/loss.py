@@ -147,7 +147,7 @@ class VarMeanSquaredErrorR2(tf.keras.losses.Loss):
             var_map = y_pred[...,idx:]
         else:
             idx = 1
-            var_map = tf.ones_like(y_pred[...,:idx])
+            var_map = tf.ones_like(y_pred[...,:idx])*1e-2
         y_pred = y_pred[...,:idx]
         var_map = tf.where(var_map>=1e-5, var_map, 1e-5)
         # Based on ISMRM 2024 abstract No 1766: Non-central chi likelihood loss for 
