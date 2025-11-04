@@ -50,6 +50,10 @@ py.args_to_yaml(py.join(output_dir, 'settings.yml'), args)
 # =                                    data                                    =
 # ==============================================================================
 
+if args.n_echoes > 0:
+    ech_idx = args.n_echoes * 2
+else:
+    ech_idx = 12
 fm_sc = 300.0
 r2_sc = 200.0
 
@@ -65,7 +69,7 @@ valY=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
 B_dataset_val = tf.data.Dataset.from_tensor_slices(valY)
 B_dataset_val.batch(1)
 
-if not(args.DL_gen):
+if not(args.gen_data_aug):
     dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
     out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
                                 acqs_data=False, te_data=False, MEBCRN=True)
@@ -129,9 +133,11 @@ if args.shuffle:
 # =                                   models                                   =
 # ==============================================================================
 
+total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
+
 G_mag = dl.UNet(input_shape=(None,hgt,wdt,1),
                 ME_layer=True,
-                te_input=(args.training_mode=='supervised'),
+                te_input=(args.training_mode=='supervised' and args.n_echoes==0),
                 te_shape=(None,),
                 filters=args.n_G_filters,
                 output_activation='sigmoid',
@@ -158,17 +164,20 @@ G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args
 # ==============================================================================
 
 @tf.function
-def train_G_mag(B, A=None, te=None):
-    if not A:
+def train_G(B, A=None, te=None):
+    if A is None:
         A = IDEAL_op(B, te=te, training=False)
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         # Compute model's output
-        A2B_R2 = G_mag(A_mag, training=True)
+        if args.training_mode == 'supervised':
+            A2B_R2 = G_mag([A_mag, te], training=True)
+        else:
+            A2B_R2 = G_mag(A_mag, training=True)
         A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
-        A2B2A_mag, A2B_WF_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
+        A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
         A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
 
         A2B2A_cycle_loss = loss_fn(A_mag, A2B2A_mag)
@@ -191,22 +200,25 @@ def train_G_mag(B, A=None, te=None):
 
 
 def train_step(B, A=None, te=None):
-    G_loss_dict = train_G(A, B, te)
+    G_loss_dict = train_G(B, A, te)
     return G_loss_dict
 
 
 @tf.function
 def sample(B, A=None, te=None):
-    if not A:
+    if A is None:
         A = IDEAL_op(B, te=te, training=False)
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     
     # Compute model's output
-    A2B_R2 = G_mag(A_mag, training=True)
+    if args.training_mode == 'supervised':
+        A2B_R2 = G_mag([A_mag, te], training=False)
+    else:
+        A2B_R2 = G_mag(A_mag, training=False)
     A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
-    A2B2A_mag, A2B_WF_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
+    A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
     A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
     A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
     A2B = tf.concat([A2B_WF_mag,A2B_R2], axis=1)
@@ -223,7 +235,7 @@ def sample(B, A=None, te=None):
 
 
 def validation_step(B, A=None, te=None):
-    A2B2A_mag, A2B, val_B2A2B_dict = sample(B, te)
+    A2B2A_mag, A2B, val_B2A2B_dict = sample(B, A, te)
     return A2B2A_mag, A2B, val_B2A2B_dict
 
 # ==============================================================================
@@ -280,15 +292,10 @@ for ep in range(args.epochs):
             # Random vertical reflections
             B = tf.image.random_flip_up_down(B)
 
-            if args.DL_gen:
+            if args.gen_data_aug:
                 B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
             else:
                 B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
-
-            # Random off-resonance field-map scaling factor
-            if args.FM_aug:
-                B_FM = B[...,-1:] * tf.random.normal([1],mean=args.FM_mean,stddev=0.25,dtype=tf.float32)
-                B = tf.concat([B[...,:-1],B_FM], axis=-1)
         
         # ==============================================================================
 
@@ -297,7 +304,7 @@ for ep in range(args.epochs):
         # ==============================================================================
         
         if args.n_echoes == 0:
-            ne_sel = np.random.randint(2,7)
+            ne_sel = np.random.randint(3,7)
         else:
             ne_sel = 0
         if args.field == 3.0:

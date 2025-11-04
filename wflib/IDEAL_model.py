@@ -318,14 +318,14 @@ def CSE_mag(acqs, out_maps, params):
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
 
+    te = params[1] # (nb,ne,1)
+    ne = te.shape[1]
+
     if te is None:
         if field == 1.5:
             te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
         elif field == 3.0:
             te = gen_TEvar(ne, bs=n_batch, TE_ini_min=0.879e-3, TE_ini_d=None, d_TE_min=0.6623e-3, d_TE_d=None) 
-
-    te = params[1] # (nb,ne,1)
-    ne = te.shape[1]
 
     M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
     A, A_pinv = gen_A(M)
