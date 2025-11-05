@@ -26,6 +26,8 @@ py.arg('--gen_partial_real', type=int, default=0, choices=[0,2,6,10])
 py.arg('--gen_filename', default='LDM_ds')
 py.arg('--shuffle', type=bool, default=True)
 py.arg('--n_echoes', type=int, default=6)
+py.arg('--min_rand_ne', type=int, default=4)
+py.arg('--max_rand_ne', type=int, default=6)
 py.arg('--field', type=float, default=1.5)
 py.arg('--n_G_filters', type=int, default=36)
 py.arg('--batch_size', type=int, default=1)
@@ -304,7 +306,7 @@ for ep in range(args.epochs):
         # ==============================================================================
         
         if args.n_echoes == 0:
-            ne_sel = np.random.randint(4,7)
+            ne_sel = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
         else:
             ne_sel = 0
         if args.field == 3.0:
