@@ -138,6 +138,7 @@ if args.shuffle:
 total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 
 G_mag = dl.UNet(input_shape=(None,hgt,wdt,1),
+                bayesian=(args.main_loss=='Rice'),
                 ME_layer=True,
                 te_input=(args.training_mode=='supervised' and args.n_echoes==0),
                 te_shape=(None,),
@@ -148,7 +149,7 @@ G_mag = dl.UNet(input_shape=(None,hgt,wdt,1),
 IDEAL_op = wf.IDEAL_Layer(field=args.field)
 
 if args.main_loss == 'Rice':
-    loss_fn = gan.VarMeanSquaredErrorR2()
+    loss_fn = lambda y, p_y: -p_y.log_prob(y)
 elif args.main_loss == 'MSE':
     loss_fn = tf.losses.MeanSquaredError()
 elif args.main_loss == 'MAE':
@@ -177,7 +178,8 @@ def train_G(B, A=None, te=None):
             A2B_R2 = G_mag([A_mag, te], training=True)
         else:
             A2B_R2 = G_mag(A_mag, training=True)
-        A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
+        if args.main_loss != 'Rice':
+            A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
         A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
         A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
@@ -218,7 +220,8 @@ def sample(B, A=None, te=None):
         A2B_R2 = G_mag([A_mag, te], training=False)
     else:
         A2B_R2 = G_mag(A_mag, training=False)
-    A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
+    if args.main_loss != 'Rice':
+        A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
     A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
     A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
