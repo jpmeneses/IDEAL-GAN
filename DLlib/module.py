@@ -54,6 +54,7 @@ class Rician(tfd.Distribution):
 
     def _log_prob(self, x):
         x = tf.convert_to_tensor(x, dtype=self.dtype)
+        x_ep = tf.where(x<1e-5,1e-5,x)
         nu = self._nu
         sigma = self._sigma
         tf.debugging.assert_all_finite(x, "y contained NaN/Inf")
@@ -61,7 +62,7 @@ class Rician(tfd.Distribution):
         tf.debugging.assert_all_finite(sigma, "sigma contained NaN/Inf")
 
         # Compute argument of the Bessel function
-        arg = x * nu / tf.square(sigma)
+        arg = tf.math.divide_no_nan(x * nu, tf.square(sigma))
         tf.debugging.assert_all_finite(arg, "x contained NaN/Inf before bessel_i0")
 
         # Use exponentially scaled Bessel function for numerical stability:
@@ -71,8 +72,8 @@ class Rician(tfd.Distribution):
 
         # Combine all terms
         log_unnorm = (
-            tf.math.log(x) - 2.0 * tf.math.log(sigma)
-            - (x**2 + nu**2) / (2.0 * sigma**2)
+            tf.math.log(x_ep) - 2.0 * tf.math.log(sigma)
+            - tf.math.divide_no_nan(x**2 + nu**2 , 2.0 * sigma**2)
         )
         tf.debugging.assert_all_finite(log_unnorm, "log unnorm produced NaN/Inf")
         return log_unnorm + log_bessel
