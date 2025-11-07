@@ -150,12 +150,13 @@ IDEAL_op = wf.IDEAL_Layer(field=args.field)
 
 if args.main_loss == 'Rice':
     loss_fn = lambda y, p_y: -p_y.log_prob(y)
+    loss_alt = tf.losses.MeanSquaredError()
 elif args.main_loss == 'MSE':
-    loss_fn = tf.losses.MeanSquaredError()
+    loss_fn = loss_alt = tf.losses.MeanSquaredError()
 elif args.main_loss == 'MAE':
-    loss_fn = tf.losses.MeanAbsoluteError()
+    loss_fn = loss_alt = tf.losses.MeanAbsoluteError()
 elif args.main_loss == 'MSLE':
-    loss_fn = tf.losses.MeanSquaredLogarithmicError()
+    loss_fn = loss_alt = tf.losses.MeanSquaredLogarithmicError()
 else:
     raise(NameError('Unrecognized Main Loss Function'))
 
@@ -184,10 +185,10 @@ def train_G(B, A=None, te=None):
         A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
         A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
 
-        A2B2A_cycle_loss = loss_fn(A_mag, A2B2A_mag)
+        A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
 
         ############### Splited losses ####################
-        WF_abs_loss = loss_fn(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
+        WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
         R2_loss = loss_fn(B[:,2:,:,:,1:], A2B_R2)
 
         if args.training_mode == 'supervised':
@@ -228,10 +229,10 @@ def sample(B, A=None, te=None):
     A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
     A2B = tf.concat([A2B_WF_mag,A2B_R2], axis=1)
 
-    A2B2A_cycle_loss = loss_fn(A_mag, A2B2A_mag)
+    A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
 
     ############### Splited losses ####################
-    WF_abs_loss = loss_fn(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
+    WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
     R2_loss = loss_fn(B[:,2:,:,:,1:], A2B_R2)
 
     return A2B2A_mag, A2B, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
