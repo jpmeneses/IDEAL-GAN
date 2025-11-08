@@ -21,8 +21,9 @@ class Rician(tfd.Distribution):
     def __init__(self, nu, sigma, validate_args=False, allow_nan_stats=True, name="Rician"):
         parameters = dict(locals())
         with tf.name_scope(name) as name:
-            self._nu = tf.convert_to_tensor(nu, name="nu")
-            self._sigma = tf.convert_to_tensor(sigma, name="sigma")
+            self._nu = tf.convert_to_tensor(nu, name="nu") 
+            sigma_aux = tf.convert_to_tensor(sigma, name="sigma")
+            self._sigma = tf.where(sigma_aux<1e-10,1e-10,sigma_aux)
             super(Rician, self).__init__(
                 dtype=self._nu.dtype,
                 reparameterization_type=tfd.NOT_REPARAMETERIZED,
@@ -71,11 +72,12 @@ class Rician(tfd.Distribution):
         tf.debugging.assert_all_finite(log_bessel, "bessel_i0e produced NaN/Inf")
 
         # Combine all terms
-        log_unnorm = (
-            tf.math.log(x_ep) - 2.0 * tf.math.log(sigma)
-            - tf.math.divide_no_nan(x**2 + nu**2 , 2.0 * sigma**2)
-        )
-        tf.debugging.assert_all_finite(log_unnorm, "log unnorm produced NaN/Inf")
+        log_unnorm = tf.math.log(x_ep) 
+        tf.debugging.assert_all_finite(log_unnorm, "log unnorm (1) produced NaN/Inf")
+        log_unnorm -= 2.0 * tf.math.log(sigma)
+        tf.debugging.assert_all_finite(log_unnorm, "log unnorm (2) produced NaN/Inf")
+        log_unnorm -= tf.math.divide_no_nan(x**2 + nu**2 , 2.0 * sigma**2)
+        tf.debugging.assert_all_finite(log_unnorm, "log unnorm (3) produced NaN/Inf")
         return log_unnorm + log_bessel
 
     def _sample_n(self, n, seed=None):
