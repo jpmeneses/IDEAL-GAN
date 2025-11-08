@@ -183,12 +183,13 @@ def train_G(B, A=None, te=None):
             A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
         A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
+        A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
         A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
 
         A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
 
         ############### Splited losses ####################
-        WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
+        WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag)
         R2_loss = loss_fn(B[:,2:,:,:,1:], A2B_R2)
 
         if args.training_mode == 'supervised':
@@ -215,6 +216,7 @@ def sample(B, A=None, te=None):
         A = IDEAL_op(B, te=te, training=False)
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+    B_abs = tf.concat([B_WF_abs,B[:,2:,:,:,1:]],axis=1)
     
     # Compute model's output
     if args.training_mode == 'supervised':
@@ -225,9 +227,11 @@ def sample(B, A=None, te=None):
         A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
     A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
-    A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
     A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
+    A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
     A2B = tf.concat([A2B_WF_mag,A2B_R2], axis=1)
+    if args.main_loss == 'Rice':
+        A2B = tf.where(B_abs!=0.0,A2B,0.0)
 
     A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
 
@@ -328,7 +332,7 @@ for ep in range(args.epochs):
                         step=G_optimizer.iterations, name='G learning rate')
 
         # sample
-        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 200//args.batch_size):
+        if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 100//args.batch_size):
             B = next(val_iter)
             B = tf.expand_dims(B, axis=0)
             B_WF = B[:,:2,:,:,:]

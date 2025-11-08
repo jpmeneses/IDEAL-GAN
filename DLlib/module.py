@@ -78,7 +78,9 @@ class Rician(tfd.Distribution):
         tf.debugging.assert_all_finite(log_unnorm, "log unnorm (2) produced NaN/Inf")
         log_unnorm -= tf.math.divide_no_nan(x**2 + nu**2 , 2.0 * sigma**2)
         tf.debugging.assert_all_finite(log_unnorm, "log unnorm (3) produced NaN/Inf")
-        return log_unnorm + log_bessel
+
+        log_prob = tf.where(x>0.0, log_unnorm + log_bessel, 0.0)
+        return log_prob
 
     def _sample_n(self, n, seed=None):
         # Sampling: Rician(nu, sigma) = sqrt((X + nu)^2 + Y^2), 
