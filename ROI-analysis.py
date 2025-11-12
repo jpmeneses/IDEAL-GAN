@@ -26,7 +26,7 @@ from matplotlib.ticker import PercentFormatter
 py.arg('--experiment_dir',default='TEaug-300')
 py.arg('--dataset', type=str, default='multiTE', choices=['multiTE','3ech','JGalgani','Attilio'])
 py.arg('--data_size', type=int, default=384, choices=[192,384])
-py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','VET-Net','AI-DEAL','GraphCuts'])
+py.arg('--model_sel', type=str, default='VET-Net', choices=['U-Net','MDWF-Net','2D-Net','VET-Net','AI-DEAL','Mag','GraphCuts'])
 py.arg('--remove_ech1', type=bool, default=False)
 py.arg('--phase_constraint', type=bool, default=False)
 py.arg('--magnitude_disc', type=bool, default=False)
@@ -156,6 +156,9 @@ elif args.model_sel == 'MDWF-Net':
                             WF_self_attention=args.D1_SelfAttention, R2_self_attention=args.D2_SelfAttention,
                             FM_self_attention=args.D3_SelfAttention)
   checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B), py.join('output', args.experiment_dir, 'checkpoints'))
+elif args.model_sel == '2D-Net':
+  G_A2B = dl.PM_Generator(input_shape=(None,None,2*args.n_echoes), te_input=False, ME_layer=None, filters=args.n_G_filters)
+  checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B), py.join('output', args.experiment_dir, 'checkpoints'))
 elif args.model_sel == 'VET-Net':
   G_A2B = dl.PM_Generator(input_shape=(None,None,None,2), te_input=True, te_shape=(None,), filters=args.n_G_filters)
   checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B), py.join('output', args.experiment_dir, 'checkpoints'))
@@ -165,6 +168,11 @@ elif args.model_sel == 'AI-DEAL':
   G_A2R2= dl.UNet(input_shape=(None,None,None,1), bayesian=True, ME_layer=True, filters=args.n_G_filters,
                   output_activation='sigmoid', self_attention=args.D2_SelfAttention)
   checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B, G_A2R2=G_A2R2), py.join('output', args.experiment_dir, 'checkpoints'))
+elif args.model_sel == 'Mag':
+  G_mag = dl.UNet(input_shape=(None,None,None,1),bayesian=(args.main_loss=='Rice'),ME_layer=True,filters=args.n_G_filters,
+                  te_input=(args.training_mode=='supervised' and args.n_echoes==0),te_shape=(None,),
+                  output_activation='sigmoid',self_attention=args.D1_SelfAttention)
+  checkpoint = tl.Checkpoint(dict(G_mag=G_mag), py.join('output', args.experiment_dir, 'checkpoints'))
 
 try:  # restore checkpoint including the epoch counter
     checkpoint.restore().assert_existing_objects_matched()
@@ -173,6 +181,7 @@ except Exception as e:
 
 @tf.function
 def sample(A, B, TE=None):
+  A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A), axis=-1, keepdims=True))
   if args.model_sel == 'U-Net':
     A_pf = data.A_from_MEBCRN(A) # CHANGE TO NON-MEBCRN FORMAT
     A2B_WF_abs = G_A2B(A_pf, training=False)
@@ -193,6 +202,20 @@ def sample(A, B, TE=None):
     A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
     A2B = tf.where(A[:,:1,...]!=0.0, A2B, 0.0)
     A2B_var = None
+  elif args.model_sel == '2D-Net':
+    if TE is None:
+      TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True)
+    A_pf = data.A_from_MEBCRN(A) # CHANGE TO NON-MEBCRN FORMAT
+    A2B_PM = G_A2B(A_pf, training=False)
+    A2B_PM = tf.where(A[:,0,...]!=0.0, A2B_PM, 0.0)
+    A2B_PM = tf.expand_dims(A2B_PM, axis=1)
+    A2B_PM = A2B_PM[...,::-1]
+    if args.remove_ech1:
+      A2B_WF = wf.get_rho(A[:,1:,...], A2B_PM, te=TE[:,1:,...])
+    else:
+      A2B_WF = wf.get_rho(A, A2B_PM, te=TE, phase_constraint=args.phase_constraint)
+    A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
+    A2B_var = None
   elif args.model_sel == 'VET-Net':
     if TE is None:
       TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True)
@@ -205,7 +228,6 @@ def sample(A, B, TE=None):
     A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
     A2B_var = None
   elif args.model_sel == 'AI-DEAL':
-    A_abs = tf.math.sqrt(tf.reduce_sum(tf.square(A), axis=-1, keepdims=True))
     if args.remove_ech1:
       A2B_FM = G_A2B(A[:,1:,...], training=False)
     else:
@@ -229,6 +251,25 @@ def sample(A, B, TE=None):
       A2B_var = tf.where(A_aux[:,:5,...]!=0.0, A2B_var, 1e-10)
     A2B = tf.concat([A2B_WF, A2B_PM], axis=1)
     A2B = tf.where(A[:,:3,...]!=0.0, A2B, 0.0)
+  elif args.model_sel == 'Mag':
+    if args.main_loss == 'Rice':
+      A2B_R2_prob = G_mag([A_abs, TE], training=False)
+      A2B_R2 = A2B_R2_prob.mean()
+    elif args.training_mode == 'supervised':
+      A2B_R2 = G_mag([A_abs, TE], training=False)
+    else:
+      A2B_R2 = G_mag(A_abs, training=False)
+    A2B_R2 = tf.where(A_abs[:,:1,...]!=0.0,A2B_R2,0.0)
+    A2B_WF_abs, A2B2A_abs = wf.CSE_mag(A_abs, A2B_R2, [args.field, TE])
+    A2B2A_abs = tf.where(A_abs!=0.0,A2B2A_abs,0.0)
+    A2B_abs = tf.concat([A2B_WF_abs,A2B_R2],axis=1)
+    A2B = tf.concat([A2B_abs,tf.zeros_like(A2B_abs)],axis=-1)
+    if args.main_loss == 'Rice':
+      A2B_var_aux = tf.concat([tf.zeros_like(A2B_R2_prob.variance()),A2B_R2_prob.variance()], axis=-1)
+      A2B_var= tf.concat([tf.zeros_like(A2B_var_aux),tf.zeros_like(A2B_var_aux),tf.zeros_like(A2B_var_aux),
+                          tf.zeros_like(A2B_var_aux),A2B_var_aux], axis=1)
+    else:
+      A2B_var = None
   return A2B, A2B_var
 
 def test(A, B, TE=None):
