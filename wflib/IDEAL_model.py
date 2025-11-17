@@ -96,25 +96,38 @@ def eigenvals(X):
     b = X[...,1:2]
     c = X[...,2:]
     
-    # Closed-form largest eigenvalue
-    delta = tf.sqrt(((a - c) / 2.0)**2 + (b / 2.0)**2)
-    lambda_max = (a + c) / 2.0 + delta
+    # closed-form delta = sqrt(((a-c)/2)^2 + (b/2)^2)
+    half = 0.5
+    adiff_half = (a - c) * half
+    b_half = b * half
+    delta = tf.sqrt(adiff_half * adiff_half + b_half * b_half + 1e-12)
 
-    # Corresponding eigenvector (unnormalized)
-    vx = b / 2.0
-    vy = lambda_max - a
+    # eigenvalues (max,min)
+    lam_max = (a + c) * half + delta
+    lam_min = (a + c) * half - delta
 
-    # Normalize eigenvectors
-    norm = tf.sqrt(vx**2 + vy**2)
+    # ensure non-negative lambda_max for sqrt (clip tiny negatives due to numeric noise)
+    lam_max_pos = tf.maximum(lam_max, 0.0)
+
+    # principal eigenvector (unnormalized): [b/2, lam_max - a]
+    vx = b_half
+    vy = lam_max - a
+
+    # normalize eigenvector safely
+    norm = tf.sqrt(vx**2 + vy**2 + 1e-12)
     vx = tf.math.divide_no_nan(vx,norm)
     vy = tf.math.divide_no_nan(vy,norm)
 
     # Form eigenvector matrix
-    v_max = tf.concat([vx, vy], axis=-1) 
+    v_max = tf.concat([vx, vy], axis=-1)
 
-    # Recover x,y estimates
-    scale = tf.sqrt(tf.maximum(lambda_max, 0.0))
-    return scale * v_max
+    # reconstruct x,y estimates (up to global sign)
+    scale = tf.sqrt(lam_max_pos)
+    xy_est = scale * v_max
+
+    # rank-1 ratio (small = good). Clip to [0,1] and avoid divide-by-zero
+    rank1_ratio = tf.math.divide_no_nan(lam_min , lam_max)
+    return (xy_est, rank1_ratio)
 
 
 
@@ -313,7 +326,7 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
-def CSE_mag(acqs, out_maps, params):
+def CSE_mag(acqs, out_maps, params, uncertainty=False):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
@@ -352,12 +365,16 @@ def CSE_mag(acqs, out_maps, params):
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
     rho_abc = tf.transpose(AWmS,perm=[0,2,1]) # shape = (nb,nv,3)
-    rho_hat = eigenvals(rho_abc)
+    rho_hat, rho_unc = eigenvals(rho_abc)
 
     # Reshape to original acquisition dimensions
     res_rho = tf.reshape(tf.transpose(rho_hat,perm=[0,2,1]), [n_batch,ns,hgt,wdt,1]) / rho_sc
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
-    return (res_rho,res_gt)
+    res_unc = tf.reshape(tf.transpose(rho_unc,perm=[0,2,1]), [n_batch,1,hgt,wdt,1])
+    if uncertainty:
+        return (res_rho,res_gt,res_unc)
+    else:
+        return (res_rho,res_gt)
 
 
 def IDEAL_mag(out_maps, params):
