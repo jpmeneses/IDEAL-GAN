@@ -181,7 +181,7 @@ def sample(A, B, TE=None):
     else:
       A2B_R2 = G_mag(A_abs, training=False)
     A2B_R2 = tf.where(A_abs[:,:1,...]!=0.0,A2B_R2,0.0)
-    A2B_WF_abs, A2B2A_abs, A2B_WF_var = wf.CSE_mag(A_abs, A2B_R2, [args.field, TE])
+    A2B_WF_abs, A2B2A_abs, A2B_WF_var = wf.CSE_mag(A_abs, A2B_R2, [args.field, TE], uncertainty=True)
     A2B2A_abs = tf.where(A_abs!=0.0,A2B2A_abs,0.0)
     A2B_abs = tf.concat([A2B_WF_abs,A2B_R2],axis=1)
     A2B = tf.concat([A2B_abs,tf.zeros_like(A2B_abs)],axis=-1)
