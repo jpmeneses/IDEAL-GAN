@@ -27,9 +27,12 @@ args = py.args_from_yaml(py.join('output',test_args.experiment_dir, 'settings.ym
 args.__dict__.update(test_args.__dict__)
 
 # Excel file for saving ROIs values
-out_filename = args.map+'_phantom_ROIs'
+out_filename = args.map
 if args.phase_constraint:
   out_filename += '_pc'
+if args.magnitude_disc:
+  out_filename += '_md'
+out_filename += '_phantom_ROIs'
 workbook = xlsxwriter.Workbook(py.join('output',args.experiment_dir,out_filename+'.xlsx'))
 
 r2_sc,fm_sc = 200.0,300.0
@@ -169,6 +172,8 @@ def sample(A, B, TE=None):
     A2B = tf.where(A[:,:3,...]!=0.0, A2B, 0.0)
   elif args.model_sel == 'Mag':
     if args.main_loss == 'Rice':
+      if TE is None:
+        TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True)
       A2B_R2_prob = G_mag([A_abs, TE], training=False)
       A2B_R2 = A2B_R2_prob.mean()
     elif args.training_mode == 'supervised':
@@ -176,7 +181,7 @@ def sample(A, B, TE=None):
     else:
       A2B_R2 = G_mag(A_abs, training=False)
     A2B_R2 = tf.where(A_abs[:,:1,...]!=0.0,A2B_R2,0.0)
-    A2B_WF_abs, A2B2A_abs = wf.CSE_mag(A_abs, A2B_R2, [args.field, TE])
+    A2B_WF_abs, A2B2A_abs, A2B_WF_var = wf.CSE_mag(A_abs, A2B_R2, [args.field, TE])
     A2B2A_abs = tf.where(A_abs!=0.0,A2B2A_abs,0.0)
     A2B_abs = tf.concat([A2B_WF_abs,A2B_R2],axis=1)
     A2B = tf.concat([A2B_abs,tf.zeros_like(A2B_abs)],axis=-1)
