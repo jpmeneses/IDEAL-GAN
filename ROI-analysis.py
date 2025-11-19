@@ -268,9 +268,10 @@ def sample(A, B, TE=None):
     A2B_abs = tf.concat([A2B_WF_abs,A2B_R2],axis=1)
     A2B = tf.concat([A2B_abs,tf.zeros_like(A2B_abs)],axis=-1)
     if args.main_loss == 'Rice':
-      A2B_var_aux = tf.concat([tf.zeros_like(A2B_R2_prob.variance()),A2B_R2_prob.variance()], axis=-1)
-      A2B_var= tf.concat([tf.zeros_like(A2B_var_aux),tf.zeros_like(A2B_var_aux),tf.zeros_like(A2B_var_aux),
-                          tf.zeros_like(A2B_var_aux),A2B_var_aux], axis=1)
+      A2B_PM_var = tf.concat([tf.zeros_like(A2B_R2_prob.variance()),A2B_R2_prob.variance()], axis=-1)
+      A2B_WF_var = tf.concat([A2B_WF_var,tf.zeros_like(A2B_WF_var)], axis=-1)
+      A2B_var= tf.concat([tf.zeros_like(A2B_WF_var),A2B_WF_var,A2B_WF_var,
+                          tf.zeros_like(A2B_WF_var),A2B_PM_var], axis=1)
     else:
       A2B_var = None
   return A2B, A2B_var
@@ -309,10 +310,13 @@ for A, B, TE in tqdm.tqdm(A_B_dataset_test, desc='Testing Samples Loop', total=l
     F_var = tf.abs(tf.complex(A2B_var[:,3,:,:,:1],A2B_var[:,3,:,:,1:]))
     r2s_var = A2B_var[:,-1,:,:,1:]*(r2_sc**2)
 
-    PDFF_var = W_var/(A2B_WF_abs[...,:1]**2)
-    PDFF_var -= 2 * WF_var / (A2B_WF_abs[...,:1]*A2B_WFsum_abs)
-    PDFF_var += (W_var + F_var + 2*WF_var)/(A2B_WF_abs[...,:1])
-    PDFF_var *= A2B_WF_abs[...,:1]**2 / (A2B_WFsum_abs)**2 #[W_var,WF_var,F_var]
+    if args.model_sel == 'Mag':
+      PDFF_var = WF_var
+    else:
+      PDFF_var = W_var/(A2B_WF_abs[...,:1]**2)
+      PDFF_var -= 2 * WF_var / (A2B_WF_abs[...,:1]*A2B_WFsum_abs)
+      PDFF_var += (W_var + F_var + 2*WF_var)/(A2B_WF_abs[...,:1])
+      PDFF_var *= A2B_WF_abs[...,:1]**2 / (A2B_WFsum_abs)**2 #[W_var,WF_var,F_var]
 
     A2B = tf.concat([A2B,PDFF_var],axis=-1)
 
