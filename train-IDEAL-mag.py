@@ -38,6 +38,7 @@ py.arg('--lr', type=float, default=0.0008)
 py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
 py.arg('--main_loss', default='Rice', choices=['Rice', 'MSE', 'MAE', 'MSLE'])
+py.arg('--R2_TV_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 args = py.args()
 
@@ -196,6 +197,12 @@ def train_G(B, A=None, te=None):
             G_loss = R2_loss
         elif args.training_mode == 'unsupervised':
             G_loss = A2B2A_cycle_loss
+
+        if args.main_loss == 'Rice':
+            R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2.mean()))
+        else:
+            R2_TV = tf.reduce_sum(tf.image.total_variation(A2B_R2))
+        G_loss += R2_TV * args.R2_TV_weight
         
     G_grad = t.gradient(G_loss, G_mag.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables))
