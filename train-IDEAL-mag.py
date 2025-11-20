@@ -199,7 +199,7 @@ def train_G(B, A=None, te=None):
             G_loss = A2B2A_cycle_loss
 
         if args.main_loss == 'Rice':
-            R2_TV_aux = A2B_R2.mean()
+            R2_TV_aux = A2B_R2.nu
         else:
             R2_TV_aux = A2B_R2
         R2_TV = tf.reduce_sum(tf.image.total_variation(R2_TV_aux[:,0,...]))
