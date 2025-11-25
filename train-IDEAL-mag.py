@@ -39,6 +39,7 @@ py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
 py.arg('--main_loss', default='Rice', choices=['Rice', 'MSE', 'MAE', 'MSLE'])
 py.arg('--R2_TV_weight', type=float, default=0.0)
+py.arg('--A2B2A_TV_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 args = py.args()
 
@@ -203,14 +204,18 @@ def train_G(B, A=None, te=None):
         else:
             R2_TV_aux = A2B_R2
         R2_TV = tf.reduce_sum(tf.image.total_variation(R2_TV_aux[:,0,...]))
-        G_loss += R2_TV * args.R2_TV_weight
+        A2B2A_aux = tf.reshape(A2B2A_mag,[-1,A2B2A_mag.shape[2],A2B2A_mag.shape[3],A2B2A_mag.shape[4]])
+        A2B2A_TV = tf.reduce_sum(tf.image.total_variation(A2B2A_aux))
+        G_loss += R2_TV * args.R2_TV_weight + A2B2A_TV * args.A2B2A_TV_weight
         
     G_grad = t.gradient(G_loss, G_mag.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables))
 
     return {'A2B2A_cycle_loss': A2B2A_cycle_loss,
             'WF_loss': WF_abs_loss,
-            'R2_loss': R2_loss}
+            'R2_loss': R2_loss,
+            'R2_TV': R2_TV,
+            'A2B2A_TV': A2B2A_TV}
 
 
 def train_step(B, A=None, te=None):
