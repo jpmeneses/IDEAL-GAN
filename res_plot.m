@@ -2,7 +2,7 @@
 clearvars, clc
 location = uigetdir();
 
-load([location,'/results_MP_GC_IM_0010/IM_0010_MP_GC.mat'])
+load([location,'/results_MP_GC_IM_0014/IM_0014_MP_GC.mat'])
 % load([location,'/site6_1p5T_protocol2.mat'])
 F_gt = F; P_gt = P; R_gt = R; R2_gt = R2;
 % msk=abs(mean(imDataAll.images,5));
@@ -11,20 +11,45 @@ F_gt = F; P_gt = P; R_gt = R; R2_gt = R2;
 % R2_gt = R2_gt(1:end-mod(size(R2_gt,1),16),:,:);
 % P_gt=zeros(size(F_gt)); 
 
-load([location,'/2D_NSA1_ORIG_IM_0010/res_MP_VETNet_0010.mat'])
+load([location,'/2D_NSA1_ORIG_IM_0014/res_MP_VETNet_0014.mat'])
 F_VET = F;
 F_gt = F_gt.*(F(:,:,end:-1:1)>0);
 P_gt = P_gt.*(P(:,:,end:-1:1)>0);
 R_gt = R_gt.*(R(:,:,end:-1:1,:)>0);
 R2_gt = R2_gt.*(R2(:,:,end:-1:1)>0);
 
-load([location,'/2D_NSA1_ORIG_IM_0010/res_MP_UNet_0010.mat'])
+load([location,'/2D_NSA1_ORIG_IM_0014/res_MP_UNet_0014.mat'])
 F_UNet = F;
 
-load([location,'/2D_NSA1_ORIG_IM_0010/res_MP_MDWFNet_0010.mat'])
+load([location,'/2D_NSA1_ORIG_IM_0014/res_MP_MDWFNet_0014.mat'])
 F_MDWF = F;
-
+%%
 figure(1), imshow3D(F)
+
+% PDFF-R2* distributions (and multi-site phantom refs)
+X = F_gt(F_gt>0);
+Y = R2_gt(F_gt>0);
+nbins = 100;  % adjust as needed
+
+[h, xedges, yedges] = histcounts2(X, Y, nbins);
+
+x_phantom = [0, 0.026, 0.053, 0.079, 0.105, 0.157, 0.209,...
+    0.312,0.413,0.514,1] .* 1e2;
+y_phantom = [13.70370388, 15.82716084, 17.82715988, 18.19753075,...
+    19.97530937, 22.51851845, 27.72839546, 32.37036896,...
+    38.3209877, 44.6419754, 27.30864143];
+
+
+figure(2);
+imagesc(xedges, yedges, log(h')); hold on
+plot(x_phantom, y_phantom, 'LineStyle','none','Marker','o',...
+    'MarkerEdgeColor','magenta','LineWidth',2), hold off
+set(gca, 'YDir', 'normal'); % fix axis direction
+colorbar;
+xlabel('X');
+ylabel('Y');
+title('2D Histogram Heatmap');
+
 
 %% Quantitative maps
 n = 4;
