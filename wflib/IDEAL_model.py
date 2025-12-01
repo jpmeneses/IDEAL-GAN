@@ -326,7 +326,7 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
-def CSE_mag(acqs, out_maps, params, uncertainty=False):
+def CSE_mag(acqs, out_maps, params, demod_signal=False, uncertainty=False):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
@@ -370,10 +370,15 @@ def CSE_mag(acqs, out_maps, params, uncertainty=False):
 
     # Reshape to original acquisition dimensions
     res_rho = tf.reshape(tf.transpose(rho_hat,perm=[0,2,1]), [n_batch,ns,hgt,wdt,1]) / rho_sc
+    res_demod = tf.reshape(WmS, [n_batch,ne,hgt,wdt,1])
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
     res_unc = tf.reshape(tf.transpose(rho_unc,perm=[0,2,1]), [n_batch,1,hgt,wdt,1])
-    if uncertainty:
+    if uncertainty and demod_signal:
+        return (res_rho,res_gt,res_demod,res_unc)
+    elif uncertainty:
         return (res_rho,res_gt,res_unc)
+    elif demod_signal:
+        return (res_rho,res_gt,res_demod)
     else:
         return (res_rho,res_gt)
 
