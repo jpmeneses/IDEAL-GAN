@@ -372,13 +372,14 @@ for ep in range(args.epochs):
             A, B = next(val_iter)
             A = tf.expand_dims(A, axis=0)
             B = tf.expand_dims(B, axis=0)
+            A = A[:,:ne_sel,...]
             B_WF = B[:,:2,:,:,:]
             B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
 
             if args.field == 3.0:
-                TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel, 1, TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+                TE_valid = wf.gen_TEvar(A.shape[1], 1, TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
             else:
-                TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel, 1)
+                TE_valid = wf.gen_TEvar(A.shape[1], 1, orig=True)
             
             B2A, B2A2B, val_A2B_dict = validation_step(B, A, te=TE_valid)
             B2A2B_WF_abs = B2A2B[:,:2,:,:,:]
