@@ -71,9 +71,6 @@ dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
 valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, end=4,
                             acqs_data=True, te_data=False, MEBCRN=True)
 
-valX = valX[:,:,::4,::4,:]
-valY = valY[:,:,::4,::4,:]
-
 A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX, valY))
 A_B_dataset_val.batch(1)
 
