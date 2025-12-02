@@ -68,29 +68,47 @@ r2_sc = 200.0
 dataset_dir = '../datasets/'
 
 dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-valY=data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                    acqs_data=False, te_data=False, MEBCRN=True)
+valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx, end=4,
+                            acqs_data=True, te_data=False, MEBCRN=True)
 
-B_dataset_val = tf.data.Dataset.from_tensor_slices(valY)
-B_dataset_val.batch(1)
+valX = valX[:,:,::4,::4,:]
+valY = valY[:,:,::4,::4,:]
+
+A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX, valY))
+A_B_dataset_val.batch(1)
 
 if not(args.gen_data_aug):
     dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=True)
-
     dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=True)
-
     dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
-                                acqs_data=False, te_data=False, MEBCRN=True)
+
+    if args.training_mode == 'supervised':
+        out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                    acqs_data=False, te_data=False, MEBCRN=True)
+
+        out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
+                                    acqs_data=False, te_data=False, MEBCRN=True)
+
+        out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
+                                    acqs_data=False, te_data=False, MEBCRN=True)
+    else:
+        acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
+                                            acqs_data=True, te_data=False, MEBCRN=True)
+
+        acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
+                                            acqs_data=True, te_data=False, MEBCRN=True)
+
+        acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
+                                            acqs_data=True, te_data=False, MEBCRN=True)
+        trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
 
     trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
     len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
     
-    B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
+    if args.training_mode == 'supervised':
+        B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
+    else:
+        B_dataset = tf.data.Dataset.from_tensor_slices((trainX, trainY))
 
 else:
     c_pha = 3
@@ -143,7 +161,7 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 G_mag = dl.UNet(input_shape=(None,hgt,wdt,1),
                 bayesian=(args.main_loss=='Rice'),
                 ME_layer=True,
-                te_input=(args.training_mode=='supervised' and args.n_echoes==0),
+                te_input=(args.n_echoes==0),
                 te_shape=(None,),
                 filters=args.n_G_filters,
                 output_activation='sigmoid',
@@ -292,7 +310,7 @@ train_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summar
 val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summaries', 'validation'))
 
 # sample
-val_iter = cycle(B_dataset_val)
+val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
 n_div = np.ceil(total_steps/len(valY))
@@ -307,6 +325,12 @@ for ep in range(args.epochs):
 
     # train for an epoch
     for B in B_dataset:
+        if len(B) > 1:
+            A = B[0]
+            B = B[1]
+        else:
+            A = None
+
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
@@ -344,7 +368,7 @@ for ep in range(args.epochs):
         else:
             te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 
-        G_loss_dict = train_step(B, te=te_var)
+        G_loss_dict = train_step(B, A, te=te_var)
 
         # # summary
         with train_summary_writer.as_default():
@@ -354,7 +378,8 @@ for ep in range(args.epochs):
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 100//args.batch_size):
-            B = next(val_iter)
+            A, B = next(val_iter)
+            A = tf.expand_dims(A, axis=0)
             B = tf.expand_dims(B, axis=0)
             B_WF = B[:,:2,:,:,:]
             B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
@@ -364,7 +389,7 @@ for ep in range(args.epochs):
             else:
                 TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel, 1)
             
-            B2A, B2A2B, val_A2B_dict = validation_step(B, te=TE_valid)
+            B2A, B2A2B, val_A2B_dict = validation_step(B, A, te=TE_valid)
             B2A2B_WF_abs = B2A2B[:,:2,:,:,:]
 
             # # summary
