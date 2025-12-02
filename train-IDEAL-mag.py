@@ -267,7 +267,7 @@ def sample(B, A=None, te=None):
 
     ############### Splited losses ####################
     WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
-    R2_loss = loss_fn(B[:,2:,:,:,1:], A2B_R2)
+    R2_loss = loss_alt(B[:,2:,:,:,1:], A2B_R2)
 
     return A2B2A_mag, A2B, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
                             'WF_loss': WF_abs_loss,
