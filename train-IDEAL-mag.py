@@ -39,7 +39,6 @@ py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
 py.arg('--main_loss', default='Rice', choices=['Rice', 'MSE', 'MAE', 'MSLE'])
 py.arg('--R2_TV_weight', type=float, default=0.0)
-py.arg('--A2B2A_TV_weight', type=float, default=0.0)
 py.arg('--A_demod_TV_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 args = py.args()
@@ -222,10 +221,6 @@ def train_G(B, A=None, te=None):
         R2_TV = tf.reduce_sum(tf.image.total_variation(R2_TV_aux[:,0,...]))
         G_loss += R2_TV * args.R2_TV_weight
         
-        A2B2A_aux = tf.reshape(A2B2A_mag,[-1,A2B2A_mag.shape[2],A2B2A_mag.shape[3],A2B2A_mag.shape[4]])
-        A2B2A_TV = tf.reduce_sum(tf.image.total_variation(A2B2A_aux))
-        G_loss += A2B2A_TV * args.A2B2A_TV_weight
-
         Ad_aux = tf.reshape(A_demod,[-1,A2B2A_mag.shape[2],A2B2A_mag.shape[3],A2B2A_mag.shape[4]])
         Ad_TV = tf.reduce_sum(tf.image.total_variation(Ad_aux))
         G_loss += Ad_TV * args.A_demod_TV_weight
@@ -237,7 +232,6 @@ def train_G(B, A=None, te=None):
             'WF_loss': WF_abs_loss,
             'R2_loss': R2_loss,
             'R2_TV': R2_TV,
-            'A2B2A_TV': A2B2A_TV,
             'Ad_TV': Ad_TV}
 
 
