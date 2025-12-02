@@ -100,7 +100,7 @@ if not(args.gen_data_aug):
 
         acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
                                             acqs_data=True, te_data=False, MEBCRN=True)
-        trainX = np.concatenate((acqs_1,acqs_2,acqs_3,acqs_4,acqs_5),axis=0)
+        trainX = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
 
     trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
     len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
