@@ -347,6 +347,9 @@ def CSE_mag(acqs, out_maps, params, demod_signal=False, R2_prob=False, uncertain
     Smtx = tf.reshape(acqs, [n_batch, ne, num_voxel]) # shape: (nb,ne,nv)
     
     # Extract R2s
+    if R2_prob:
+        r2s_nu = out_maps.nu
+        r2s_nu = r2s_nu[:,0,:,:,0] * r2_sc
     r2s = out_maps[:,0,:,:,0] * r2_sc # (nb,hgt,wdt)
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
@@ -357,7 +360,7 @@ def CSE_mag(acqs, out_maps, params, demod_signal=False, R2_prob=False, uncertain
     Wp = tf.math.exp(tf.linalg.matmul(-te, xi_rav))
 
     if R2_prob:
-        xi_nu_rav = tf.reshape(r2s.nu,[n_batch,-1])
+        xi_nu_rav = tf.reshape(r2s_nu,[n_batch,-1])
         xi_nu_rav = tf.expand_dims(xi_nu_rav,1) # (nb,1,nv)
         Wm_nu = tf.math.exp(tf.linalg.matmul(te, xi_nu_rav)) # (nb,ne,nv)
         WmS_nu = tf.square(Wm_nu * Smtx) # shape = (nb,ne,nv)
