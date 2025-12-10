@@ -326,7 +326,7 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
-def CSE_mag(acqs, out_maps, params, demod_signal=False, uncertainty=False):
+def CSE_mag(acqs, out_maps, params, demod_signal=False, R2_prob=False, uncertainty=False):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
@@ -356,6 +356,12 @@ def CSE_mag(acqs, out_maps, params, demod_signal=False, uncertainty=False):
     Wm = tf.math.exp(tf.linalg.matmul(te, xi_rav)) # (nb,ne,nv)
     Wp = tf.math.exp(tf.linalg.matmul(-te, xi_rav))
 
+    if R2_prob:
+        xi_nu_rav = tf.reshape(r2s.nu,[n_batch,-1])
+        xi_nu_rav = tf.expand_dims(xi_nu_rav,1) # (nb,1,nv)
+        Wm_nu = tf.math.exp(tf.linalg.matmul(te, xi_nu_rav)) # (nb,ne,nv)
+        WmS_nu = tf.square(Wm_nu * Smtx) # shape = (nb,ne,nv)
+
     # Matrix operations
     WmS = tf.square(Wm * Smtx) # shape = (nb,ne,nv)
     AWmS = tf.linalg.matmul(A_pinv,WmS) # shape = (nb,3,nv)
@@ -370,7 +376,10 @@ def CSE_mag(acqs, out_maps, params, demod_signal=False, uncertainty=False):
 
     # Reshape to original acquisition dimensions
     res_rho = tf.reshape(tf.transpose(rho_hat,perm=[0,2,1]), [n_batch,ns,hgt,wdt,1]) / rho_sc
-    res_demod = tf.reshape(WmS, [n_batch,ne,hgt,wdt,1])
+    if R2_prob:
+        res_demod = tf.reshape(WmS_nu, [n_batch,ne,hgt,wdt,1])
+    else:
+        res_demod = tf.reshape(WmS, [n_batch,ne,hgt,wdt,1])
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
     res_unc = tf.reshape(tf.transpose(rho_unc,perm=[0,2,1]), [n_batch,1,hgt,wdt,1])
     if uncertainty and demod_signal:

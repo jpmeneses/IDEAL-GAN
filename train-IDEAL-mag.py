@@ -192,14 +192,15 @@ def train_G(B, A=None, te=None):
     B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         # Compute model's output
-        if args.training_mode == 'supervised':
+        if args.n_echoes==0:
             A2B_R2 = G_mag([A_mag, te], training=True)
         else:
             A2B_R2 = G_mag(A_mag, training=True)
         if args.main_loss != 'Rice':
             A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
-        A2B_WF_mag, A2B2A_mag, A_demod = wf.CSE_mag(A_mag, A2B_R2, [args.field, te], demod_signal=True)
+        A2B_WF_mag, A2B2A_mag, A_demod = wf.CSE_mag(A_mag, A2B_R2, [args.field, te],
+                                                    demod_signal=True, R2_prob=(args.main_loss=='Rice'))
         A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
         A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
 
@@ -249,7 +250,7 @@ def sample(B, A=None, te=None):
     B_abs = tf.concat([B_WF_abs,B[:,2:,:,:,1:]],axis=1)
     
     # Compute model's output
-    if args.training_mode == 'supervised':
+    if args.n_echoes==0:
         A2B_R2 = G_mag([A_mag, te], training=False)
     else:
         A2B_R2 = G_mag(A_mag, training=False)
