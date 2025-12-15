@@ -19,7 +19,8 @@ from itertools import cycle
 # ==============================================================================
 
 py.arg('--dataset', default='WF-IDEAL')
-py.arg('--data_size', type=int, default=384, choices=[192,384])
+py.arg('--train_data', default='HDF5', choices=['HDF5','DICOM','NIFTI'])
+py.arg('--dataset_dir', default='../datasets/')
 py.arg('--training_mode', default='supervised', choices=['supervised','unsupervised'])
 py.arg('--gen_data_aug', type=bool, default=False)
 py.arg('--gen_partial_real', type=int, default=0, choices=[0,2,6,10])
@@ -64,89 +65,135 @@ r2_sc = 200.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../datasets/'
 
-dataset_hdf5_1 = 'INTA_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-valX, valY = data.load_hdf5(dataset_dir, dataset_hdf5_1, ech_idx,
-                            acqs_data=True, te_data=False, MEBCRN=True)
+if args.train_data == 'HDF5':
+    dataset_hdf5_1 = 'INTA_GC_384_complex_2D.hdf5'
+    valX, valY = data.load_hdf5(args.dataset_dir, dataset_hdf5_1, ech_idx,
+                                acqs_data=True, te_data=False, MEBCRN=True)
 
-A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX, valY))
-A_B_dataset_val.batch(1)
+    A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX, valY))
+    A_B_dataset_val.batch(1)
 
-if not(args.gen_data_aug):
-    dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    dataset_hdf5_3 = 'Volunteers_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-    dataset_hdf5_4 = 'Attilio_GC_' + str(args.data_size) + '_complex_2D.hdf5'
+    if not(args.gen_data_aug):
+        dataset_hdf5_2 = 'INTArest_GC_384_complex_2D.hdf5'
+        dataset_hdf5_3 = 'Volunteers_GC_384_complex_2D.hdf5'
+        dataset_hdf5_4 = 'Attilio_GC_384_complex_2D.hdf5'
 
-    if args.training_mode == 'supervised':
-        out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                    acqs_data=False, te_data=False, MEBCRN=True)
+        if args.training_mode == 'supervised':
+            out_maps_2 = data.load_hdf5(args.dataset_dir,dataset_hdf5_2, ech_idx,
+                                        acqs_data=False, te_data=False, MEBCRN=True)
 
-        out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
-                                    acqs_data=False, te_data=False, MEBCRN=True)
+            out_maps_3 = data.load_hdf5(args.dataset_dir, dataset_hdf5_3, ech_idx,
+                                        acqs_data=False, te_data=False, MEBCRN=True)
 
-        out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
-                                    acqs_data=False, te_data=False, MEBCRN=True)
+            out_maps_4 = data.load_hdf5(args.dataset_dir, dataset_hdf5_4, ech_idx,
+                                        acqs_data=False, te_data=False, MEBCRN=True)
+        else:
+            acqs_2, out_maps_2 = data.load_hdf5(args.dataset_dir,dataset_hdf5_2, ech_idx,
+                                                acqs_data=True, te_data=False, MEBCRN=True)
+
+            acqs_3, out_maps_3 = data.load_hdf5(args.dataset_dir, dataset_hdf5_3, ech_idx,
+                                                acqs_data=True, te_data=False, MEBCRN=True)
+
+            acqs_4, out_maps_4 = data.load_hdf5(args.dataset_dir, dataset_hdf5_4, ech_idx,
+                                                acqs_data=True, te_data=False, MEBCRN=True)
+            trainX = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
+
+        trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
+        len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
+        
+        if args.training_mode == 'supervised':
+            B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
+        else:
+            B_dataset = tf.data.Dataset.from_tensor_slices((trainX, trainY))
+
     else:
-        acqs_2, out_maps_2 = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx,
-                                            acqs_data=True, te_data=False, MEBCRN=True)
+        c_pha = 3
+        recordPath = py.join('tfrecord', args.DL_filename)
+        tfr_dataset = tf.data.TFRecordDataset([recordPath])
+        # Create a description of the features.
+        feature_description = {
+            'out_maps': tf.io.FixedLenFeature([], tf.string),
+            }
 
-        acqs_3, out_maps_3 = data.load_hdf5(dataset_dir, dataset_hdf5_3, ech_idx,
-                                            acqs_data=True, te_data=False, MEBCRN=True)
+        def _parse_function(example_proto):
+            # Parse the input `tf.train.Example` proto using the dictionary above.
+            parsed_ds = tf.io.parse_example(example_proto, feature_description)
+            return tf.io.parse_tensor(parsed_ds['out_maps'], out_type=tf.float32)
 
-        acqs_4, out_maps_4 = data.load_hdf5(dataset_dir, dataset_hdf5_4, ech_idx,
-                                            acqs_data=True, te_data=False, MEBCRN=True)
-        trainX = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
+        if args.DL_partial_real != 0:
+            if args.DL_partial_real == 2:
+                end_idx = 62
+            elif args.DL_partial_real == 6:
+                end_idx = 200
+            elif args.DL_partial_real == 10:
+                end_idx = 330
+            dataset_hdf5_2 = 'INTArest_GC_384_complex_2D.hdf5'
+            trainY = data.load_hdf5(args.dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
+                                    acqs_data=False, te_data=False, MEBCRN=True,
+                                    mag_and_phase=True, unwrap=True)
+            B_dataset = tfr_dataset.skip(end_idx).map(_parse_function)
+            B_dataset_aux = tf.data.Dataset.from_tensor_slices(trainY)
+            B_dataset = B_dataset.concatenate(B_dataset_aux)
+        else:
+            B_dataset = tfr_dataset.map(_parse_function)
 
-    trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
-    len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
-    
-    if args.training_mode == 'supervised':
-        B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
-    else:
-        B_dataset = tf.data.Dataset.from_tensor_slices((trainX, trainY))
+        for B in B_dataset.take(1):
+            n_ch,hgt,wdt,n_out = B.shape
+            print(B.shape)
+        len_dataset = int(args.DL_filename.split('_')[-1])
+        if args.DL_partial_real != 0:
+            len_dataset += trainY.shape[0]
+
+    B_dataset = B_dataset.batch(args.batch_size)
+    if args.shuffle:
+        B_dataset = B_dataset.shuffle(len_dataset)
 
 else:
-    c_pha = 3
-    recordPath = py.join('tfrecord', args.DL_filename)
-    tfr_dataset = tf.data.TFRecordDataset([recordPath])
-    # Create a description of the features.
-    feature_description = {
-        'out_maps': tf.io.FixedLenFeature([], tf.string),
-        }
+    folders = [os.path.join(args.dataset_dir, d) for d in os.listdir(args.dataset_dir) if os.path.isdir(os.path.join(args.dataset_dir, d))]
+    folders_mr = [os.path.join(f, os.listdir(f)[0]) for i, f in enumerate(folders) if os.path.join(f, os.listdir(f)[0])]
+    folders_cse = list()
+    for f in folders_mr:
+        scan_files = os.listdir(f)
+        if args.train_data == 'DICOM':
+            cse_scan = [item for item in scan_files if "MECSE" in item]
+        elif args.train_data == 'NIFTI':
+            cse_scan = [item for item in scan_files if "nifti" in item]
+        folders_cse.append(os.path.join(f,cse_scan[0]))
+    num_fold = len(folders_cse)
 
-    def _parse_function(example_proto):
-        # Parse the input `tf.train.Example` proto using the dictionary above.
-        parsed_ds = tf.io.parse_example(example_proto, feature_description)
-        return tf.io.parse_tensor(parsed_ds['out_maps'], out_type=tf.float32)
+    A_dataset = tf.data.Dataset.from_tensor_slices(folders_cse)
+    if args.train_data == 'DICOM':
+        A_dataset = A_dataset.map(lambda f: data.tf_load_dicom_series(f))
+    elif args.train_data == 'NIFTI':
+        A_dataset = A_dataset.map(lambda f: data.tf_load_nifti_series(f))
+    A_dataset = A_dataset.unbatch()
 
-    if args.DL_partial_real != 0:
-        if args.DL_partial_real == 2:
-            end_idx = 62
-        elif args.DL_partial_real == 6:
-            end_idx = 200
-        elif args.DL_partial_real == 10:
-            end_idx = 330
-        dataset_hdf5_2 = 'INTArest_GC_' + str(args.data_size) + '_complex_2D.hdf5'
-        trainY = data.load_hdf5(dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
-                                acqs_data=False, te_data=False, MEBCRN=True,
-                                mag_and_phase=True, unwrap=True)
-        B_dataset = tfr_dataset.skip(end_idx).map(_parse_function)
-        B_dataset_aux = tf.data.Dataset.from_tensor_slices(trainY)
-        B_dataset = B_dataset.concatenate(B_dataset_aux)
-    else:
-        B_dataset = tfr_dataset.map(_parse_function)
+    len_dataset = sum(1 for _ in A_dataset)
+    for a in A_dataset.take(1):
+        ne,hgt,wdt,n_ch = a.shape
+    A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
 
-    for B in B_dataset.take(1):
-        n_ch,hgt,wdt,n_out = B.shape
-        print(B.shape)
-    len_dataset = int(args.DL_filename.split('_')[-1])
-    if args.DL_partial_real != 0:
-        len_dataset += trainY.shape[0]
+    A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//2)])
+    if args.train_data == 'DICOM':
+        A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
+    elif args.train_data == 'NIFTI':
+        A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_nifti_series(f))
+    A_dataset_val = A_dataset_val.unbatch()
+    len_val = sum(1 for _ in A_dataset_val)
+    A_dataset_val = A_dataset_val.batch(1)
 
-B_dataset = B_dataset.batch(args.batch_size)
-if args.shuffle:
-    B_dataset = B_dataset.shuffle(len_dataset)
+
+
+
+
+
+
+
+
+args.dataset_dir = '../datasets/'
+
+
 
 # ==============================================================================
 # =                                   models                                   =
@@ -355,8 +402,8 @@ for ep in range(args.epochs):
         else:
             ne_sel = 0
         if args.field == 3.0:
-            te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], 
-                                TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+            te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.8e-3,
+                                TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
         else:
             te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 

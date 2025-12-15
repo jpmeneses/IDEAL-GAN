@@ -429,57 +429,54 @@ def load_dicom_series(folder_path):
     dicom_files = sorted([os.path.join(folder_path, f) for f in os.listdir(folder_path)
                           if f.endswith(".dcm")])
     
-    images = []
+    f = dicom_files[0]
+    ds = pydicom.dcmread(f)
+    img = ds.pixel_array.astype(np.float32)
+    echo_all = int(ds.get((0x0018, 0x0091), pydicom.DataElement((0x0018, 0x0091), 'DS', 1)).value)
+    X = np.ones((40,echo_all,img.shape[0],img.shape[1],1),dtype=np.complex64)
+    # TE = np.zeros((40,echo_all),dtype=np.float32)
     n_sl = 0
-    err_flag = False
+    
     for j, f in enumerate(dicom_files):
         ds = pydicom.dcmread(f)
         img = ds.pixel_array.astype(np.float32)
 
         img_comp = str(ds.get((0x2005, 0x1011), pydicom.DataElement((0x2005, 0x1011), 'DS', 1)).value)
-        echo_time = float(ds.get((0x0018, 0x0081), pydicom.DataElement((0x0018, 0x0081), 'DS', 1)).value)
+        # echo_time = float(ds.get((0x0018, 0x0081), pydicom.DataElement((0x0018, 0x0081), 'DS', 1)).value)
         echo_num = int(ds.get((0x0018, 0x0086), pydicom.DataElement((0x0018, 0x0086), 'DS', 1)).value)
         echo_all = int(ds.get((0x0018, 0x0091), pydicom.DataElement((0x0018, 0x0091), 'DS', 1)).value)
         RescaleIntercept = float(ds.get((0x2005, 0x100D), pydicom.DataElement((0x2005, 0x100D), 'DS', 1)).value)
-        RescaleSlope = float(ds.get((0x2005, 0x100A), pydicom.DataElement((0x2005, 0x100A), 'DS', 1)).value)
-        # print(j, "Component: ", img_comp)
+        RescaleSlope = float(ds.get((0x2005, 0x100E), pydicom.DataElement((0x2005, 0x100E), 'DS', 1)).value)
 
-        resc_img = RescaleSlope*(img-RescaleIntercept)
+        resc_img = (img-RescaleIntercept)/RescaleSlope
 
-        if img_comp == "R" and echo_num == 1:
-            err_flag = False
-            echoes = list()
-
-        if img_comp == "R":
-            aux_img = np.expand_dims(resc_img,axis=-1)
-        elif img_comp == "I":
-            aux_img = np.concatenate([aux_img,np.expand_dims(resc_img,axis=-1)], axis=-1)
-            if aux_img.shape[-1] == 2:
-                echoes.append(aux_img)
-            else:
-                err_flag = True
-
-            if echo_all == len(echoes) and (not err_flag):
-                im_echoes = np.stack(echoes, axis=0)
-                # Normalization considering max magnitude value
-                mag_echoes = np.sqrt(np.sum(np.square(im_echoes),axis=-1,keepdims=True))
-                im_echoes_norm = im_echoes/np.max(mag_echoes)
-                # Masking considering magnitude threshold
-                im_echoes_mean = np.mean(mag_echoes/np.max(mag_echoes),axis=0,keepdims=True)
-                im_echoes_mask = np.repeat(im_echoes_mean>0.05,echo_all,axis=0)
-                im_echoes_mask = np.repeat(im_echoes_mask,2,axis=-1)
-                images.append(np.where(im_echoes_mask,im_echoes_norm,0.0))
+        if img_comp == "M":
+            X[n_sl,echo_num-1,:,:,0] *= resc_img
+        elif img_comp == "P":
+            X[n_sl,echo_num-1,:,:,0] *= np.exp(1j*resc_img)
+            # TE[n_sl,echo_num-1] = echo_time
+            if echo_num == echo_all:
                 n_sl += 1
+    
+    X = X[:n_sl,...]
+    # TE = TE[:n_sl,...]
 
-    # print("No. slices:", n_sl)
-    # for i, arr in enumerate(images):
-        # print(i, arr.shape, arr.dtype)
-    images = np.stack(images, axis=0)  # (num_echoes, H, W, 2)
+    rem_sl = []
+    for sl in range(X.shape[0]):
+        for ech in range(X.shape[1]):
+            if (abs(X[sl,ech,...]) <= 1.1).all():
+                rem_sl.append(sl)
+                break
+        X_sc = np.max(X[sl,...])
+        X[sl,...] /= X_sc
+    X = np.delete(X,rem_sl,axis=0)
+    # TE = np.delete(TE,rem_sl,axis=0)
+    X = np.concatenate([np.real(X),np.imag(X)],axis=-1)  # (num_echoes, H, W, 2)
 
     # Quantitative maps
     # out_maps = np.ones([n_sl,3,images.shape[1],images.shape[2],2], dtype=np.float32)
 
-    return images
+    return X
 
 
 def tf_load_dicom_series(folder_path):
