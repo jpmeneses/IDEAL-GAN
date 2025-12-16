@@ -104,9 +104,9 @@ if args.train_data == 'HDF5':
         len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
         
         if args.training_mode == 'supervised':
-            B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
+            A_B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
         else:
-            B_dataset = tf.data.Dataset.from_tensor_slices((trainX, trainY))
+            A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX, trainY))
 
     else:
         c_pha = 3
@@ -133,22 +133,22 @@ if args.train_data == 'HDF5':
             trainY = data.load_hdf5(args.dataset_dir,dataset_hdf5_2, ech_idx, end=end_idx,
                                     acqs_data=False, te_data=False, MEBCRN=True,
                                     mag_and_phase=True, unwrap=True)
-            B_dataset = tfr_dataset.skip(end_idx).map(_parse_function)
-            B_dataset_aux = tf.data.Dataset.from_tensor_slices(trainY)
-            B_dataset = B_dataset.concatenate(B_dataset_aux)
+            A_B_dataset = tfr_dataset.skip(end_idx).map(_parse_function)
+            A_B_dataset_aux = tf.data.Dataset.from_tensor_slices(trainY)
+            A_B_dataset = A_B_dataset.concatenate(A_B_dataset_aux)
         else:
-            B_dataset = tfr_dataset.map(_parse_function)
+            A_B_dataset = tfr_dataset.map(_parse_function)
 
-        for B in B_dataset.take(1):
+        for B in A_B_dataset.take(1):
             n_ch,hgt,wdt,n_out = B.shape
             print(B.shape)
         len_dataset = int(args.DL_filename.split('_')[-1])
         if args.DL_partial_real != 0:
             len_dataset += trainY.shape[0]
 
-    B_dataset = B_dataset.batch(args.batch_size)
+    A_B_dataset = A_B_dataset.batch(args.batch_size)
     if args.shuffle:
-        B_dataset = B_dataset.shuffle(len_dataset)
+        A_B_dataset = A_B_dataset.shuffle(len_dataset)
 
 else:
     folders = [os.path.join(args.dataset_dir, d) for d in os.listdir(args.dataset_dir) if os.path.isdir(os.path.join(args.dataset_dir, d))]
@@ -163,37 +163,26 @@ else:
         folders_cse.append(os.path.join(f,cse_scan[0]))
     num_fold = len(folders_cse)
 
-    A_dataset = tf.data.Dataset.from_tensor_slices(folders_cse)
+    A_B_dataset = tf.data.Dataset.from_tensor_slices(folders_cse)
     if args.train_data == 'DICOM':
-        A_dataset = A_dataset.map(lambda f: data.tf_load_dicom_series(f))
+        A_B_dataset = A_B_dataset.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
-        A_dataset = A_dataset.map(lambda f: data.tf_load_nifti_series(f))
-    A_dataset = A_dataset.unbatch()
+        A_B_dataset = A_B_dataset.map(lambda f: data.tf_load_nifti_series(f))
+    A_B_dataset = A_B_dataset.unbatch()
 
-    len_dataset = sum(1 for _ in A_dataset)
-    for a in A_dataset.take(1):
+    len_dataset = sum(1 for _ in A_B_dataset)
+    for a in A_B_dataset.take(1):
         ne,hgt,wdt,n_ch = a.shape
-    A_dataset = A_dataset.batch(args.batch_size).shuffle(len_dataset)
+    A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
 
-    A_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//2)])
+    A_B_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//2)])
     if args.train_data == 'DICOM':
-        A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
+        A_B_dataset_val = A_B_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
-        A_dataset_val = A_dataset_val.map(lambda f: data.tf_load_nifti_series(f))
-    A_dataset_val = A_dataset_val.unbatch()
-    len_val = sum(1 for _ in A_dataset_val)
-    A_dataset_val = A_dataset_val.batch(1)
-
-
-
-
-
-
-
-
-
-args.dataset_dir = '../datasets/'
-
+        A_B_dataset_val = A_B_dataset_val.map(lambda f: data.tf_load_nifti_series(f))
+    A_B_dataset_val = A_B_dataset_val.unbatch()
+    len_val = sum(1 for _ in A_B_dataset_val)
+    A_B_dataset_val = A_B_dataset_val.batch(1)
 
 
 # ==============================================================================
@@ -236,8 +225,8 @@ G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args
 def train_G(B, A=None, te=None):
     if A is None:
         A = IDEAL_op(B, te=te, training=False)
+        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         # Compute model's output
         if args.n_echoes==0:
@@ -249,25 +238,32 @@ def train_G(B, A=None, te=None):
 
         A2B_WF_mag, A2B2A_mag, A_demod = wf.CSE_mag(A_mag, A2B_R2, [args.field, te],
                                                     demod_signal=True, R2_prob=(args.main_loss=='Rice'))
-        A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
         A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
 
         A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
 
         ############### Splited losses ####################
-        WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag)
-        R2_loss = loss_fn(B[:,2:,:,:,1:], A2B_R2)
+        if B is not None:
+            A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
+            WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag)
+            R2_loss = loss_fn(B[:,2:,:,:,1:], A2B_R2)
+
+            if args.main_loss == 'Rice':
+                R2_TV_aux = A2B_R2.nu
+            else:
+                R2_TV_aux = A2B_R2
+            R2_TV = tf.reduce_sum(tf.image.total_variation(R2_TV_aux[:,0,...]))
+
+        else:
+            WF_abs_loss = tf.constant(0.0)
+            R2_loss = tf.constant(0.0)
+            R2_TV = tf.constant(0.0)
 
         if args.training_mode == 'supervised':
             G_loss = R2_loss
         elif args.training_mode == 'unsupervised':
             G_loss = A2B2A_cycle_loss
 
-        if args.main_loss == 'Rice':
-            R2_TV_aux = A2B_R2.nu
-        else:
-            R2_TV_aux = A2B_R2
-        R2_TV = tf.reduce_sum(tf.image.total_variation(R2_TV_aux[:,0,...]))
         G_loss += R2_TV * args.R2_TV_weight
         
         Ad_aux = tf.reshape(A_demod,[-1,A2B2A_mag.shape[2],A2B2A_mag.shape[3],A2B2A_mag.shape[4]])
@@ -293,9 +289,9 @@ def train_step(B, A=None, te=None):
 def sample(B, A=None, te=None):
     if A is None:
         A = IDEAL_op(B, te=te, training=False)
+        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+        B_abs = tf.concat([B_WF_abs,B[:,2:,:,:,1:]],axis=1)
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
-    B_abs = tf.concat([B_WF_abs,B[:,2:,:,:,1:]],axis=1)
     
     # Compute model's output
     if args.n_echoes==0:
@@ -306,17 +302,21 @@ def sample(B, A=None, te=None):
         A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
     A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
-    A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
     A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
     A2B = tf.concat([A2B_WF_mag,A2B_R2], axis=1)
-    if args.main_loss == 'Rice':
-        A2B = tf.where(B_abs!=0.0,A2B,0.0)
 
     A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
 
     ############### Splited losses ####################
-    WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
-    R2_loss = loss_alt(B[:,2:,:,:,1:], A2B_R2)
+    if B is not None:
+        A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
+        WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
+        R2_loss = loss_alt(B[:,2:,:,:,1:], A2B_R2)
+        if args.main_loss == 'Rice':
+            A2B = tf.where(B_abs!=0.0,A2B,0.0)
+    else:
+        WF_abs_loss = tf.constant(0.0)
+        R2_loss = tf.constant(0.0)
 
     return A2B2A_mag, A2B, {'A2B2A_cycle_loss': A2B2A_cycle_loss,
                             'WF_loss': WF_abs_loss,
@@ -364,33 +364,41 @@ for ep in range(args.epochs):
     ep_cnt.assign_add(1)
 
     # train for an epoch
-    for B in B_dataset:
-        if len(B) > 1:
-            A = B[0]
-            B = B[1]
+    for X in A_B_dataset:
+        if len(X) > 1:
+            A = X[0]
+            B = X[1]
+        elif X.shape[1] >= 6:
+            A = X
+            B = None
+            if args.field == 3.0:
+                te_var=wf.gen_TEvar(args.n_echoes, bs=A.shape[0],
+                                    TE_ini_min=0.879e-3, d_TE_min=0.662e-3)
+            else:
+                te_var = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True)
         else:
             A = None
-
+            B = X
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
-        p = np.random.rand()
-        if p <= 0.4:
-            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
-            
-            # Random 90 deg rotations
-            B = tf.image.rot90(B,k=np.random.randint(3))
+            p = np.random.rand()
+            if p <= 0.4:
+                B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
+                
+                # Random 90 deg rotations
+                B = tf.image.rot90(B,k=np.random.randint(3))
 
-            # Random horizontal reflections
-            B = tf.image.random_flip_left_right(B)
+                # Random horizontal reflections
+                B = tf.image.random_flip_left_right(B)
 
-            # Random vertical reflections
-            B = tf.image.random_flip_up_down(B)
+                # Random vertical reflections
+                B = tf.image.random_flip_up_down(B)
 
-            if args.gen_data_aug:
-                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
-            else:
-                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+                if args.gen_data_aug:
+                    B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
+                else:
+                    B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
         
         # ==============================================================================
 
@@ -398,15 +406,15 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-        if args.n_echoes == 0:
-            ne_sel = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
-        else:
-            ne_sel = 0
-        if args.field == 3.0:
-            te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.8e-3,
-                                TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
-        else:
-            te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
+            if args.n_echoes == 0:
+                ne_sel = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
+            else:
+                ne_sel = 0
+            if args.field == 3.0:
+                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.8e-3,
+                                    TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
+            else:
+                te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 
         G_loss_dict = train_step(B, A, te=te_var)
 
@@ -418,12 +426,19 @@ for ep in range(args.epochs):
 
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 100//args.batch_size):
-            A, B = next(val_iter)
+            X = next(val_iter)
+            if len(X) > 1:
+                A = X[0]
+                B = X[1]
+                B = tf.expand_dims(B, axis=0)
+                B_WF = B[:,:2,:,:,:]
+                B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
+            else:
+                A = X
+                B = None
             A = tf.expand_dims(A, axis=0)
-            B = tf.expand_dims(B, axis=0)
-            A = A[:,:ne_sel,...]
-            B_WF = B[:,:2,:,:,:]
-            B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
+            ne_sel_val = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
+            A = A[:,:ne_sel_val,...]
 
             if args.field == 3.0:
                 TE_valid = wf.gen_TEvar(A.shape[1], 1, TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
@@ -513,29 +528,35 @@ for ep in range(args.epochs):
             fig.delaxes(axs[1,5])
 
             # Ground-truth in the third row
-            wn_aux = np.squeeze(B_WF_abs[:,0,:,:,:])
-            W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
-                                interpolation='none', vmin=0, vmax=1)
-            fig.colorbar(W_unet, ax=axs[2,1])
-            axs[2,1].axis('off')
+            if B is not None:
+                wn_aux = np.squeeze(B_WF_abs[:,0,:,:,:])
+                W_unet = axs[2,1].imshow(wn_aux, cmap='bone',
+                                    interpolation='none', vmin=0, vmax=1)
+                fig.colorbar(W_unet, ax=axs[2,1])
+                axs[2,1].axis('off')
 
-            fn_aux = np.squeeze(B_WF_abs[:,1,:,:,:])
-            F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
-                                interpolation='none', vmin=0, vmax=1)
-            fig.colorbar(F_unet, ax=axs[2,2])
-            axs[2,2].axis('off')
+                fn_aux = np.squeeze(B_WF_abs[:,1,:,:,:])
+                F_unet = axs[2,2].imshow(fn_aux, cmap='pink',
+                                    interpolation='none', vmin=0, vmax=1)
+                fig.colorbar(F_unet, ax=axs[2,2])
+                axs[2,2].axis('off')
 
-            r2n_aux = np.squeeze(B[:,2,:,:,1])
-            r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
-                                 interpolation='none', vmin=0, vmax=r2_sc)
-            fig.colorbar(r2_unet, ax=axs[2,3])
-            axs[2,3].axis('off')
+                r2n_aux = np.squeeze(B[:,2,:,:,1])
+                r2_unet = axs[2,3].imshow(r2n_aux*r2_sc, cmap='copper',
+                                     interpolation='none', vmin=0, vmax=r2_sc)
+                fig.colorbar(r2_unet, ax=axs[2,3])
+                axs[2,3].axis('off')
 
-            fieldn_aux = np.squeeze(B[:,2,:,:,0])
-            field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
-                                    interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
-            fig.colorbar(field_unet, ax=axs[2,4])
-            axs[2,4].axis('off')
+                fieldn_aux = np.squeeze(B[:,2,:,:,0])
+                field_unet = axs[2,4].imshow(fieldn_aux*fm_sc, cmap='twilight',
+                                        interpolation='none', vmin=-fm_sc/2, vmax=fm_sc/2)
+                fig.colorbar(field_unet, ax=axs[2,4])
+                axs[2,4].axis('off')
+            else:
+                fig.delaxes(axs[2,1])
+                fig.delaxes(axs[2,2])
+                fig.delaxes(axs[2,3])
+                fig.delaxes(axs[2,4])
             fig.delaxes(axs[2,0])
             fig.delaxes(axs[2,5])
 
