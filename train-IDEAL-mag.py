@@ -354,7 +354,7 @@ val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summarie
 val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(len_val))
+n_div = np.ceil(total_steps/len_val)
 
 # main loop
 for ep in range(args.epochs):
