@@ -176,7 +176,7 @@ else:
         ne,hgt,wdt,n_ch = a.shape
     A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
 
-    A_B_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//2)])
+    A_B_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//6)])
     if args.train_data == 'DICOM':
         A_B_dataset_val = A_B_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
@@ -373,8 +373,8 @@ for ep in range(args.epochs):
             A = X
             B = None
             if args.field == 3.0:
-                te_var=wf.gen_TEvar(args.n_echoes, bs=A.shape[0],
-                                    TE_ini_min=0.879e-3, d_TE_min=0.662e-3)
+                te_var=wf.gen_TEvar(args.n_echoes, bs=A.shape[0], TE_ini_min=0.879e-3, 
+                                    TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
             else:
                 te_var = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True)
         else:
