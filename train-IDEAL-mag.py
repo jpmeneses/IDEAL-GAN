@@ -431,13 +431,13 @@ for ep in range(args.epochs):
             if len(X) > 1:
                 A = X[0]
                 B = X[1]
+                A = tf.expand_dims(A, axis=0)
                 B = tf.expand_dims(B, axis=0)
                 B_WF = B[:,:2,:,:,:]
                 B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
             else:
                 A = X
                 B = None
-            A = tf.expand_dims(A, axis=0)
             ne_sel_val = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
             A = A[:,:ne_sel_val,...]
 
