@@ -72,6 +72,7 @@ if args.train_data == 'HDF5':
     valX, valY = data.load_hdf5(args.dataset_dir, dataset_hdf5_1, ech_idx,
                                 acqs_data=True, te_data=False, MEBCRN=True)
 
+    len_val = len(valY)
     A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX, valY))
     A_B_dataset_val.batch(1)
 
@@ -353,7 +354,7 @@ val_summary_writer = tf.summary.create_file_writer(py.join(output_dir, 'summarie
 val_iter = cycle(A_B_dataset_val)
 sample_dir = py.join(output_dir, 'samples_training')
 py.mkdir(sample_dir)
-n_div = np.ceil(total_steps/len(valY))
+n_div = np.ceil(total_steps/len(len_val))
 
 # main loop
 for ep in range(args.epochs):
