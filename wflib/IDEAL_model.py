@@ -335,9 +335,9 @@ def CSE_mag(acqs, out_maps, params, demod_signal=False, R2_prob=False, uncertain
     ne = te.shape[1]
 
     if te is None:
-        if field == 1.5:
+        if params[0] == 1.5:
             te = gen_TEvar(ne, bs=n_batch, orig=True) # (nb,ne,1)
-        elif field == 3.0:
+        elif params[0] == 3.0:
             te = gen_TEvar(ne, bs=n_batch, TE_ini_min=0.879e-3, TE_ini_d=None, d_TE_min=0.6623e-3, d_TE_d=None) 
 
     M = gen_M(te, field=params[0], get_Mpinv=False) # (nb,ne,ns)
