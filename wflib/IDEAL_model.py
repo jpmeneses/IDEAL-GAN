@@ -350,7 +350,11 @@ def CSE_mag(acqs, out_maps, params, demod_signal=False, R2_prob=False, uncertain
     if R2_prob:
         r2s_nu = out_maps.nu
         r2s_nu = r2s_nu[:,0,:,:,0] * r2_sc
+        if params[0] == 3.0:
+            r2s_nu *= 3.0
     r2s = out_maps[:,0,:,:,0] * r2_sc # (nb,hgt,wdt)
+    if params[0] == 3.0:
+        r2s *= 3.0
 
     # IDEAL Operator evaluation for xi = phi + 1j*r2s/(2*np.pi)
     xi_rav = tf.reshape(r2s,[n_batch,-1])
