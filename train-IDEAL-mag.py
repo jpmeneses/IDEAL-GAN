@@ -438,6 +438,7 @@ for ep in range(args.epochs):
                 A = A[:,:ne_sel_val,...]
                 B_WF = B[:,:2,:,:,:]
                 B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
+                TE_valid = wf.gen_TEvar(ne_sel_val, 1, orig=True)
             elif X.shape[1] >= 6:
                 A = X
                 B = None
