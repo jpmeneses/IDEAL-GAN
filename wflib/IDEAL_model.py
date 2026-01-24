@@ -14,7 +14,7 @@ f_p = tf.expand_dims(f_p,0)
 A_p = np.array([[1.0,0.0],[0.0,0.087],[0.0,0.693],[0.0,0.128],[0.0,0.004],[0.0,0.039],[0.0,0.048]])
 A_p = tf.convert_to_tensor(A_p,dtype=tf.complex64)
 
-r2_sc = 200.0   # HR:150 / GC:200
+# r2_sc = 200.0   # HR:150 / GC:200
 fm_sc = 300.0   # HR:300 / GC:400
 rho_sc = 1.4
 
@@ -131,7 +131,7 @@ def eigenvals(X):
 
 
 
-def acq_to_acq(acqs, param_maps, te=None, field=1.5, only_mag=False):
+def acq_to_acq(acqs, param_maps, te=None, field=1.5, r2_sc=200.0, only_mag=False):
     n_batch,ne,hgt,wdt,n_ch = acqs.shape
 
     if te is None:
@@ -193,7 +193,7 @@ def acq_to_acq(acqs, param_maps, te=None, field=1.5, only_mag=False):
 
 
 #@tf.custom_gradient
-def IDEAL_model(out_maps, params):
+def IDEAL_model(out_maps, params, r2_sc=200.0):
     n_batch,_,hgt,wdt,_ = out_maps.shape
 
     te = params[1] # (nb,ne,1)
@@ -276,14 +276,15 @@ def IDEAL_model(out_maps, params):
 
 
 class IDEAL_Layer(tf.keras.layers.Layer):
-    def __init__(self, field=1.5):
+    def __init__(self, field=1.5, r2_sc=200.0):
         super(IDEAL_Layer, self).__init__()
         self.field = field
+        self.r2_sc = r2_sc
 
     def call(self,out_maps,te=None,ne=6,training=None):
         if te is None:
             te = gen_TEvar(ne, out_maps.shape[0], orig=True)
-        return IDEAL_model(out_maps, [self.field, te])
+        return IDEAL_model(out_maps, [self.field, te], r2_sc=self.r2_sc)
 
 
 class LWF_Layer(tf.keras.layers.Layer):
@@ -326,7 +327,7 @@ class LWF_Layer(tf.keras.layers.Layer):
         return res_gt
 
 
-def CSE_mag(acqs, out_maps, params, demod_signal=False, R2_prob=False, uncertainty=False):
+def CSE_mag(acqs, out_maps, params, r2_sc=200.0, demod_signal=False, R2_prob=False, uncertainty=False):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
@@ -399,7 +400,7 @@ def CSE_mag(acqs, out_maps, params, demod_signal=False, R2_prob=False, uncertain
         return (res_rho,res_gt)
 
 
-def IDEAL_mag(out_maps, params):
+def IDEAL_mag(out_maps, params, r2_sc=200.0):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
@@ -451,7 +452,7 @@ def IDEAL_mag(out_maps, params):
     return res_gt
 
 
-def IDEAL_mag_phase(out_maps, params):
+def IDEAL_mag_phase(out_maps, params, r2_sc=200.0):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)
@@ -523,7 +524,7 @@ class IDEAL_mag_Layer(tf.keras.layers.Layer):
 
 
 @tf.function
-def get_Ps_norm(acqs,param_maps,te=None):
+def get_Ps_norm(acqs,param_maps,te=None, r2_sc=200.0):
     n_batch,hgt,wdt,d_ech = acqs.shape
     n_ech = d_ech//2
 
@@ -577,7 +578,7 @@ def get_Ps_norm(acqs,param_maps,te=None):
     return L2_norm
 
 
-def get_rho(acqs, param_maps, field=1.5, te=None, phase_constraint=False, MEBCRN=True, acq_demod=False):
+def get_rho(acqs, param_maps, field=1.5, te=None, r2_sc=200.0, phase_constraint=False, MEBCRN=True, acq_demod=False):
     if MEBCRN:
         n_batch,ne,hgt,wdt,n_ch = acqs.shape
     else:
@@ -678,7 +679,7 @@ def get_rho(acqs, param_maps, field=1.5, te=None, phase_constraint=False, MEBCRN
 
 
 #@tf.function
-def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
+def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, r2_sc=200.0, rem_R2=False):
     n_batch,ne,hgt,wdt,_ = acqs.shape
     
     if te is None:
@@ -760,7 +761,7 @@ def PDFF_uncertainty(acqs, phi_tfp, r2s_tfp, te=None, rem_R2=False):
 
 
 #@tf.function
-def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, field=1.5, rem_R2=False, only_mag=False):
+def acq_uncertainty(rho_maps, phi_tfp, r2s_tfp, ne=6, te=None, r2_sc=200.0, field=1.5, rem_R2=False, only_mag=False):
     n_batch,_,hgt,wdt,n_ch = rho_maps.shape
 
     if te is None:
@@ -852,7 +853,7 @@ def acq_mag_demod(acqs_abs, out_maps, te=None):
     return res_gt 
 
 
-def recon_demod_abs(ech1_abs, out_maps, te=None):
+def recon_demod_abs(ech1_abs, out_maps, te=None, r2_sc=200.0):
     n_batch,_,hgt,wdt,_ = out_maps.shape
     voxel_shape = tf.convert_to_tensor((hgt,wdt))
     num_voxel = tf.math.reduce_prod(voxel_shape)

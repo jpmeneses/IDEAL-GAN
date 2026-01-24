@@ -204,7 +204,7 @@ G_mag = dl.UNet(input_shape=(None,hgt,wdt,1),
                 output_activation='sigmoid',
                 self_attention=args.D1_SelfAttention)
 
-IDEAL_op = wf.IDEAL_Layer(field=args.field)
+IDEAL_op = wf.IDEAL_Layer(field=args.field, r2_sc=r2_sc)
 
 if args.main_loss == 'Rice':
     loss_fn = lambda y, p_y: -p_y.log_prob(y)
@@ -305,7 +305,7 @@ def sample(B, A=None, te=None):
     if args.main_loss != 'Rice':
         A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
 
-    A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te])
+    A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te], r2_sc=r2_sc)
     A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
     A2B = tf.concat([A2B_WF_mag,A2B_R2], axis=1)
 
