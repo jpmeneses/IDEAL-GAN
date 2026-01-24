@@ -372,18 +372,21 @@ for ep in range(args.epochs):
         if len(X) > 1:
             A = X[0]
             B = X[1]
+            bs = A.shape[0]
         elif X.shape[1] >= 6:
             A = X
             B = None
+            bs = X.shape[0]
         else:
             A = None
             B = X
+            bs = X.shape[0]
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
         p = np.random.rand()
         if p <= 0.4:
-            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
+            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[bs,hgt,wdt,n_out*n_ch])
             
             # Random 90 deg rotations
             B = tf.image.rot90(B,k=np.random.randint(3))
@@ -395,9 +398,9 @@ for ep in range(args.epochs):
             B = tf.image.random_flip_up_down(B)
 
             if args.gen_data_aug:
-                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
+                B = tf.transpose(tf.reshape(B,[bs,hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
             else:
-                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+                B = tf.transpose(tf.reshape(B,[bs,hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
         
         # ==============================================================================
 
@@ -411,13 +414,13 @@ for ep in range(args.epochs):
             ne_sel = 0
         if args.field == 3.0:
             if args.n_echoes==0:
-                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.8e-3,
+                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=bs, TE_ini_min=0.8e-3,
                                     TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
             else:
-                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.879e-3,
+                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=bs, TE_ini_min=0.879e-3,
                                     TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
         else:
-            te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
+            te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=bs)
 
         G_loss_dict = train_step(B, A, te=te_var)
 
