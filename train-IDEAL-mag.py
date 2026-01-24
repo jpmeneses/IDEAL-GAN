@@ -229,8 +229,8 @@ G_optimizer = tf.keras.optimizers.Adam(learning_rate=G_lr_scheduler, beta_1=args
 def train_G(B, A=None, te=None):
     if A is None:
         A = IDEAL_op(B, te=te, training=False)
-        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
     with tf.GradientTape() as t:
         # Compute model's output
         if args.n_echoes==0:
@@ -293,9 +293,9 @@ def train_step(B, A=None, te=None):
 def sample(B, A=None, te=None):
     if A is None:
         A = IDEAL_op(B, te=te, training=False)
-        B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
-        B_abs = tf.concat([B_WF_abs,B[:,2:,:,:,1:]],axis=1)
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+    B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
+    B_abs = tf.concat([B_WF_abs,B[:,2:,:,:,1:]],axis=1)
     
     # Compute model's output
     if args.n_echoes==0:
@@ -375,11 +375,6 @@ for ep in range(args.epochs):
         elif X.shape[1] >= 6:
             A = X
             B = None
-            if args.field == 3.0:
-                te_var=wf.gen_TEvar(args.n_echoes, bs=A.shape[0], TE_ini_min=0.879e-3, 
-                                    TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
-            else:
-                te_var = wf.gen_TEvar(args.n_echoes, bs=A.shape[0], orig=True)
         else:
             A = None
             B = X
@@ -415,8 +410,12 @@ for ep in range(args.epochs):
             else:
                 ne_sel = 0
             if args.field == 3.0:
-                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.8e-3,
-                                    TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
+                if args.n_echoes==0:
+                    te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.8e-3,
+                                        TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
+                else:
+                    te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.879e-3,
+                                        TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
             else:
                 te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 
