@@ -381,23 +381,23 @@ for ep in range(args.epochs):
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
-            p = np.random.rand()
-            if p <= 0.4:
-                B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
-                
-                # Random 90 deg rotations
-                B = tf.image.rot90(B,k=np.random.randint(3))
+        p = np.random.rand()
+        if p <= 0.4:
+            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[B.shape[0],hgt,wdt,n_out*n_ch])
+            
+            # Random 90 deg rotations
+            B = tf.image.rot90(B,k=np.random.randint(3))
 
-                # Random horizontal reflections
-                B = tf.image.random_flip_left_right(B)
+            # Random horizontal reflections
+            B = tf.image.random_flip_left_right(B)
 
-                # Random vertical reflections
-                B = tf.image.random_flip_up_down(B)
+            # Random vertical reflections
+            B = tf.image.random_flip_up_down(B)
 
-                if args.gen_data_aug:
-                    B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
-                else:
-                    B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+            if args.gen_data_aug:
+                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
+            else:
+                B = tf.transpose(tf.reshape(B,[B.shape[0],hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
         
         # ==============================================================================
 
@@ -405,19 +405,19 @@ for ep in range(args.epochs):
         # =                                RANDOM TEs                                  =
         # ==============================================================================
         
-            if args.n_echoes == 0:
-                ne_sel = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
+        if args.n_echoes == 0:
+            ne_sel = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
+        else:
+            ne_sel = 0
+        if args.field == 3.0:
+            if args.n_echoes==0:
+                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.8e-3,
+                                    TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
             else:
-                ne_sel = 0
-            if args.field == 3.0:
-                if args.n_echoes==0:
-                    te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.8e-3,
-                                        TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
-                else:
-                    te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.879e-3,
-                                        TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
-            else:
-                te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
+                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0], TE_ini_min=0.879e-3,
+                                    TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
+        else:
+            te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=B.shape[0])
 
         G_loss_dict = train_step(B, A, te=te_var)
 
