@@ -23,6 +23,7 @@ py.arg('--dataset', default='WF-IDEAL')
 py.arg('--train_data', default='HDF5', choices=['HDF5','DICOM','NIFTI'])
 py.arg('--dataset_dir', default='../datasets/')
 py.arg('--training_mode', default='supervised', choices=['supervised','unsupervised'])
+py.arg('--data_aug', type=bool, default=False)
 py.arg('--gen_data_aug', type=bool, default=False)
 py.arg('--gen_partial_real', type=int, default=0, choices=[0,2,6,10])
 py.arg('--gen_filename', default='LDM_ds')
@@ -384,23 +385,24 @@ for ep in range(args.epochs):
         # ==============================================================================
         # =                             DATA AUGMENTATION                              =
         # ==============================================================================
-        p = np.random.rand()
-        if p <= 0.4:
-            B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[bs,hgt,wdt,n_out*n_ch])
-            
-            # Random 90 deg rotations
-            B = tf.image.rot90(B,k=np.random.randint(3))
+        if args.data_aug:
+            p = np.random.rand()
+            if p <= 0.4:
+                B = tf.reshape(tf.transpose(B,perm=[0,2,3,1,4]),[bs,hgt,wdt,n_out*n_ch])
+                
+                # Random 90 deg rotations
+                B = tf.image.rot90(B,k=np.random.randint(3))
 
-            # Random horizontal reflections
-            B = tf.image.random_flip_left_right(B)
+                # Random horizontal reflections
+                B = tf.image.random_flip_left_right(B)
 
-            # Random vertical reflections
-            B = tf.image.random_flip_up_down(B)
+                # Random vertical reflections
+                B = tf.image.random_flip_up_down(B)
 
-            if args.gen_data_aug:
-                B = tf.transpose(tf.reshape(B,[bs,hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
-            else:
-                B = tf.transpose(tf.reshape(B,[bs,hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
+                if args.gen_data_aug:
+                    B = tf.transpose(tf.reshape(B,[bs,hgt,wdt,n_ch,n_out]),[0,3,1,2,4])
+                else:
+                    B = tf.transpose(tf.reshape(B,[bs,hgt,wdt,n_out,n_ch]),[0,3,1,2,4])
         
         # ==============================================================================
 
