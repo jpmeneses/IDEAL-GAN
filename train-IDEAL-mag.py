@@ -435,32 +435,35 @@ for ep in range(args.epochs):
         # sample
         if (G_optimizer.iterations.numpy() % n_div == 0) or (G_optimizer.iterations.numpy() < 100//args.batch_size):
             X = next(val_iter)
-            ne_sel_val = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
+            if args.n_echoes == 0:
+                ne_sel_val = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
+            else:
+                ne_sel_val = 0
             if len(X) > 1:
                 A = tf.expand_dims(X[0], axis=0)
                 B = tf.expand_dims(X[1], axis=0)
                 A = A[:,:ne_sel_val,...]
                 B_WF = B[:,:2,:,:,:]
                 B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
-                TE_valid = wf.gen_TEvar(ne_sel_val, 1, orig=True)
+                TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel_val, 1, orig=True)
             elif X.shape[1] >= 6:
                 A = X
                 B = None
                 if args.field == 3.0:
-                    TE_valid=wf.gen_TEvar(ne_sel_val, bs=A.shape[0], TE_ini_min=0.879e-3, 
+                    TE_valid=wf.gen_TEvar(args.n_echoes+ne_sel_val, bs=A.shape[0], TE_ini_min=0.879e-3, 
                                         TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
                 else:
-                    TE_valid = wf.gen_TEvar(ne_sel_val, bs=A.shape[0], orig=True)
-                A = A[:,:ne_sel_val,...]
+                    TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel_val, bs=A.shape[0], orig=True)
+                A = A[:,:(args.n_echoes+ne_sel_val),...]
             else:
                 A = None
                 B = tf.expand_dims(X, axis=0)
                 B_WF = B[:,:2,:,:,:]
                 B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
                 if args.field == 3.0:
-                    TE_valid = wf.gen_TEvar(ne_sel_val, 1, TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
+                    TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel_val, 1, TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
                 else:
-                    TE_valid = wf.gen_TEvar(ne_sel_val, 1, orig=True)
+                    TE_valid = wf.gen_TEvar(args.n_echoes+ne_sel_val, 1, orig=True)
             
             B2A, B2A2B, val_A2B_dict = validation_step(B, A, te=TE_valid)
             B2A2B_WF_abs = B2A2B[:,:2,:,:,:]
