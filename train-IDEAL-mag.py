@@ -438,7 +438,7 @@ for ep in range(args.epochs):
             if len(X) > 1:
                 A = tf.expand_dims(X[0], axis=0)
                 B = tf.expand_dims(X[1], axis=0)
-                ne_sel_val = np.random.randint(args.min_rand_ne,A.shape[0]+1)
+                ne_sel_val = np.random.randint(args.min_rand_ne,A.shape[1]+1)
                 A = A[:,:ne_sel_val,...]
                 B_WF = B[:,:2,:,:,:]
                 B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B_WF),axis=-1,keepdims=True))
@@ -446,7 +446,7 @@ for ep in range(args.epochs):
             elif X.shape[1] >= 6:
                 A = X
                 B = None
-                ne_sel_val = np.random.randint(args.min_rand_ne,A.shape[0]+1)
+                ne_sel_val = np.random.randint(args.min_rand_ne,A.shape[1]+1)
                 if args.field == 3.0:
                     TE_valid=wf.gen_TEvar(ne_sel_val, bs=A.shape[0], TE_ini_min=0.879e-3, 
                                         TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
