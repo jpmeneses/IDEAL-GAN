@@ -4,6 +4,8 @@ import tensorflow_addons as tfa
 import tensorflow.keras as keras
 import tensorflow_probability as tfp
 
+import wflib as wf
+
 from DLlib import bn, complex_utils
 from DLlib.attention import SelfAttention, AdaIN
 
@@ -347,6 +349,9 @@ def UNet(
     bayesian=False,
     std_out=False,
     ME_layer=False,
+    CSE_layer=False,
+    field=1.5,
+    r2_sc=200.0,
     te_input=False,
     te_shape=(6,),
     filters=72,
@@ -421,6 +426,12 @@ def UNet(
     output = keras.layers.Conv2D(n_out, (1, 1), activation=output_activation, kernel_initializer=output_initializer)(x)
     if ME_layer:
         output = keras.layers.Lambda(lambda z: tf.expand_dims(z,axis=1))(output)
+    ###########################
+    #### ADD CSE-OP LAYER #####
+    if CSE_layer:
+        output = wf.CSE_to_CSE_Layer(field=field,r2_sc=r2_sc)([inputs1,output,inputs2])
+    ###########################
+    ###########################
     if bayesian or std_out:
         x_std = keras.layers.Conv2D(16, (1,1), activation='relu', kernel_initializer='he_uniform')(x)
         # Compute standard deviation (sigma; NOT sigma^2)
@@ -449,18 +460,6 @@ def UNet(
         return keras.Model(inputs=inputs1, outputs=[output,out_var])
     else:
         return keras.Model(inputs=inputs1, outputs=output)
-
-
-def CSE_sample(input_shape):
-    mean = inputs1 = keras.Input(input_shape)
-    std = inputs2 = keras.Input(input_shape)
-    x_prob = keras.layers.concatenate([mean, std])
-    out_prob = tfp.layers.DistributionLambda(
-                lambda t: tfp.distributions.Normal(
-                    loc=t[...,:input_shape[-1]],
-                    scale=tf.math.sqrt(t[...,input_shape[-1]:])),
-                )(x_prob)
-    return keras.Model(inputs=[inputs1,inputs2], outputs=out_prob)
 
 
 def MDWF_Generator(
