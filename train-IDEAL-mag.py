@@ -76,7 +76,7 @@ if args.train_data == 'HDF5':
     valX, valY = data.load_hdf5(args.dataset_dir, dataset_hdf5_1, ech_idx,
                                 acqs_data=True, te_data=False, MEBCRN=True)
 
-    len_val = len(valY)
+    len_val,n_out,hgt,wdt,n_ch = np.shape(valY)
     A_B_dataset_val = tf.data.Dataset.from_tensor_slices((valX, valY))
     A_B_dataset_val.batch(1)
 
@@ -105,13 +105,16 @@ if args.train_data == 'HDF5':
                                                 acqs_data=True, te_data=False, MEBCRN=True)
             trainX = np.concatenate((acqs_2,acqs_3,acqs_4),axis=0)
 
-        trainY  = np.concatenate((out_maps_2,out_maps_3,out_maps_4),axis=0)
-        len_dataset,n_out,hgt,wdt,n_ch = np.shape(trainY)
-        
         if args.training_mode == 'supervised':
-            A_B_dataset = tf.data.Dataset.from_tensor_slices(trainY)
+            A_B_dataset_2 = tf.data.Dataset.from_tensor_slices(out_maps_2)
+            A_B_dataset_3 = tf.data.Dataset.from_tensor_slices(out_maps_3)
+            A_B_dataset_4 = tf.data.Dataset.from_tensor_slices(out_maps_4)
         else:
-            A_B_dataset = tf.data.Dataset.from_tensor_slices((trainX, trainY))
+            A_B_dataset_2 = tf.data.Dataset.from_tensor_slices((acqs_2,out_maps_2))
+            A_B_dataset_3 = tf.data.Dataset.from_tensor_slices((acqs_3,out_maps_3))
+            A_B_dataset_4 = tf.data.Dataset.from_tensor_slices((acqs_4,out_maps_4))
+        A_B_dataset = A_B_dataset_2.concatenate(A_B_dataset_3).concatenate(A_B_dataset_4)
+        len_dataset = out_maps_2.shape[0] + out_maps_3.shape[0] + out_maps_4.shape[0]
 
     else:
         c_pha = 3
@@ -146,14 +149,13 @@ if args.train_data == 'HDF5':
 
         for B in A_B_dataset.take(1):
             n_ch,hgt,wdt,n_out = B.shape
-            print(B.shape)
         len_dataset = int(args.DL_filename.split('_')[-1])
         if args.DL_partial_real != 0:
             len_dataset += trainY.shape[0]
 
-    A_B_dataset = A_B_dataset.batch(args.batch_size)
     if args.shuffle:
         A_B_dataset = A_B_dataset.shuffle(len_dataset)
+    A_B_dataset = A_B_dataset.batch(args.batch_size)
 
 else:
     folders = [os.path.join(args.dataset_dir, d) for d in os.listdir(args.dataset_dir) if os.path.isdir(os.path.join(args.dataset_dir, d))]
@@ -373,6 +375,9 @@ for ep in range(args.epochs):
         if len(X) > 1:
             A = X[0]
             B = X[1]
+            if len(A.shape) < 5:
+                A = tf.expand_dims(A,0)
+                B = tf.expand_dims(B,0)
             bs = A.shape[0]
         elif X.shape[1] >= 6:
             A = X
