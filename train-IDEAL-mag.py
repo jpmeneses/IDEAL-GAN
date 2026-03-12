@@ -168,9 +168,9 @@ else:
         elif args.train_data == 'NIFTI':
             cse_scan = [item for item in scan_files if "nifti" in item]
         folders_cse.append(os.path.join(f,cse_scan[0]))
-    num_fold = len(folders_cse)
+    num_fold = len(folders_cse) - 2
 
-    A_B_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//6):])
+    A_B_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//8):]) # 
     if args.train_data == 'DICOM':
         A_B_dataset = A_B_dataset.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
@@ -182,7 +182,7 @@ else:
         ne,hgt,wdt,n_ch = a.shape
     A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
 
-    A_B_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//6)])
+    A_B_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//8)])
     if args.train_data == 'DICOM':
         A_B_dataset_val = A_B_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
@@ -233,6 +233,8 @@ def train_G(B, A=None, te=None):
     if A is None:
         A = IDEAL_op(B, te=te, training=False)
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
+    A_msk = tf.reduce_mean(A_mag, axis=1, keepdims=True)
+    A_msk_me = tf.repeat(A_msk,A.shape[1],axis=1)
     with tf.GradientTape() as t:
         # Compute model's output
         if args.n_echoes==0:
@@ -240,18 +242,18 @@ def train_G(B, A=None, te=None):
         else:
             A2B_R2 = G_mag(A_mag, training=True)
         if args.main_loss != 'Rice':
-            A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
+            A2B_R2 = tf.where(A_msk>=5e-2,A2B_R2,0.0)
 
-        A2B_WF_mag, A2B2A_mag, A_demod = wf.CSE_mag(A_mag, A2B_R2, [args.field, te],
+        A2B_WF_mag, A2B2A_mag, A_demod = wf.CSE_mag(A_mag, A2B_R2, [args.field, te], r2_sc=r2_sc,
                                                     demod_signal=True, R2_prob=(args.main_loss=='Rice'))
-        A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
+        A2B2A_mag = tf.where(A_msk_me>=5e-2,A2B2A_mag,0.0)
 
         A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
 
         ############### Splited losses ####################
         if B is not None:
             B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
-            A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
+            A2B_WF_mag = tf.where(B_WF_abs>=5e-2,A2B_WF_mag,0.0)
             WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag)
             R2_loss = loss_fn(B[:,2:,:,:,1:], A2B_R2)
 
@@ -297,17 +299,18 @@ def sample(B, A=None, te=None):
     if A is None:
         A = IDEAL_op(B, te=te, training=False)
     A_mag = tf.math.sqrt(tf.reduce_sum(tf.square(A),axis=-1,keepdims=True))
-    
+    A_msk = tf.reduce_mean(A_mag, axis=1, keepdims=True)
+    A_msk_me = tf.repeat(A_msk,A.shape[1],axis=1)
     # Compute model's output
     if args.n_echoes==0:
         A2B_R2 = G_mag([A_mag, te], training=False)
     else:
         A2B_R2 = G_mag(A_mag, training=False)
     if args.main_loss != 'Rice':
-        A2B_R2 = tf.where(A_mag[:,:1,...]!=0.0,A2B_R2,0.0)
+        A2B_R2 = tf.where(A_msk>=5e-2,A2B_R2,0.0)
 
     A2B_WF_mag, A2B2A_mag = wf.CSE_mag(A_mag, A2B_R2, [args.field, te], r2_sc=r2_sc)
-    A2B2A_mag = tf.where(A_mag!=0.0,A2B2A_mag,0.0)
+    A2B2A_mag = tf.where(A_msk_me>=5e-2,A2B2A_mag,0.0)
     A2B = tf.concat([A2B_WF_mag,A2B_R2], axis=1)
 
     A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
@@ -316,11 +319,11 @@ def sample(B, A=None, te=None):
     if B is not None:
         B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
         B_abs = tf.concat([B_WF_abs,B[:,2:,:,:,1:]],axis=1)
-        A2B_WF_mag = tf.where(B_WF_abs!=0.0,A2B_WF_mag,0.0)
+        A2B_WF_mag = tf.where(B_WF_abs>=5e-2,A2B_WF_mag,0.0)
         WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag[:,:1,:,:,:2])
         R2_loss = loss_alt(B[:,2:,:,:,1:], A2B_R2)
         if args.main_loss == 'Rice':
-            A2B = tf.where(B_abs!=0.0,A2B,0.0)
+            A2B = tf.where(B_abs>=5e-2,A2B,0.0)
     else:
         WF_abs_loss = tf.constant(0.0)
         R2_loss = tf.constant(0.0)
