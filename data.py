@@ -435,6 +435,8 @@ def load_dicom_series(folder_path):
     echo_all = int(ds.get((0x0018, 0x0091), pydicom.DataElement((0x0018, 0x0091), 'DS', 1)).value)
     X = np.ones((40,echo_all,img.shape[0],img.shape[1],1),dtype=np.complex64)
     # TE = np.zeros((40,echo_all),dtype=np.float32)
+    idx_mag = np.full((40,echo_all), True)
+    idx_pha = np.full((40,echo_all), True)
     n_sl = 0
     
     for j, f in enumerate(dicom_files):
@@ -451,26 +453,22 @@ def load_dicom_series(folder_path):
         resc_img = (img-RescaleIntercept)/RescaleSlope
 
         if img_comp == "M":
-            X[n_sl,echo_num-1,:,:,0] *= resc_img
+            if echo_num == 1:
+                resc_sc = np.max(resc_img)
+            X[n_sl,echo_num-1,:,:,0] *= resc_img/resc_sc
+            idx_mag[n_sl,echo_num-1] = False
         elif img_comp == "P":
             X[n_sl,echo_num-1,:,:,0] *= np.exp(1j*resc_img)
             # TE[n_sl,echo_num-1] = echo_time
+            idx_pha[n_sl,echo_num-1] = False
             if echo_num == echo_all:
                 n_sl += 1
     
-    X = X[:n_sl,...]
-    # TE = TE[:n_sl,...]
-
-    rem_sl = []
-    for sl in range(X.shape[0]):
-        for ech in range(X.shape[1]):
-            if (abs(X[sl,ech,...]) <= 1.1).all():
-                rem_sl.append(sl)
-                break
-        X_sc = np.max(X[sl,...])
-        X[sl,...] /= X_sc
-    X = np.delete(X,rem_sl,axis=0)
-    # TE = np.delete(TE,rem_sl,axis=0)
+    idx = np.logical_or(idx_mag,idx_pha)
+    idx2 = np.any(idx,1)
+    X = X[~idx2,...]
+    # TE = TE[~idx,...]
+    
     X = np.concatenate([np.real(X),np.imag(X)],axis=-1)  # (num_echoes, H, W, 2)
 
     # Quantitative maps
