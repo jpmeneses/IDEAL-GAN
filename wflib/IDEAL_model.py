@@ -350,8 +350,8 @@ def CSE_mag(acqs, out_maps, params, r2_sc=200.0, demod_signal=False, R2_prob=Fal
     WmS = tf.square(Wm * Smtx) # shape = (nb,ne,nv)
     AWmS = tf.linalg.matmul(A_pinv,WmS) # shape = (nb,3,nv)
     AAWmS = tf.linalg.matmul(A,AWmS) # shape = (nb,ne,nv)
-    Smtx_hat = tf.where(AAWmS<1e-6,0.0,tf.math.sqrt(AAWmS)) # shape = (nb,ne,nv)
-    Smtx_hat *= Wp 
+    # AAWmS = tf.where(AAWmS<1e-6,0.0,tf.math.sqrt(AAWmS)) # shape = (nb,ne,nv)
+    Smtx_hat = Wp * AAWmS
 
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
