@@ -42,6 +42,7 @@ py.arg('--beta_1', type=float, default=0.9)
 py.arg('--beta_2', type=float, default=0.999)
 py.arg('--main_loss', default='Rice', choices=['Rice', 'MSE', 'MAE', 'MSLE'])
 py.arg('--R2_TV_weight', type=float, default=0.0)
+py.arg('--LS_TV_weight', type=float, default=0.0)
 py.arg('--A_demod_TV_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 args = py.args()
@@ -63,7 +64,7 @@ else:
     ech_idx = 12
 fm_sc = 300.0
 if args.field == 3.0:
-    r2_sc = 600.0
+    r2_sc = 200.0
 else:
     r2_sc = 200.0
 
@@ -110,9 +111,9 @@ if args.train_data == 'HDF5':
             A_B_dataset_3 = tf.data.Dataset.from_tensor_slices(out_maps_3)
             A_B_dataset_4 = tf.data.Dataset.from_tensor_slices(out_maps_4)
         else:
-            A_B_dataset_2 = tf.data.Dataset.from_tensor_slices((acqs_2,out_maps_2))
-            A_B_dataset_3 = tf.data.Dataset.from_tensor_slices((acqs_3,out_maps_3))
-            A_B_dataset_4 = tf.data.Dataset.from_tensor_slices((acqs_4,out_maps_4))
+            A_B_dataset_2 = tf.data.Dataset.from_tensor_slices(acqs_2)
+            A_B_dataset_3 = tf.data.Dataset.from_tensor_slices(acqs_3)
+            A_B_dataset_4 = tf.data.Dataset.from_tensor_slices(acqs_4)
         A_B_dataset = A_B_dataset_2.concatenate(A_B_dataset_3).concatenate(A_B_dataset_4)
         len_dataset = out_maps_2.shape[0] + out_maps_3.shape[0] + out_maps_4.shape[0]
 
@@ -168,9 +169,9 @@ else:
         elif args.train_data == 'NIFTI':
             cse_scan = [item for item in scan_files if "nifti" in item]
         folders_cse.append(os.path.join(f,cse_scan[0]))
-    num_fold = len(folders_cse) - 2
+    num_fold = 32
 
-    A_B_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//8):]) # 
+    A_B_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//8):num_fold]) # 
     if args.train_data == 'DICOM':
         A_B_dataset = A_B_dataset.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
@@ -201,7 +202,7 @@ total_steps = np.ceil(len_dataset/args.batch_size)*args.epochs
 G_mag = dl.UNet(input_shape=(None,hgt,wdt,1),
                 bayesian=(args.main_loss=='Rice'),
                 ME_layer=True,
-                te_input=(args.n_echoes==0),
+                te_input=(args.training_mode=='supervised'),
                 te_shape=(None,),
                 filters=args.n_G_filters,
                 output_activation='sigmoid',
@@ -237,15 +238,15 @@ def train_G(B, A=None, te=None):
     A_msk_me = tf.repeat(A_msk,A.shape[1],axis=1)
     with tf.GradientTape() as t:
         # Compute model's output
-        if args.n_echoes==0:
+        if args.training_mode=='supervised':
             A2B_R2 = G_mag([A_mag, te], training=True)
         else:
             A2B_R2 = G_mag(A_mag, training=True)
         if args.main_loss != 'Rice':
             A2B_R2 = tf.where(A_msk>=5e-2,A2B_R2,0.0)
 
-        A2B_WF_mag, A2B2A_mag, A_demod = wf.CSE_mag(A_mag, A2B_R2, [args.field, te], r2_sc=r2_sc,
-                                                    demod_signal=True, R2_prob=(args.main_loss=='Rice'))
+        A2B_WF_mag, A2B2A_mag, A_demod,A_ls =wf.CSE_mag(A_mag, A2B_R2, [args.field, te], r2_sc=r2_sc,
+                                                        demod_signal=True, R2_prob=(args.main_loss=='Rice'))
         A2B2A_mag = tf.where(A_msk_me>=5e-2,A2B2A_mag,0.0)
 
         A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
@@ -277,7 +278,8 @@ def train_G(B, A=None, te=None):
         
         Ad_aux = tf.reshape(A_demod,[-1,A2B2A_mag.shape[2],A2B2A_mag.shape[3],A2B2A_mag.shape[4]])
         Ad_TV = tf.reduce_sum(tf.image.total_variation(Ad_aux))
-        G_loss += Ad_TV * args.A_demod_TV_weight
+        LS_TV = tf.reduce_sum(tf.image.total_variation(A_ls))
+        G_loss += Ad_TV * args.A_demod_TV_weight + LS_TV * args.LS_TV_weight
         
     G_grad = t.gradient(G_loss, G_mag.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables))
@@ -286,7 +288,8 @@ def train_G(B, A=None, te=None):
             'WF_loss': WF_abs_loss,
             'R2_loss': R2_loss,
             'R2_TV': R2_TV,
-            'Ad_TV': Ad_TV}
+            'Ad_TV': Ad_TV,
+            'LS_TV': LS_TV}
 
 
 def train_step(B, A=None, te=None):
@@ -302,7 +305,7 @@ def sample(B, A=None, te=None):
     A_msk = tf.reduce_mean(A_mag, axis=1, keepdims=True)
     A_msk_me = tf.repeat(A_msk,A.shape[1],axis=1)
     # Compute model's output
-    if args.n_echoes==0:
+    if args.training_mode=='supervised':
         A2B_R2 = G_mag([A_mag, te], training=False)
     else:
         A2B_R2 = G_mag(A_mag, training=False)
@@ -470,7 +473,7 @@ for ep in range(args.epochs):
                 if args.field == 3.0:
                     TE_valid = wf.gen_TEvar(ne_sel_val, 1, TE_ini_d=0.4e-3, d_TE_min=1.0e-3, d_TE_d=0.3e-3)
                 else:
-                    TE_valid = wf.gen_TEvar(ne_sel_val, 1, orig=True)
+                    TE_valid = wf.gen_TEvar(ne_sel_val, 1)
             
             B2A, B2A2B, val_A2B_dict = validation_step(B, A, te=TE_valid)
             B2A2B_WF_abs = B2A2B[:,:2,:,:,:]

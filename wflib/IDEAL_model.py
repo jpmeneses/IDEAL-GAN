@@ -364,6 +364,7 @@ def CSE_mag(acqs, out_maps, params, r2_sc=200.0, demod_signal=False, R2_prob=Fal
         res_demod = tf.reshape(WmS_nu, [n_batch,ne,hgt,wdt,1])
     else:
         res_demod = tf.reshape(WmS, [n_batch,ne,hgt,wdt,1])
+    res_ls = tf.reshape(tf.transpose(AWmS,perm=[0,2,1]), [n_batch,hgt,wdt,3]) / (rho_sc**2)
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
     res_unc = tf.reshape(tf.transpose(rho_unc,perm=[0,2,1]), [n_batch,1,hgt,wdt,1])
     if uncertainty and demod_signal:
@@ -371,7 +372,7 @@ def CSE_mag(acqs, out_maps, params, r2_sc=200.0, demod_signal=False, R2_prob=Fal
     elif uncertainty:
         return (res_rho,res_gt,res_unc)
     elif demod_signal:
-        return (res_rho,res_gt,res_demod)
+        return (res_rho,res_gt,res_demod,res_ls)
     else:
         return (res_rho,res_gt)
 
