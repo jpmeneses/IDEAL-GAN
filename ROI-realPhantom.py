@@ -40,7 +40,7 @@ r2_sc,fm_sc = 200.0,300.0
 ################################################################################
 ######################### DIRECTORIES AND FILENAMES ############################
 ################################################################################
-dataset_dir = '../datasets/'
+dataset_dir = 'D:/CIB-data/'
 dataset_hdf5 = args.dataset + '_GC_192_128_complex_2D.hdf5'
 testX, testY, TEs =  data.load_hdf5(dataset_dir, dataset_hdf5, acqs_data=True,
                                     te_data=True, MEBCRN=True)
@@ -89,7 +89,7 @@ elif args.model_sel == 'AI-DEAL':
   checkpoint = tl.Checkpoint(dict(G_A2B=G_A2B, G_A2R2=G_A2R2), py.join('output', args.experiment_dir, 'checkpoints'))
 elif args.model_sel == 'Mag':
   G_mag = dl.UNet(input_shape=(None,None,None,1),bayesian=(args.main_loss=='Rice'),ME_layer=True,filters=args.n_G_filters,
-                  te_input=(args.training_mode=='supervised' and args.n_echoes==0),te_shape=(None,),
+                  te_input=(args.training_mode=='supervised'),te_shape=(None,),
                   output_activation='sigmoid',self_attention=args.D1_SelfAttention)
   checkpoint = tl.Checkpoint(dict(G_mag=G_mag), py.join('output', args.experiment_dir, 'checkpoints'))
 
@@ -181,7 +181,7 @@ def sample(A, B, TE=None):
     else:
       A2B_R2 = G_mag(A_abs, training=False)
     A2B_R2 = tf.where(A_abs[:,:1,...]!=0.0,A2B_R2,0.0)
-    A2B_WF_abs, A2B2A_abs, A2B_WF_var = wf.CSE_mag(A_abs, A2B_R2, [args.field, TE], uncertainty=True)
+    A2B_WF_abs, A2B2A_abs, A2B_WF_var, _ = wf.CSE_mag(A_abs, A2B_R2, [args.field, TE], uncertainty=True)
     A2B2A_abs = tf.where(A_abs!=0.0,A2B2A_abs,0.0)
     A2B_PM = tf.concat([tf.zeros_like(A2B_R2),A2B_R2],axis=-1)
     A2B_WF = tf.concat([A2B_WF_abs,tf.zeros_like(A2B_WF_abs)],axis=-1)

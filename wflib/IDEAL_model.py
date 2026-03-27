@@ -78,7 +78,7 @@ def gen_M(te, field=1.5, get_Mpinv=True, get_P0=False, get_H=False):
 
 
 @tf.function
-def gen_A(M):
+def gen_A(M, gen_AtA_pinv=False):
     M_abs = tf.abs(M)
     M_real= tf.math.real(M)
     C1 = M_abs[...,:1]
@@ -88,7 +88,13 @@ def gen_A(M):
 
     Q, R = tf.linalg.qr(A)
     A_pinv = tf.linalg.solve(R, tf.transpose(Q, perm=[0,2,1])) # shape: bs x 3 x ne
-    return A, A_pinv
+
+    if gen_AtA_pinv:
+        Q_ata, R_ata = tf.linalg.qr(tf.matmul(A, A, transpose_a=True)) # shape: bs x 3 x 3
+        AtA_pinv = tf.linalg.solve(R_ata, tf.transpose(Q_ata, perm=[0,2,1])) # shape: bs x 3 x 3
+        return A, A_pinv, AtA_pinv
+    else:
+        return A, A_pinv
 
 
 def eigenvals(X):
@@ -98,9 +104,10 @@ def eigenvals(X):
     
     # closed-form delta = sqrt(((a-c)/2)^2 + (b/2)^2)
     half = 0.5
+    _eps = 1e-12
     adiff_half = (a - c) * half
     b_half = b * half
-    delta = tf.sqrt(adiff_half * adiff_half + b_half * b_half + 1e-12)
+    delta = tf.sqrt(adiff_half * adiff_half + b_half * b_half + _eps)
 
     # eigenvalues (max,min)
     lam_max = (a + c) * half + delta
@@ -108,13 +115,14 @@ def eigenvals(X):
 
     # ensure non-negative lambda_max for sqrt (clip tiny negatives due to numeric noise)
     lam_max_pos = tf.maximum(lam_max, 0.0)
+    lam_min_pos = tf.maximum(lam_min, 0.0)
 
     # principal eigenvector (unnormalized): [b/2, lam_max - a]
     vx = b_half
     vy = lam_max - a
 
     # normalize eigenvector safely
-    norm = tf.sqrt(vx**2 + vy**2 + 1e-12)
+    norm = tf.sqrt(vx**2 + vy**2 + _eps)
     vx = tf.math.divide_no_nan(vx,norm)
     vy = tf.math.divide_no_nan(vy,norm)
 
@@ -126,7 +134,7 @@ def eigenvals(X):
     xy_est = scale * v_max
 
     # rank-1 ratio (small = good). Clip to [0,1] and avoid divide-by-zero
-    rank1_ratio = tf.math.divide_no_nan(lam_min , lam_max)
+    rank1_ratio = tf.math.divide_no_nan(lam_min_pos, lam_max_pos)
     return (xy_est, rank1_ratio)
 
 
@@ -142,7 +150,7 @@ def acq_to_acq(acqs, param_maps, te=None, field=1.5, r2_sc=200.0):
 
     M, M_pinv = gen_M(te, field=field) # M shape: (nb,ne,ns)
     if n_ch == 1:
-        M, M_pinv = gen_A(M)
+        M = gen_A(M)
 
     if n_ch > 1:
         S = tf.complex(acqs[...,0],acqs[...,1]) # (nb,ne,hgt,wdt)
@@ -353,6 +361,22 @@ def CSE_mag(acqs, out_maps, params, r2_sc=200.0, demod_signal=False, R2_prob=Fal
     # AAWmS = tf.where(AAWmS<1e-6,0.0,tf.math.sqrt(AAWmS)) # shape = (nb,ne,nv)
     Smtx_hat = Wp * AAWmS
 
+    # resid = WmS - AAWmS # shape = (nb,ne,nv)
+    # rss = tf.reduce_sum(resid**2, axis=1, keepdims=True) # shape = (nb,1,nv)
+    # sigma2 = tf.squeeze(rss, axis=1) / tf.cast(ne - AWmS.shape[1], tf.float32) # shape = (nb,nv)
+    # cov_theta = sigma2[...,None,None] * AtA_pinv # shape = (nb,nv,3,3)
+    # se = tf.sqrt(tf.linalg.diag_part(cov_theta)) # shape = (nb,nv,3)
+    # t_stats = tf.math.divide_no_nan(AWmS, tf.transpose(se, perm=[0,2,1])) # shape = (nb,3,nv) t_stats = [t_a, t_b, t_c]
+    # if (abs(t_b) < 2) and (abs(t_c) < 2):
+        # No evidence for y ≠ 0
+        # use reduced model
+    # AWmS = tf.where(tf.logical_and(tf.abs(t_stats[:,1:2,...])<2,tf.abs(t_stats[:,2:,...])<2), 
+                    # tf.concat([tf.reduce_mean(Smtx,axis=1,keepdims=True),tf.zeros_like(Smtx[:,:2,...])],axis=1),
+                    # AWmS) 
+    # AWmS = tf.where(tf.math.divide_no_nan(AWmS[:,2:,...],AWmS[:,:1,...]) < 1e-4, 
+                    # tf.concat([tf.reduce_mean(Smtx,axis=1,keepdims=True),tf.zeros_like(Smtx[:,:2,...])],axis=1),
+                    # AWmS) 
+
     # Extract corresponding Water/Fat signals
     # Reshape to original images dimensions
     rho_abc = tf.transpose(AWmS,perm=[0,2,1]) # shape = (nb,nv,3)
@@ -364,13 +388,17 @@ def CSE_mag(acqs, out_maps, params, r2_sc=200.0, demod_signal=False, R2_prob=Fal
         res_demod = tf.reshape(WmS_nu, [n_batch,ne,hgt,wdt,1])
     else:
         res_demod = tf.reshape(WmS, [n_batch,ne,hgt,wdt,1])
-    res_ls = tf.reshape(tf.transpose(AWmS,perm=[0,2,1]), [n_batch,hgt,wdt,3]) / (rho_sc**2)
+    res_ls = tf.reshape(tf.transpose(rho_abc,perm=[0,2,1]), [n_batch,3,hgt,wdt,1]) / (rho_sc**2)
     res_gt = tf.reshape(Smtx_hat, [n_batch,ne,hgt,wdt,1])
     res_unc = tf.reshape(tf.transpose(rho_unc,perm=[0,2,1]), [n_batch,1,hgt,wdt,1])
+
+    # IDEA: IMPLEMENT CUSTOM GRADIENTS
+    # (WOULD REQUIRE REDUCTION IN THE NUM OF OUTPUTS)
+
     if uncertainty and demod_signal:
         return (res_rho,res_gt,res_demod,res_unc)
     elif uncertainty:
-        return (res_rho,res_gt,res_unc)
+        return (res_rho,res_gt,res_unc,res_ls)
     elif demod_signal:
         return (res_rho,res_gt,res_demod,res_ls)
     else:
