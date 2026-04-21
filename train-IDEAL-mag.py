@@ -43,8 +43,8 @@ py.arg('--beta_2', type=float, default=0.999)
 py.arg('--main_loss', default='Rice', choices=['Rice', 'MSE', 'MAE', 'MSLE'])
 py.arg('--main_out_var', default='R2s', choices=['R2s', 'WF', 'R2s-WF'])
 py.arg('--R2_TV_weight', type=float, default=0.0)
-py.arg('--LS_TV_weight', type=float, default=0.0)
 py.arg('--LS_NZ_weight', type=float, default=0.0)
+py.arg('--LS_cond_weight', type=float, default=0.0)
 py.arg('--A_demod_TV_weight', type=float, default=0.0)
 py.arg('--D1_SelfAttention',type=bool, default=False)
 args = py.args()
@@ -247,8 +247,8 @@ def train_G(B, A=None, te=None):
         if args.main_loss != 'Rice':
             A2B_R2 = tf.where(A_msk>=5e-2,A2B_R2,0.0)
 
-        A2B_WF_mag, A2B2A_mag, A_demod,A_ls =wf.CSE_mag(A_mag, A2B_R2, [args.field, te], r2_sc=r2_sc,
-                                                        demod_signal=True, R2_prob=(args.main_loss=='Rice'))
+        A2B_WF_mag, A2B2A_mag, A_demod, A2B_ls = wf.CSE_mag(A_mag, A2B_R2, [args.field, te], r2_sc=r2_sc,
+                                                            demod_signal=True, R2_prob=(args.main_loss=='Rice'))
         A2B2A_mag = tf.where(A_msk_me>=5e-2,A2B2A_mag,0.0)
 
         A2B2A_cycle_loss = loss_alt(A_mag, A2B2A_mag)
@@ -256,8 +256,9 @@ def train_G(B, A=None, te=None):
         ############### Splited losses ####################
         if B is not None:
             B_WF_abs = tf.math.sqrt(tf.reduce_sum(tf.square(B[:,:2,...]),axis=-1,keepdims=True))
-            A2B_WF_mag = tf.where(B_WF_abs>=5e-2,A2B_WF_mag,0.0)
-            WF_abs_loss = loss_alt(B_WF_abs, A2B_WF_mag)
+            B_WF_sq = tf.concat([tf.square(B_WF_abs[:,:1,...]), 2.0*tf.reduce_prod(B_WF_abs,axis=1,keepdims=True), tf.square(B_WF_abs[:,1:,...])], axis=1)
+            # A2B_WF_mag = tf.where(B_WF_abs>=5e-2,A2B_WF_mag,0.0)
+            WF_abs_loss = loss_alt(B_WF_sq, A2B_ls)
             R2_loss = loss_fn(B[:,2:,:,:,1:], A2B_R2)
 
             if args.main_loss == 'Rice':
@@ -285,15 +286,12 @@ def train_G(B, A=None, te=None):
         
         Ad_aux = tf.reshape(A_demod,[-1,A2B2A_mag.shape[2],A2B2A_mag.shape[3],A2B2A_mag.shape[4]])
         Ad_TV = tf.reduce_sum(tf.image.total_variation(Ad_aux))
-        LS_NZ = tf.reduce_sum(tf.where(A_ls[:,::2,...]<0.0,tf.abs(A_ls[:,::2,...]),0.0))
+        LS_NZ = tf.reduce_sum(tf.where(A2B_ls<0.0,tf.square(A2B_ls),0.0)) # Try tf.square instead of tf.abs
         
-        # Weighted TV-reg for denoising in low PDFF regions
-        dx = A_ls[:,:1,:,1:,:] - A_ls[:,:1,:,:-1,:]
-        dy = A_ls[:,:1,1:,:,:] - A_ls[:,:1,:-1,:,:]
-        wtv = tf.math.divide_no_nan(A_ls[:,:1,...],tf.reduce_sum(A_ls[:,::2,...]))
-        LS_TV = tf.reduce_sum(wtv[:,:,:,:-1,:] * tf.abs(dx)) + tf.reduce_sum(wtv[:,:,:-1,:,:] * tf.abs(dy))
+        aux_cond = tf.square(A2B_ls[:,1:2,...]) - 4.0*tf.reduce_prod(A2B_ls[:,::2,...], axis=1, keepdims=True)
+        LS_cond = tf.reduce_sum(tf.where(aux_cond > 0.0, tf.square(aux_cond), 0.0)) 
         
-        G_loss += Ad_TV * args.A_demod_TV_weight + LS_NZ * args.LS_NZ_weight + LS_TV * args.LS_TV_weight
+        G_loss += Ad_TV * args.A_demod_TV_weight + LS_NZ * args.LS_NZ_weight + LS_cond * args.LS_cond_weight
         
     G_grad = t.gradient(G_loss, G_mag.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables))
@@ -303,8 +301,8 @@ def train_G(B, A=None, te=None):
             'R2_loss': R2_loss,
             'R2_TV': R2_TV,
             'Ad_TV': Ad_TV,
-            'LS_TV': LS_TV,
-            'LS_NZ': LS_NZ}
+            'LS_NZ': LS_NZ,
+            'LS_cond': LS_cond}
 
 
 def train_step(B, A=None, te=None):
