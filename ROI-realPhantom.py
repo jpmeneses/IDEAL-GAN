@@ -174,9 +174,12 @@ def sample(A, B, TE=None):
     if args.main_loss == 'Rice':
       if TE is None:
         TE = wf.gen_TEvar(A.shape[1], bs=A.shape[0], orig=True)
-      A2B_R2_prob = G_mag([A_abs, TE], training=False)
+      if args.training_mode == 'supervised' and args.n_echoes == 0:
+        A2B_R2_prob = G_mag([A_abs, TE], training=False)
+      else:
+        A2B_R2_prob = G_mag(A_abs, training=False)
       A2B_R2 = A2B_R2_prob.mean()
-    elif args.training_mode == 'supervised':
+    elif args.training_mode == 'supervised': # and args.n_echoes == 0:
       A2B_R2 = G_mag([A_abs, TE], training=False)
     else:
       A2B_R2 = G_mag(A_abs, training=False)
