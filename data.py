@@ -429,17 +429,10 @@ def load_dicom_series(folder_path):
     dicom_files = sorted([os.path.join(folder_path, f) for f in os.listdir(folder_path)
                           if f.endswith(".dcm")])
     
-    f = dicom_files[0]
-    ds = pydicom.dcmread(f)
-    img = ds.pixel_array.astype(np.float32)
-    echo_all = int(ds.get((0x0018, 0x0091), pydicom.DataElement((0x0018, 0x0091), 'DS', 1)).value)
-    X = np.ones((40,echo_all,img.shape[0],img.shape[1],1),dtype=np.complex64)
-    # TE = np.zeros((40,echo_all),dtype=np.float32)
-    idx_mag = np.full((40,echo_all), True)
-    idx_pha = np.full((40,echo_all), True)
-    n_sl = 0
+    sl_dict = dict()
+    sl_dict_ph = dict()
     
-    for j, f in enumerate(dicom_files):
+    for i, f in enumerate(dicom_files):
         ds = pydicom.dcmread(f)
         img = ds.pixel_array.astype(np.float32)
 
@@ -447,28 +440,38 @@ def load_dicom_series(folder_path):
         # echo_time = float(ds.get((0x0018, 0x0081), pydicom.DataElement((0x0018, 0x0081), 'DS', 1)).value)
         echo_num = int(ds.get((0x0018, 0x0086), pydicom.DataElement((0x0018, 0x0086), 'DS', 1)).value)
         echo_all = int(ds.get((0x0018, 0x0091), pydicom.DataElement((0x0018, 0x0091), 'DS', 1)).value)
+        img_pos = ds.get((0x0020, 0x0032), pydicom.DataElement((0x0020, 0x0032), 'DS', 1)).value
+        sl_pos = np.round(img_pos[-1],1)
         RescaleIntercept = float(ds.get((0x2005, 0x100D), pydicom.DataElement((0x2005, 0x100D), 'DS', 1)).value)
         RescaleSlope = float(ds.get((0x2005, 0x100E), pydicom.DataElement((0x2005, 0x100E), 'DS', 1)).value)
 
         resc_img = (img-RescaleIntercept)/RescaleSlope
 
+        if sl_pos not in sl_dict:
+            sl_dict[sl_pos] = dict()
+            sl_dict_ph[sl_pos] = dict()
+
         if img_comp == "M":
-            if echo_num == 1:
-                resc_sc = np.max(resc_img)
-            X[n_sl,echo_num-1,:,:,0] *= resc_img/resc_sc
-            idx_mag[n_sl,echo_num-1] = False
+            sl_dict[sl_pos][echo_num] = resc_img.astype(np.complex64)
         elif img_comp == "P":
-            X[n_sl,echo_num-1,:,:,0] *= np.exp(1j*resc_img)
-            # TE[n_sl,echo_num-1] = echo_time
-            idx_pha[n_sl,echo_num-1] = False
-            if echo_num == echo_all:
-                n_sl += 1
+            sl_dict_ph[sl_pos][echo_num] = resc_img.astype(np.complex64)
     
-    idx = np.logical_or(idx_mag,idx_pha)
-    idx2 = np.any(idx,1)
-    X = X[~idx2,...]
-    # TE = TE[~idx,...]
+    # Count num of slices with all echoes
+    n_sl_edit = [len(sl_dict[sl]) for sl in sl_dict].count(echo_all)
+    X = np.zeros((n_sl_edit,echo_all,img.shape[0],img.shape[1],1),dtype=np.complex64)
+    n_sl = 0
+
+    for i, sl in enumerate(sl_dict):
+        if len(sl_dict[sl]) == echo_all:
+            for j, sl_ech in enumerate(sl_dict[sl]):
+                X[n_sl,j,:,:,0] = sl_dict[sl][sl_ech]
+                if sl_ech in sl_dict_ph[sl]:
+                    X[n_sl,j,:,:,0] *= np.exp(1j*sl_dict_ph[sl][sl_ech])
+                # else:
+                #     print('Warning! No phase on slice/echo:',n_sl,j+1)
+            n_sl += 1
     
+    X /= np.max(abs(X))
     X = np.concatenate([np.real(X),np.imag(X)],axis=-1)  # (num_echoes, H, W, 2)
 
     # Quantitative maps
