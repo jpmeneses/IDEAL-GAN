@@ -287,11 +287,12 @@ def train_G(B, A=None, te=None):
         Ad_aux = tf.reshape(A_demod,[-1,A2B2A_mag.shape[2],A2B2A_mag.shape[3],A2B2A_mag.shape[4]])
         Ad_TV = tf.reduce_sum(tf.image.total_variation(Ad_aux))
         LS_NZ = tf.reduce_sum(tf.where(A2B_ls<0.0,tf.square(A2B_ls),0.0)) # Try tf.square instead of tf.abs
+        WF_NZ = tf.reduce_sum(tf.where(A2B_ls[...,:1]<A2B_ls[...,-1:],A2B_ls[...,-1:]-A2B_ls[...,:1],0.0)) 
         
         aux_cond = tf.square(A2B_ls[:,1:2,...]) - 4.0*tf.reduce_prod(A2B_ls[:,::2,...], axis=1, keepdims=True)
         LS_cond = tf.reduce_sum(tf.where(aux_cond > 0.0, tf.square(aux_cond), 0.0)) 
         
-        G_loss += Ad_TV * args.A_demod_TV_weight + LS_NZ * args.LS_NZ_weight + LS_cond * args.LS_cond_weight
+        G_loss += Ad_TV * args.A_demod_TV_weight + LS_NZ * args.LS_NZ_weight + WF_NZ * args.LS_cond_weight
         
     G_grad = t.gradient(G_loss, G_mag.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables))
@@ -302,6 +303,7 @@ def train_G(B, A=None, te=None):
             'R2_TV': R2_TV,
             'Ad_TV': Ad_TV,
             'LS_NZ': LS_NZ,
+            'WF_NZ': WF_NZ,
             'LS_cond': LS_cond}
 
 
