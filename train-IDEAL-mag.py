@@ -1,11 +1,32 @@
 import functools
 
 import os
+# Make only physical GPU 0 visible to this process
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
+physical_gpus = tf.config.list_physical_devices("GPU")
+print("Physical GPUs:", physical_gpus)
+
+if physical_gpus:
+    try:
+        tf.config.experimental.set_memory_growth(physical_gpus[0], True)
+    except RuntimeError as error:
+        print("GPU configuration error:", error)
+
+print("Logical GPUs:", tf.config.list_logical_devices("GPU"))
+print("Built with CUDA:", tf.test.is_built_with_cuda())
+
+with tf.device("/GPU:0"):
+    a = tf.random.normal((2000, 2000))
+    b = tf.matmul(a, a)
+
+print("Test calculation completed:", b.device)
+
 import tf2lib as tl
 import tf2gan as gan
 import DLlib as dl
@@ -286,13 +307,13 @@ def train_G(B, A=None, te=None):
         
         Ad_aux = tf.reshape(A_demod,[-1,A2B2A_mag.shape[2],A2B2A_mag.shape[3],A2B2A_mag.shape[4]])
         Ad_TV = tf.reduce_sum(tf.image.total_variation(Ad_aux))
-        LS_NZ = tf.reduce_sum(tf.where(A2B_ls<0.0,tf.square(A2B_ls),0.0)) # Try tf.square instead of tf.abs
-        WF_NZ = tf.reduce_sum(tf.where(A2B_ls[...,:1]<A2B_ls[...,-1:],A2B_ls[...,-1:]-A2B_ls[...,:1],0.0)) 
+        LS_NZ = tf.reduce_sum(tf.where(A2B_ls[...,::2]<0.0,tf.square(A2B_ls[...,::2]),0.0)) 
+        WF_NZ = tf.reduce_sum(tf.where(A2B_ls[...,:1]<A2B_ls[...,-1:],A2B_ls[...,-1:]-A2B_ls[...,:1],0.0)) # Limit PDFF<50%
         
         aux_cond = tf.square(A2B_ls[:,1:2,...]) - 4.0*tf.reduce_prod(A2B_ls[:,::2,...], axis=1, keepdims=True)
         LS_cond = tf.reduce_sum(tf.where(aux_cond > 0.0, tf.square(aux_cond), 0.0)) 
         
-        G_loss += Ad_TV * args.A_demod_TV_weight + LS_NZ * args.LS_NZ_weight + WF_NZ * args.LS_cond_weight
+        G_loss += Ad_TV * args.A_demod_TV_weight + LS_NZ * args.LS_NZ_weight + LS_cond * args.LS_cond_weight
         
     G_grad = t.gradient(G_loss, G_mag.trainable_variables)
     G_optimizer.apply_gradients(zip(G_grad, G_mag.trainable_variables))
