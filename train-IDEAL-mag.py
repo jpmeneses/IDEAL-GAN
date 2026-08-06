@@ -461,13 +461,11 @@ for ep in range(args.epochs):
             ne_sel = np.random.randint(args.min_rand_ne,args.max_rand_ne+1)
         else:
             ne_sel = 0
+        if A is not None:
+            A = A[:,:(args.n_echoes+ne_sel),...]
         if args.field == 3.0:
-            if args.n_echoes==0:
-                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=bs, TE_ini_min=0.8e-3,
-                                    TE_ini_d=0.4e-3, d_TE_min=0.6e-3, d_TE_d=0.4e-3)
-            else:
-                te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=bs, TE_ini_min=0.879e-3,
-                                    TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
+            te_var=wf.gen_TEvar(args.n_echoes+ne_sel, bs=bs, TE_ini_min=0.879e-3,
+                                TE_ini_d=None, d_TE_min=0.662e-3, d_TE_d=None)
         else:
             te_var = wf.gen_TEvar(args.n_echoes+ne_sel, bs=bs)
 
