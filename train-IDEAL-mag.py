@@ -49,6 +49,7 @@ py.arg('--gen_data_aug', type=bool, default=False)
 py.arg('--gen_partial_real', type=int, default=0, choices=[0,2,6,10])
 py.arg('--gen_filename', default='LDM_ds')
 py.arg('--shuffle', type=bool, default=True)
+py.arg('--k_fold', type=int, default=1)
 py.arg('--n_echoes', type=int, default=6)
 py.arg('--min_rand_ne', type=int, default=4)
 py.arg('--max_rand_ne', type=int, default=6)
@@ -192,9 +193,15 @@ else:
         elif args.train_data == 'NIFTI':
             cse_scan = [item for item in scan_files if "nifti" in item]
         folders_cse.append(os.path.join(f,cse_scan[0]))
-    num_fold = 32
+    idxs = [i for i in range(len(folders_cse))]
+    n_folds = 5
+    n_divs = int(np.ceil(len(folders_cse)/n_folds))
+    idxs_val = [i for i in range(n_divs*(args.k_fold-1), min(n_divs*args.k_fold, len(folders_cse)))]
+    del idxs[n_divs*(args.k_fold-1):n_divs*args.k_fold]
+    print(idxs)
+    print(idxs_val)
 
-    A_B_dataset = tf.data.Dataset.from_tensor_slices(folders_cse[(num_fold//8):num_fold]) # 
+    A_B_dataset = tf.data.Dataset.from_tensor_slices([folders_cse[idx] for idx in idxs]) 
     if args.train_data == 'DICOM':
         A_B_dataset = A_B_dataset.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
@@ -206,7 +213,7 @@ else:
         ne,hgt,wdt,n_ch = a.shape
     A_B_dataset = A_B_dataset.batch(args.batch_size).shuffle(len_dataset)
 
-    A_B_dataset_val = tf.data.Dataset.from_tensor_slices(folders_cse[:(num_fold//8)])
+    A_B_dataset_val = tf.data.Dataset.from_tensor_slices([folders_cse[idx] for idx in idxs_val])
     if args.train_data == 'DICOM':
         A_B_dataset_val = A_B_dataset_val.map(lambda f: data.tf_load_dicom_series(f))
     elif args.train_data == 'NIFTI':
