@@ -8,6 +8,7 @@ __pycache__/
 DiscTest.py
 PM-scaling.ipynb
 metrics-test.ipynb
+run_experiments.py
 submit_*
 test_genMetrics.py
 test_gradients.py
